@@ -43,7 +43,7 @@ password for the certificate.
 
 If you want to use `pistrong` without a full InstallPiStrong install, use `InstallPiStrong postconf` which will create:
 
-* `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior configuration
+* `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior use
 * `/etc/swanctl/pistrongdb.json` pistrong CA database
 * `~/.pistrongrc` pistrong config file for frequently-used settings rather than on the command line
 * Copies (in /etc/swanctl) of the just-created files swanctl.piStrongInstall, pistrongdb.piStrongInstall, and .pistrongrc.piStrongInstall
@@ -56,8 +56,8 @@ If you want to use `pistrong` without a full InstallPiStrong install, use `Insta
 * `pistrong add fred --device=iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random`
     Add user Fred, for the deivce iPhone. Copy the necessary certs to `webdir`. Send Fred mail at the specified email address with links to the certs using `weburl`. The device name is a convenience to help you identify where a cert is deployed. If --device is not specified, `dev` is used.
 
-* `pistrong list fred --all`
-    List all certs for user fred
+* `pistrong list fred --all` [ --full ]
+    List all certs for user fred. Print the cert contents also if --full specified
 
 * `pistrong deleteca`
     Delete the whole CA including all user certs. You will be asked "are you sure", since this is irreversible and will require that all issued certs be replaced.

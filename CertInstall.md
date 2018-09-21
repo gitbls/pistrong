@@ -32,7 +32,7 @@ properties" is selected).
 Personal Certificates store, and the CA certificate contained in the .p12 will be stored in Trusted Root Certification Authorities store
     * Click Finish
 * Create the VPN connection
-    * Open the Settings app, click "Network & Internet" then click VPN
+    * In the Settings app, go to "Network & Internet" then click "Change Adapter Options"
       * Click "Add a VPN connection"
       * VPN provider: Windows (built-in)
       * Connection name: Descriptive name for the VPN
@@ -60,10 +60,10 @@ If you want to route all of your internet traffic over the VPN, you need to enab
       * Select "Internet Protocol Version 4 (TCP/IPv4)", then select the Properties Tab and click Advanced…
       * Select/check "Use default gateway on remote network"
       * OK out of all screens
-* **Powershell (Admin)** 
+* **Powershell (Admin)**
     * Open a Powershell (Admin) window
     * Use `Get-VpnConnection` to list your VPNs and check the current state of Split Tunneling
-    * Use `Set-VpnConnection -SplitTunneling 1` to turn it on (all traffic flows over the VPN), or 0  to turn it off
+    * Use `Set-VpnConnection -SplitTunneling 1` to turn it on (all traffic flows over the VPN), or 0 to turn it off
 
 ## MacOS
 
