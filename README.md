@@ -84,15 +84,6 @@ certificates.
 
     Note that the last configuration line in .pistrongrc must not have a comma. 
 
-* For an iPhone user who has received the email message, it's easier to load the CA
-cert first. Then copy the cert password and lastly click the device
-cert. Refer to the cert link email for the fields to fill in when
-creating the VPN.
-
-* I don't think you can use a blank password for the device cert on iOS (but
-  you can on Windows). Why would you need to? Cut/paste the key and you're good
-  to go.
-
 * Email server configuration is beyond the scope of this
 document. However, if you install postfix (on a Raspberry Pi), take all
 the defaults, and select local mail delivery, pistrong will be able to
