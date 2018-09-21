@@ -8,13 +8,13 @@ You can use the Apple Configurator app to load certificates. Another way is to p
 * Open the Settings app
 * Open the VPN settings
 * Tap "Add VPN Configuration"
-   * Type: IKEv2
-   * Description: Descriptive name for the VPN
-   * Server: the fully-qualified domain name provided in the mail from `pistrong`. Use the server IP address if you don't have a DNS name for the server.
-   * Remote ID: The remote ID provided in the mail (This is the VPN san key)
-   * Local ID: the local ID given to you in the mail (this is user-device-servername\@ipsec.vpn)
-   * User Authentication: Certificate
-   * Certificate: choose the certificate matching the Local ID you entered above
+   * **Type:** IKEv2
+   * **Description:** Descriptive name for the VPN
+   * **Server:** the fully-qualified domain name provided in the mail from `pistrong`. Use the server IP address if you don't have a DNS name for the server.
+   * **Remote ID:** The remote ID provided in the mail (This is the VPN san key)
+   * **Local ID:** the local ID given to you in the mail (this is user-device-servername\@ipsec.vpn)
+   * **User Authentication:** Certificate
+   * **Certificate:** choose the certificate matching the Local ID you entered above
    * Done
 
 You can now connect to the VPN from your iOS device.
