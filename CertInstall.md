@@ -34,18 +34,18 @@ Personal Certificates store, and the CA certificate contained in the .p12 will b
 * Create the VPN connection
     * In the Settings app, go to "Network & Internet" then click "Change Adapter Options"
       * Click "Add a VPN connection"
-      * VPN provider: Windows (built-in)
-      * Connection name: Descriptive name for the VPN
-      * Server name or address: the fully-qualified domain name (or IP) of your VPN server
-      * VPN type: IKEv2
-      * Type of sign-in info: Certificate
-      * User name and Password can stay blank
+      * **VPN provider:** Windows (built-in)
+      * **Connection name:** Descriptive name for the VPN
+      * **Server name or address:** the fully-qualified domain name (or IP) of your VPN server
+      * **VPN type:** IKEv2
+      * **Type of sign-in info:** Certificate
+      * **User name and Password:**leave blank
       * Click Save
 * Require encryption on the VPN
     * In the Settings app, go to "Network & Internet" then click "Change Adapter Options"
       * Right click on the newly-created VPN and then click Properties
       * On the Security tab
-        * Data encryption: Require encryption
+        * **Data encryption:** Require encryption
         * Ensure "Use machine certificates" is selected
       *  Click OK or Done all the way out
 
