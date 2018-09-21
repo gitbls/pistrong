@@ -17,34 +17,31 @@ usage scenario
 
 ## InstallPiStrong 
 
-InstallPiStrong downloads the source and builds and installs the latest
+`InstallPiStrong` downloads the source and builds and installs the latest
 release of strongSwan (currently 5.6.3). It also creates
-the strongSwan configuration and required config files for pistrong. The
+the strongSwan configuration and required config files for `pistrong`. The
 installation has been fully tested on Raspbian. Support for openSuSE,
 Ubuntu, Debian, and Centos is implemented but not fully end-to-end
 tested.
 
-InstallPiStrong builds strongSwan from source rather than using the
+`InstallPiStrong` builds strongSwan from source rather than using the
 distro's strongSwan version since most distros are carrying older
 versions of strongSwan. Additionally, not all distros appear to have
-strongSwan built with `--enable-systemd`. pistrong only works with the
+strongSwan built with `--enable-systemd`. `pistrong` only works with the
 new systemd model. The download/install/build process takes 15-20
 minutes on a Raspberry Pi 3B.
 
 ## pistrong
-pistrong is used to create the CA and manage users. pistrong provides
+`pistrong` is used to create the CA and manage users. `pistrong` provides
 commands to create (or delete) the CA, add, revoke, delete, or list
 users, and simple strongSwan service management (start, stop, restart,
 enable, disable, status).
 
-The CA is maintained in `/etc/swanctl`. As mentioned previously, pistrong
-requires strongSwan to be built with `--enable-systemd`.
-
-If you have a webserver and email, pistrong can send email to the
+If you have a webserver and email, `pistrong` can send email to the
 user with a link to the certificates, and a separate email with the
 password for the certificate. 
 
-If you're using pistrong without a full InstallPiStrong install, use
+If you're using `pistrong` without a full InstallPiStrong install, use
 `InstallPiStrong postconf` which will create `/etc/swanctl/swanctl.conf`
 and `~/.pistrongrc`, as well as the backup copies (in /etc/swanctl)
 swanctl.piStrongInstall and .pistrongrc.piStrongInstall. This will also
