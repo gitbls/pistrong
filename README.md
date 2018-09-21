@@ -45,7 +45,7 @@ If you want to use `pistrong` without a full InstallPiStrong install, use
 `InstallPiStrong postconf` which will create:
 * `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior configuration
 * `/etc/swanctl/pistrongdb.json` pistrong CA database
-* ~/.pistrongrc` pistrong config file for frequently-used settings
+* `~/.pistrongrc` pistrong config file for frequently-used settings rather than on the command line
 * Copies (in /etc/swanctl) of the just-created files swanctl.piStrongInstall, pistrongdb.piStrongInstall, and .pistrongrc.piStrongInstall
 
 ## Example commands
