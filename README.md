@@ -10,10 +10,10 @@ users.
 
 pistrong consists of two components:
 
-InstallPiStrong - Installs and configures strongSwan for the roadwarrior
+* `InstallPiStrong` - Installs and configures strongSwan for the roadwarrior
 usage scenario
 
-pistrong - Used for ongoing CA and user key/cert management
+* `pistrong` - Used for ongoing CA and user key/cert management
 
 ## InstallPiStrong 
 
@@ -38,7 +38,7 @@ commands to create (or delete) the CA, add, revoke, delete, or list
 users, and simple strongSwan service management (start, stop, restart,
 enable, disable, status).
 
-The CA is maintained in /etc/swanctl. As mentioned previously, pistrong
+The CA is maintained in `/etc/swanctl`. As mentioned previously, pistrong
 requires strongSwan to be built with --enable-systemd.
 
 If you have a webserver and email, pistrong can send email to the
