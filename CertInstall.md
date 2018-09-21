@@ -39,7 +39,7 @@ Personal Certificates store, and the CA certificate contained in the .p12 will b
       * **Server name or address:** the fully-qualified domain name (or IP) of your VPN server
       * **VPN type:** IKEv2
       * **Type of sign-in info:** Certificate
-      * **User name and Password:**leave blank
+      * **User name and Password:** leave blank
       * Click Save
 * Require encryption on the VPN
     * In the Settings app, go to "Network & Internet" then click "Change Adapter Options"
