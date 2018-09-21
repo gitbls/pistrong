@@ -18,19 +18,18 @@ usage scenario
 ## InstallPiStrong 
 
 InstallPiStrong downloads the source and builds and installs the latest
-release of strongSwan (currently 5.6.3). InstallPiStrong also creates
+release of strongSwan (currently 5.6.3). It also creates
 the strongSwan configuration and required config files for pistrong. The
 installation has been fully tested on Raspbian. Support for openSuSE,
 Ubuntu, Debian, and Centos is implemented but not fully end-to-end
 tested.
 
 InstallPiStrong builds strongSwan from source rather than using the
-distro's strongSwan version for two reasons. Most distros are carrying
-older versions of strongSwan. Additionally, most distros appear to have
-built strongSwan with the legacy model, rather than the newer
---enable-systemd. pistrong only works with the new systemd model. The
-download/install/build process takes 15-20 minutes on a Raspberry Pi
-3B.
+distro's strongSwan version since most distros are carrying older
+versions of strongSwan. Additionally, not all distros appear to have
+strongSwan built with `--enable-systemd`. pistrong only works with the
+new systemd model. The download/install/build process takes 15-20
+minutes on a Raspberry Pi 3B.
 
 ## pistrong
 pistrong is used to create the CA and manage users. pistrong provides
@@ -45,7 +44,7 @@ If you have a webserver and email, pistrong can send email to the
 user with a link to the certificates, and a separate email with the
 password for the certificate. 
 
-If you're using pistrong without a full InstallPiStrong, use
+If you're using pistrong without a full InstallPiStrong install, use
 `InstallPiStrong postconf` which will create `/etc/swanctl/swanctl.conf`
 and `~/.pistrongrc`, as well as the backup copies (in /etc/swanctl)
 swanctl.piStrongInstall and .pistrongrc.piStrongInstall. This will also
