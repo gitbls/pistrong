@@ -39,17 +39,17 @@ users, and simple strongSwan service management (start, stop, restart,
 enable, disable, status).
 
 The CA is maintained in `/etc/swanctl`. As mentioned previously, pistrong
-requires strongSwan to be built with --enable-systemd.
+requires strongSwan to be built with `--enable-systemd`.
 
 If you have a webserver and email, pistrong can send email to the
 user with a link to the certificates, and a separate email with the
 password for the certificate. 
 
 If you're using pistrong without a full InstallPiStrong, use
-'InstallPiStrong postconf' which will create /etc/swanctl/swanctl.conf
-and ~/.pistrongrc, as well as the backup copies (in /etc/swanctl)
+`InstallPiStrong postconf` which will create `/etc/swanctl/swanctl.conf`
+and `~/.pistrongrc`, as well as the backup copies (in /etc/swanctl)
 swanctl.piStrongInstall and .pistrongrc.piStrongInstall. This will also
-create pistrongdb.json, which contains the CA configuration information
+create `pistrongdb.json`, which contains the CA configuration information
 and the user cert database.
 
 ## Example commands
@@ -67,11 +67,11 @@ pistrong help
 
 ## Hints
 
-Edit ~/.pistrongrc as needed. Strongly suggest random:True, as it
+* Edit ~/.pistrongrc as needed. Strongly suggest random:True, as it
 simplifies the add user workflow, and adds additional protection to your
 certificates.
 
-For quick and dirty cert loading via the web (Raspbian example):
+*For quick and dirty cert loading via the web (Raspbian example):
 
 apt-get install apache2
 mkdir /var/www/html/vpn
@@ -83,25 +83,25 @@ In ~/.pistrongrc:
 
 Note that the last configuration line in .pistrongrc does not have a comma.
 
-Then # pistrong add username --device devname --mail username@email.provider
+Then `pistrong add username --device devname --mail username@email.provider`
 
-For an iPhone user with the email message, it's easier to load the CA
+* For an iPhone user with the email message, it's easier to load the CA
 cert first. Then copy the cert password and lastly click the device
 cert. Refer to the cert link email for the fields to fill in when
 creating the VPN.
 
-I don't think you can use a blank password for the device cert on iOS,
+* I don't think you can use a blank password for the device cert on iOS,
 but why would you need to? Cut/paste the key and you're good to go.
 
-Configuration of your email server is beyond the scope of this
+* Configuration of your email server is beyond the scope of this
 document. However, if you install postfix on a Raspberry Pi and take all
 the defaults and select local mail delivery, pistrong will be able to
 send mail to local users.
 
-Not Yet Completed
+* Not Yet Completed
 
-** Android and MacOS testing - Install documentation and testing for
+  * Android and MacOS testing - Install documentation and testing for
    these devices remains to be done.
 
-** Install on other distros - Additional popular distros should be added
+   * Install on other distros - Additional popular distros should be added
    to InstallPiStrong
