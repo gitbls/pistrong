@@ -61,5 +61,6 @@ If you want to route all of your internet traffic over the VPN, you need to enab
       * Select/check "Use default gateway on remote network"
       * OK out of all screens
 * **Via Powershell (Admin)** 
+    * Open a Powershell (Admin) window
     * Use `Get-VpnConnection` to list your VPNs and check the current state of Split Tunneling
     * Use `Set-VpnConnection -SplitTunneling 1` to turn it on (all traffic flows over the VPN), or 0  to turn it off
