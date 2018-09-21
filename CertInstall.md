@@ -53,14 +53,22 @@ You can now connect to the VPN from your Windows 10 device.
 
 If you want to route all of your internet traffic over the VPN, you need to enable "Use default gateway on remote network", or Split Tunneling). There are two ways to do this.
 
-* **Via Network and Sharing Center GUI** 
+* **Network and Sharing Center GUI** 
     * Open the Settings app, select Network & Internet, and click "Change adapter options” 
       * Right-click on your VPN and select Properties
       * Select the Networking tab
       * Select "Internet Protocol Version 4 (TCP/IPv4)", then select the Properties Tab and click Advanced…
       * Select/check "Use default gateway on remote network"
       * OK out of all screens
-* **Via Powershell (Admin)** 
+* **Powershell (Admin)** 
     * Open a Powershell (Admin) window
     * Use `Get-VpnConnection` to list your VPNs and check the current state of Split Tunneling
     * Use `Set-VpnConnection -SplitTunneling 1` to turn it on (all traffic flows over the VPN), or 0  to turn it off
+
+## MacOS
+
+TBD
+
+## Android
+
+TBD
