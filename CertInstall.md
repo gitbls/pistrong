@@ -8,10 +8,10 @@ both. After the certificates have been added, configure the VPN.
 * Open the VPN settings
 * Tap "Add VPN Configuration"
    * Type: IKEv2
-   * Description: Anything here. I use "hostname VPN" just because
-   * Server: the fully-qualified domain name provided in the mail from pistrong
-   * Remote ID: The remote ID provided in the mail from pistrong
-   * Local ID: the local ID given to you in the mail from pistrong
+   * Description: Descriptive name for the VPN
+   * Server: the fully-qualified domain name provided in the mail from `pistrong`
+   * Remote ID: The remote ID provided in the mail (This is the VPN san key)
+   * Local ID: the local ID given to you in the mail (this is user-device-servername@ipsec.vpn)
    * User Authentication: Certificate
    * Certificate: choose the certificate matching the Local ID you entered above
    * Done
@@ -20,35 +20,36 @@ both. After the certificates have been added, configure the VPN.
 
 ## Windows 10
 
-* Make the .p12 file available to the user, via mail, file share, etc.
-
-* Double-click the .p12 file to open the Certificate Import Wizard
-* Select "Local machine" and click Next
-* Check the file path for the .p12 file and click Next
-* Enter the password that was provided to you for the .p12 file. The default import options are fine (just "Include all extended
+* Install the certificate
+    * Make the .p12 file available to the user, via mail, file share, etc.
+    * Double-click the .p12 file to open the Certificate Import Wizard
+    * Select "Local machine" and click Next
+    * Check the file path for the .p12 file and click Next
+    * Enter the password that was provided to you for the .p12 file. The default import options are fine (only "Include all extended
 properties" is selected).
-* Choose "Automatically select the certificate store..." and click Next. The user/device certificate will be stored in the
+    * Choose "Automatically select the certificate store..." and click Next. The user/device certificate will be stored in the
 Personal Certificates store, and the CA certificate will be stored in Trusted Root Certification Authorities store
-* Click Finish
-* Open the "Change virtual private networks (VPN)" control panel
-    * Click "Add a VPN connection"
-    * VPN provider: Windows (built-in)
-    * Connection name: Enter a name of your choice
-    * Server name or address: the fully-qualified domain name (or IP) of your VPN server
-    * VPN type: IKEv2
-    * Type of sign-in info: Certificate
-    * User name and Password can stay blank
-    * Click Save
-* Now go to the Control Panel | Network and Sharing Center
-    * Click on Change Adapter Settings
-    * Right click on the newly-created VPN | Properties
-    * On the Security tab
-      * Data encryption: Require encryption
-      * Use Machine certificates
-    *  Click OK or Done all the way out
+    * Click Finish
+* Create the VPN connection
+    * Open the "Change virtual private networks (VPN)" control panel
+      * Click "Add a VPN connection"
+      * VPN provider: Windows (built-in)
+      * Connection name: Enter a name of your choice
+      * Server name or address: the fully-qualified domain name (or IP) of your VPN server
+      * VPN type: IKEv2
+      * Type of sign-in info: Certificate
+      * User name and Password can stay blank
+      * Click Save
+* Require encryption on the VPN
+    * Go to the Control Panel | Network and Sharing Center
+      * Click on Change Adapter Settings
+      * Right click on the newly-created VPN | Properties
+      * On the Security tab
+        * Data encryption: Require encryption
+        * Use Machine certificates
+      *  Click OK or Done all the way out
 
-
-* Then click on the VPN connection you just created and connect.
+* You can now connect to the VPN from your Windows 10 device.
 
 If you want to route your entire internet connection over the VPN, enable Use default gateway on remote network. There are two ways
 to do this.
@@ -61,5 +62,5 @@ to do this.
       * Select/check "Use default gateway on remote network"
       * OK out of all screens
     * Via Powershell (Admin)
-      * Use Get-VpnConnection to list your VPNs
+      * Use Get-VpnConnection to list your VPNs and check the current state of Split Tunneling
       * Use Set-VpnConnection -SplitTunneling 1 to turn it on (all traffic flows over the VPN), or 0  to turn it off
