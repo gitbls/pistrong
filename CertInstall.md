@@ -11,7 +11,7 @@ both. After the certificates have been added, configure the VPN.
    * Description: Descriptive name for the VPN
    * Server: the fully-qualified domain name provided in the mail from `pistrong`
    * Remote ID: The remote ID provided in the mail (This is the VPN san key)
-   * Local ID: the local ID given to you in the mail (this is user-device-servername@ipsec.vpn)
+   * Local ID: the local ID given to you in the mail (this is user-device-servername\@ipsec.vpn)
    * User Authentication: Certificate
    * Certificate: choose the certificate matching the Local ID you entered above
    * Done
