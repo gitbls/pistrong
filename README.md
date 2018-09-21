@@ -41,8 +41,8 @@ If you have a webserver and email, `pistrong` can send email to the
 user with a link to the certificates, and a separate email with the
 password for the certificate. 
 
-If you want to use `pistrong` without a full InstallPiStrong install, use
-`InstallPiStrong postconf` which will create:
+If you want to use `pistrong` without a full InstallPiStrong install, use `InstallPiStrong postconf` which will create:
+
 * `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior configuration
 * `/etc/swanctl/pistrongdb.json` pistrong CA database
 * `~/.pistrongrc` pistrong config file for frequently-used settings rather than on the command line
@@ -93,9 +93,9 @@ creating the VPN.
   you can on Windows). Why would you need to? Cut/paste the key and you're good
   to go.
 
-* Configuration of your email server is beyond the scope of this
-document. However, if you install postfix on a Raspberry Pi and take all
-the defaults and select local mail delivery, pistrong will be able to
+* Email server configuration is beyond the scope of this
+document. However, if you install postfix (on a Raspberry Pi), take all
+the defaults, and select local mail delivery, pistrong will be able to
 send mail to local users.
 
 ## Not Yet Completed
