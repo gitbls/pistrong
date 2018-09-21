@@ -42,11 +42,11 @@ user with a link to the certificates, and a separate email with the
 password for the certificate. 
 
 If you're using `pistrong` without a full InstallPiStrong install, use
-`InstallPiStrong postconf` which will create `/etc/swanctl/swanctl.conf`
-and `~/.pistrongrc`, as well as the backup copies (in /etc/swanctl)
-swanctl.piStrongInstall and .pistrongrc.piStrongInstall. This will also
-create `pistrongdb.json`, which contains the CA configuration information
-and the user cert database.
+`InstallPiStrong postconf` which will create:
+* `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior configuration
+* `/etc/swanctl/pistrongdb.json` pistrong CA database
+* ~/.pistrongrc` pistrong config file for frequently-used settings
+* Copies (in /etc/swanctl) of the just-created files swanctl.piStrongInstall, pistrongdb.piStrongInstall, and .pistrongrc.piStrongInstall
 
 ## Example commands
 
@@ -89,8 +89,9 @@ cert first. Then copy the cert password and lastly click the device
 cert. Refer to the cert link email for the fields to fill in when
 creating the VPN.
 
-* I don't think you can use a blank password for the device cert on iOS,
-but why would you need to? Cut/paste the key and you're good to go.
+* I don't think you can use a blank password for the device cert on iOS (but
+  you can on Windows). Why would you need to? Cut/paste the key and you're good
+  to go.
 
 * Configuration of your email server is beyond the scope of this
 document. However, if you install postfix on a Raspberry Pi and take all
