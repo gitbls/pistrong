@@ -54,15 +54,20 @@ and the user cert database.
 
 ## Example commands
 
-pistrong createca --vpnsankey my.special.vpnsankey
+* `pistrong createca --vpnsankey my.special.vpnsankey`
+    Create a new Certificate Authority using the vpnsankey as specified. The VPN SAN key provides an extra level of security for iOS device authentication. 
 
-pistrong add fred --device=iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random
+* `pistrong add fred --device=iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random`
+    Add user Fred, for the deivce iPhone. Copy the necessary certs to `webdir`. Send Fred mail at the specified email address with links to the certs using `weburl`. The device name is a convenience to help you identify where a cert is deployed. If --device is not specified, `dev` is used.
 
-pistrong list fred --all
+* `pistrong list fred --all`
+    List all certs for user fred
 
-pistrong deleteca
+* `pistrong deleteca`
+    Delete the whole CA including all user certs. You will be asked "are you sure", since this is irreversible and will require that all issued certs be replaced.
 
-pistrong help
+* `pistrong help`
+    Print some online help
 
 
 ## Hints
@@ -71,21 +76,19 @@ pistrong help
 simplifies the add user workflow, and adds additional protection to your
 certificates.
 
-*For quick and dirty cert loading via the web (Raspbian example):
+* For quick and dirty cert loading via the web (Raspbian example):
 
-apt-get install apache2
-mkdir /var/www/html/vpn
-In ~/.pistrongrc:
+    * `apt-get install apache2`
+    * `mkdir /var/www/html/vpn`
+    * In ~/.pistrongrc:
 
-   "webdir":"/var/www/html/vpn",
-   "weburl":"http://hostname/vpn",
-   "smtpserver":"ip address of smart smtp server",
+        "webdir":"/var/www/html/vpn",  
+        "weburl":"http://hostname/vpn",  
+        "smtpserver":"ip address of smart smtp server",
 
-Note that the last configuration line in .pistrongrc does not have a comma.
+    Note that the last configuration line in .pistrongrc must not have a comma. 
 
-Then `pistrong add username --device devname --mail username@email.provider`
-
-* For an iPhone user with the email message, it's easier to load the CA
+* For an iPhone user who has received the email message, it's easier to load the CA
 cert first. Then copy the cert password and lastly click the device
 cert. Refer to the cert link email for the fields to fill in when
 creating the VPN.
@@ -98,7 +101,7 @@ document. However, if you install postfix on a Raspberry Pi and take all
 the defaults and select local mail delivery, pistrong will be able to
 send mail to local users.
 
-* Not Yet Completed
+## Not Yet Completed
 
   * Android and MacOS testing - Install documentation and testing for
    these devices remains to be done.
