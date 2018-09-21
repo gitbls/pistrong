@@ -1,9 +1,10 @@
-# Installing Certificates
+# Client Certificate Installation and VPN Configuration
+
+To use the VPN on a client device you need to install certificate(s) and configure the VPN. Here are step-by-step instructions for tested client operating systems.
 
 ## iOS 10
-You can use the Apple Configurator app to load certificates. Another way is to put them on a web server and browse to
-them. pistrong can send email  with URLs for the certificates if desired. Browse to each file and follow the prompts to add them
-both. After the certificates have been added, configure the VPN.
+You can use the Apple Configurator app to load certificates. Another way is to put them on a web server and browse to them. `pistrong` can send email with URLs for the certificates if desired. Browse to each file and follow the prompts to add both the .p12 file and the CA certificate. After the certificates have been added, configure the VPN.
+
 * Open the Settings app
 * Open the VPN settings
 * Tap "Add VPN Configuration"
@@ -16,7 +17,7 @@ both. After the certificates have been added, configure the VPN.
    * Certificate: choose the certificate matching the Local ID you entered above
    * Done
 
-* You can now connect to the VPN from your iOS device.
+You can now connect to the VPN from your iOS device.
 
 ## Windows 10
 
@@ -48,7 +49,7 @@ Personal Certificates store, and the CA certificate contained in the .p12 will b
         * Ensure "Use machine certificates" is selected
       *  Click OK or Done all the way out
 
-* You can now connect to the VPN from your Windows 10 device.
+You can now connect to the VPN from your Windows 10 device.
 
 If you want to route all of your internet traffic over the VPN, you need to enable "Use default gateway on remote network", or Split Tunneling). There are two ways to do this.
 
@@ -59,6 +60,6 @@ If you want to route all of your internet traffic over the VPN, you need to enab
       * Select "Internet Protocol Version 4 (TCP/IPv4)", then select the Properties Tab and click Advanced…
       * Select/check "Use default gateway on remote network"
       * OK out of all screens
-* **Via Powershell (Admin)**
-      * Use `Get-VpnConnection` to list your VPNs and check the current state of Split Tunneling
-      * Use `Set-VpnConnection -SplitTunneling 1` to turn it on (all traffic flows over the VPN), or 0  to turn it off
+* **Via Powershell (Admin)** 
+    * Use `Get-VpnConnection` to list your VPNs and check the current state of Split Tunneling
+    * Use `Set-VpnConnection -SplitTunneling 1` to turn it on (all traffic flows over the VPN), or 0  to turn it off
