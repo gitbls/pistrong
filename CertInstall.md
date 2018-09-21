@@ -6,6 +6,7 @@ them. piswanctl can send email  with URLs for the certificates if desired. Brows
 * Open the Settings app
 * Open the VPN settings
 * Tap "Add VPN Configuration…"
+
       * Type: IKEv2
       * Description: Anything here
       * Server: the fully-qualified domain name provided in the mail from piswanctl
@@ -14,4 +15,5 @@ them. piswanctl can send email  with URLs for the certificates if desired. Brows
       * User Authentication: Certificate
       * Certificate: choose the certificate matching the Local ID you entered above.
       * Done
+
 * You can now connect to the VPN from your iOS device.
