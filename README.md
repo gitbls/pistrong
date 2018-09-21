@@ -25,7 +25,7 @@ Ubuntu, Debian, and Centos is implemented but not fully end-to-end
 tested.
 
 `InstallPiStrong` builds strongSwan from source rather than using the
-distro's strongSwan version since most distros are carrying older
+distro's strongSwan package since most distros are carrying older
 versions of strongSwan. Additionally, not all distros appear to have
 strongSwan built with `--enable-systemd`. `pistrong` only works with the
 new systemd model. The download/install/build process takes 15-20
@@ -41,7 +41,7 @@ If you have a webserver and email, `pistrong` can send email to the
 user with a link to the certificates, and a separate email with the
 password for the certificate. 
 
-If you're using `pistrong` without a full InstallPiStrong install, use
+If you want to use `pistrong` without a full InstallPiStrong install, use
 `InstallPiStrong postconf` which will create:
 * `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior configuration
 * `/etc/swanctl/pistrongdb.json` pistrong CA database
