@@ -1,9 +1,9 @@
 # Client Certificate Installation and VPN Configuration
 
-To use the VPN on a client device you need to install certificate(s) and configure the VPN. Here are step-by-step instructions for tested client operating systems.
+A client device must have the appropriate certificates installed in order to use the VPN. The details for installing certificate(s) and configuring the VPN vary by operating system. Here are step-by-step instructions for tested client operating systems.
 
 ## iOS 10
-You can use the Apple Configurator app to load certificates. Another way is to put them on a web server and browse to them. `pistrong` can send email with URLs for the certificates if desired. Browse to each file and follow the prompts to add both the .p12 file and the CA certificate. After the certificates have been added, configure the VPN.
+You can use the Apple Configurator app to load certificates. Another method is to put them on a web server and browse to them. If desired, `pistrong` can send email with URLs for the certificates. Browse to each file and follow the prompts to add both the .p12 file and the CA certificate. After the certificates have been added, configure the VPN.
 
 * Open the Settings app
 * Open the VPN settings
@@ -12,7 +12,7 @@ You can use the Apple Configurator app to load certificates. Another way is to p
    * **Description:** Descriptive name for the VPN
    * **Server:** the fully-qualified domain name provided in the mail from `pistrong`. Use the server IP address if you don't have a DNS name for the server.
    * **Remote ID:** The remote ID provided in the mail (This is the VPN san key)
-   * **Local ID:** the local ID given to you in the mail (this is user-device-servername\@ipsec.vpn)
+   * **Local ID:** the local ID given to you in the mail (this is also the certificate/profile name)
    * **User Authentication:** Certificate
    * **Certificate:** choose the certificate matching the Local ID you entered above
    * Done
@@ -32,7 +32,7 @@ properties" is selected).
 Personal Certificates store, and the CA certificate contained in the .p12 will be stored in Trusted Root Certification Authorities store
     * Click Finish
 * Create the VPN connection
-    * In the Settings app, go to "Network & Internet" then click "Change Adapter Options"
+    * In the Settings app, go to "Network & Internet" then click "VPN"
       * Click "Add a VPN connection"
       * **VPN provider:** Windows (built-in)
       * **Connection name:** Descriptive name for the VPN
@@ -51,7 +51,7 @@ Personal Certificates store, and the CA certificate contained in the .p12 will b
 
 You can now connect to the VPN from your Windows 10 device.
 
-If you want to route all of your internet traffic over the VPN, you need to enable "Use default gateway on remote network", or Split Tunneling). There are two ways to do this.
+If you want to route all of your internet traffic over the VPN, as opposed to only traffic destined for your VPN server network, you need to enable "Use default gateway on remote network", or Split Tunneling). There are two ways to do this.
 
 * **Network and Sharing Center GUI** 
     * Open the Settings app, select Network & Internet, and click "Change adapter options” 
