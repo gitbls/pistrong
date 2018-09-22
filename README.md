@@ -4,7 +4,7 @@ Simplified CA and device cert manager for strongSwan
 ## Overview
 
 pistrong greatly simplifies the installation of the strongSwan VPN for
-the roadwarrior scenario, as well as the configuration and management of
+the roadwarrior use case, as well as the configuration and management of
 the strongSwan Certificate Authority (CA) and certificates for mobile
 users.
 
@@ -13,11 +13,11 @@ pistrong consists of two components:
 * `InstallPiStrong` - Installs and configures strongSwan for the roadwarrior
 usage scenario
 
-* `pistrong` - Used for ongoing CA and user key/cert management
+* `pistrong` - Provides day-to-day CA and user key/cert management
 
 ## InstallPiStrong 
 
-`InstallPiStrong` downloads the source and builds and installs the latest
+`InstallPiStrong` downloads the source and builds/installs the latest
 release of strongSwan (currently 5.6.3). It also creates
 the strongSwan configuration and required config files for `pistrong`. The
 installation has been fully tested on Raspbian. Support for openSuSE,
@@ -31,6 +31,20 @@ strongSwan built with `--enable-systemd`. `pistrong` only works with the
 new systemd model. The download/install/build process takes 15-20
 minutes on a Raspberry Pi 3B.
 
+`InstallPiStrong` is structured into various phases. If no phase is specified, or 'all' is specified,
+all phases will be run. The phases include:
+
+* **prereq** ensures that the required packages are installed on your system
+* **download** downloads the latest strongSwan release 
+* **preconf** runs configure on the source
+* **make** compiles strongSwan
+* **install** installs strongSwan into the system
+* **postconf** or **post-configure** creates
+    * `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior use
+    * `/etc/swanctl/pistrongdb.json` pistrong CA database
+    * `~/.pistrongrc` pistrong config file for frequently-used settings rather than on the command line
+    * Copies (in /etc/swanctl) of the just-created files swanctl.piStrongInstall, pistrongdb.piStrongInstall, and .pistrongrc.piStrongInstall
+
 ## pistrong
 `pistrong` is used to create the CA and manage users. `pistrong` provides
 commands to create (or delete) the CA, add, revoke, delete, or list
@@ -41,12 +55,7 @@ If you have a webserver and email, `pistrong` can send email to the
 user with a link to the certificates, and a separate email with the
 password for the certificate. 
 
-If you want to use `pistrong` without a full InstallPiStrong install, use `InstallPiStrong postconf` which will create:
-
-* `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior use
-* `/etc/swanctl/pistrongdb.json` pistrong CA database
-* `~/.pistrongrc` pistrong config file for frequently-used settings rather than on the command line
-* Copies (in /etc/swanctl) of the just-created files swanctl.piStrongInstall, pistrongdb.piStrongInstall, and .pistrongrc.piStrongInstall
+If you want to use `pistrong` without a full InstallPiStrong install, use `InstallPiStrong postconf`.
 
 ## Example commands
 
