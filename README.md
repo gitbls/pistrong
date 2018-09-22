@@ -1,5 +1,5 @@
 # pistrong
-Simplified CA and device cert manager for strongSwan
+Simple CA and device cert manager for strongSwan
 
 ## Overview
 
@@ -31,12 +31,12 @@ strongSwan built with `--enable-systemd`. `pistrong` only works with the
 new systemd model. The download/install/build process takes 15-20
 minutes on a Raspberry Pi 3B.
 
-`InstallPiStrong` is structured into various phases. If no phase is specified, or 'all' is specified,
+`InstallPiStrong` has several phases. If no phase is specified, or **all** is specified,
 all phases will be run. The phases include:
 
 * **prereq** ensures that the required packages are installed on your system
 * **download** downloads the latest strongSwan release 
-* **preconf** runs configure on the source
+* **preconf** runs `configure` on the strongSwan source
 * **make** compiles strongSwan
 * **install** installs strongSwan into the system
 * **postconf** or **post-configure** creates
@@ -63,7 +63,7 @@ If you want to use `pistrong` without a full InstallPiStrong install, use `Insta
     Create a new Certificate Authority using the vpnsankey as specified. The VPN SAN key provides an extra level of security for iOS device authentication. 
 
 * `pistrong add fred --device=iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random`
-    Add user Fred, for the deivce iPhone. Copy the necessary certs to `webdir`. Send Fred mail at the specified email address with links to the certs using `weburl`. The device name is a convenience to help you identify where a cert is deployed. If --device is not specified, `dev` is used.
+    Add user Fred, for the device iPhone. Copy the necessary certs to `webdir`. Send Fred email with links to the certs using `weburl`. The device name is a convenience to help you identify where a cert is deployed. If --device is not specified, `dev` is used.
 
 * `pistrong list fred --all [--full]`
     List all certs for user fred. Print the cert contents also if --full specified
