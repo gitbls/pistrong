@@ -3,7 +3,7 @@ Simple CA and device cert manager for strongSwan
 
 ## Overview
 
-`pistrong` greatly simplifies installing the strongSwan VPN for
+pistrong greatly simplifies installing the strongSwan VPN for
 the roadwarrior use case, as well as configuring and managing
 the strongSwan Certificate Authority (CA) and certificates for 
 user devices.
@@ -63,9 +63,9 @@ password for the certificate.
     Create a new Certificate Authority using the vpnsankey as specified. The VPN SAN key is required and provides an extra level of security for iOS device authentication. 
 
 * `pistrong add fred --device=iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random`
-    Add user Fred, for the device named iPhone. Copy the necessary certs to `webdir`. Send Fred email with links to the certs using `weburl`. The device name is optional and may help you track where a cert is deployed. If --device is not specified, `dev` is used. In general, you should have `webdir`, `weburl`, and `random` configured in ~/.pistrongrc rather than specifying them on the command line.
+    Add user fred, for the device named iPhone. Copy the necessary certs to `webdir`. Send fred email with links to the certs using `weburl`. The device name is optional and may help you track where a cert is deployed. If --device is not specified, `dev` is used. In general, you should have `webdir`, `weburl`, and `random` configured in ~/.pistrongrc rather than specifying them on the command line.
 
-* pistrong resend fred-iPhone --mail fred@otherdomain.com Resend the email with the links to the certs to the specified email address. This assumes that `weburl` and `webdir` are set correctly in ~/.pistrongrc
+* pistrong resend fred-iPhone --mail fred@otherdomain.com Resend the email with the links to the certs to the specified email address. 
 
 * `pistrong list fred --all [--full]`
     List all certs for user fred. Print the cert contents also if --full specified
@@ -101,7 +101,7 @@ certificates.
 * Email server configuration is beyond the scope of this
 document. However, if you install postfix (on a Raspberry Pi), take all
 the defaults, and select local mail delivery, pistrong will be able to
-send mail to local users.
+send mail to local users, such as user pi.
 
 ## Security considerations
 
