@@ -72,11 +72,11 @@ If you want to route all of your internet traffic over the VPN, as opposed to on
 
 ### Windows Connect Problems Hints and Tips
 
-If you've set everything up correctly, it should "just work". But there are a few gotchas. Here are the ones that I uncovered.
+If you've set everything up correctly, it should, of course, "just work". But there are a few gotchas. Here are the ones that I discovered.
 
 * The server name or address in the Windows VPN connection properties must be the same as the fully qualified name (FQDN) of the server. On Raspbian, this can be found in /etc/hostname. Other distros may use /etc/HOSTNAME, or something else altogether. It appears that the hostname specified in the VPN connection properties is checked against the altNames (SAN values) in the VPN Host Certificate, and there must be a match or Windows will fail the connection. 
 
-  In other words, the connection will fail if Windows tries to connect to host.domain.com and the host system is configured internally with a host name of 'host'. Proper use of dynamic DNS makes this simple. It is possible to make the VPN work via IP address rather than domain name. You may be able to use makevpncert and --altsankey, but this is not recommended.
+  In other words, the connection will fail if Windows tries to connect to 'host.domain.com' and the host system is configured internally with a host name of 'host'. Proper use of dynamic DNS makes this simple. It is possible to make the VPN work using an IP address rather than an FQDN, but this is not recommended.
 
 * After you install the certificate, you can see them in the certificate manager. After you've installed the certificates, you can Windows-R (run) certmgr.msc and you'll find the strongSwan root certificate in the Trusted Root Certification Authorities. To see the user/device certificate, use the following steps to look at the device certificates.
     * Windows-R mmc.exe
@@ -85,7 +85,7 @@ If you've set everything up correctly, it should "just work". But there are a fe
     * Select Computer account and click Finish
     * Click OK
     * User/device certificates can be found in the Personal Certificates store
-    * 
+
 
 ## MacOS
 
