@@ -1,0 +1,335 @@
+#!/bin/bash
+#
+# Installation script for piStrongVPN
+# Performs the following tasks
+#   Ensures required packages are installed
+#       On Raspbian these are: Apt-get install libgmp10 libgmp-dev libsystemd-dev libssl-dev
+#   Creates a work directory (~/piStrong)
+#   Downloads and bunzip2 the current released strongswan bits 
+#   Builds strongswan
+#   Installs into the system
+#   Creates /etc/swanctl/swanctl.conf
+#   Creates root CA and VPN cert
+# Use pistrong to manage users and certificates
+# Start and stop the vpn via: pistrong start and pistrong stop
+#
+
+function getssver {
+    vs1=$(curl -s -L https://www.strongswan.org/download.html | grep 'Current Release' | head -1)
+    s1=${vs1##<h4>Current Release*normal\">}
+    ssver=${s1%%<*}
+    return 1
+}
+
+function askyn() {
+    local ans
+    echo -n "$1" '[y/n]? ' ; read $2 ans
+    case "$ans" in
+        y*|Y*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+function askin() {
+    local ans
+    echo -n "$1 "; read -n 1 ans
+}
+
+function gotoBuildDir() {
+    cd ~/piStrong
+    for i in strongswan-*; do [ -d "$i" ] && cd $i ; done
+}
+
+function emitSwanctl() {
+
+    cd /etc/swanctl
+    [ ! -d "p12" ] && mkdir p12 && chmod 750 p12
+    if [ -f swanctl.conf ] && grep '# local<suffix>' swanctl.conf > /dev/null
+    then
+        echo "% Saving original swanctl.conf"
+        mv swanctl.conf swanctl.orig
+    else
+        [ -f swanctl.conf ] && rm -f swanctl.conf
+    fi
+
+    cat > /etc/swanctl/swanctl.conf <<EOF
+connections {
+    ikev2-pubkey-ios {
+        version = 2
+        proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,aes128-sha1-modp1536,aes128-sha256-modp1536,aes128-sha256-modp2048,default
+        rekey_time = 0s
+        pools = primary-pool-ipv4
+        fragmentation = no
+        dpd_delay = 30s
+        send_cert = always
+
+        local-1 {
+             auth = pubkey
+             certs = vpnHostCert.pem
+             id = ipsec.vpn.net
+        }
+
+        remote-1 {
+             auth = eap-tls
+             id = %any
+        }
+
+        children {
+             ikev2-pubkey {
+                 local_ts = 0.0.0.0/0
+                 rekey_time = 0s
+                 dpd_action = clear
+                 esp_proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,aes128-sha1-modp1536,aes128-sha256-modp1536,aes128-sha256-modp2048,default
+             }
+        }
+    }
+    ikev2-pubkey-windows {
+        version = 2
+        proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,default
+        rekey_time = 0s
+        pools = primary-pool-ipv4
+        fragmentation = yes
+        dpd_delay = 30s
+
+        local-1 {
+             auth = pubkey
+             certs = vpnHostCert.pem
+             id = ipsec.vpn.net
+        }
+
+        remote-1 {
+             id = %any
+        }
+
+        children {
+             ikev2-pubkey {
+                 local_ts = 0.0.0.0/0
+                 rekey_time = 0s
+                 dpd_action = clear
+                 esp_proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,default
+             }
+        }
+    }
+}
+pools {
+    primary-pool-ipv4 {
+        addrs = $vpnsubnet
+        dns = $vpndns
+    }
+}
+EOF
+
+    cp /etc/swanctl/swanctl.conf /etc/swanctl/swanctl.piStrongInstall
+}
+
+function DoPreReqs() {
+    if [ -f "/etc/os-release" ]
+    then
+        osdistro=$(grep ^ID= /etc/os-release | (IFS='='; read a b ; echo $b))
+    else
+        osdistro="unknown"
+    fi
+    case "$osdistro" in
+        ubuntu)
+            echo "I'll try to install the required packages"
+            apt-get install make gcc pkg-config libgmp10 libgmp-dev libsystemd-dev libssl-dev python3-pexpect
+            echo "Check above to ensure everything got installed"
+            ;;
+        opensuse)
+            echo "I'll try to install the required packages"
+            zypper in make gcc gmp-devel systemd-devel libopenssl-1_1-devel python3-pexpect
+            echo "Check above to ensure everything got installed"
+            ;;
+        centos|rhel|fedora)
+            echo "I'll try to install the required packages, but this is incomplete"
+            yum install gcc gmp-devel.x86_64 systemd-devel.x86_x64 openssl-devel.x86_64
+            echo "Check above to ensure everything got installed"
+            echo ">> You'll need to install python3 and pexpect if they are not already installed"
+            ;;
+        debian|raspbian)
+            echo ">> Ensure your Pi is up to date"
+            echo " Your Pi must be up to date with the Raspbian repositories via these commands"
+            echo "    apt-get update"
+            echo "    apt-get upgrade"
+            echo ""
+            echo "  If you have not done this yet, respond n to exit and update your Pi"
+            echo "  Then reboot your Pi and restart this procedure"
+            echo ""
+            if askyn "Press y to Continue, n to exit and update your Pi" "-n 1"
+            then
+                echo ""
+                for p in libgmp10 libgmp-dev libsystemd-dev libssl-dev python3-pexpect ; do
+                    if ! dpkg-query -s $p > /dev/null 2>&1
+                    then
+                        echo ">> Installing package $p"
+                        apt-get install $p
+                    else
+                        echo ">> Package $p already installed"
+                    fi
+                done
+            else
+                echo ""
+                exit 1
+            fi
+            if [ "$(hostname)" == "raspberrypi" ]
+            then
+                echo ""
+                echo "% Your hostname is still 'raspberrypi'"
+                echo "  We strongly suggest you change it via raspi-config Network Options before continuing"
+                if askyn "Press y to exit and correct hostname, n to continue"
+                then
+                    exit 1
+                fi
+            fi
+    ;;
+        *) echo "% Pre-reqs unknown for distro $osdistro"
+    esac
+}
+
+function DoDownload() {
+    cd ~/
+#    ssver="5.6.3"
+    getssver
+    echo "% Using Strongswan version $ssver"
+    if askin "Press any key to start Strongswan download:" ; then echo ""; fi
+    [ -d piStrong ] && rm -rf piStrong
+    mkdir piStrong
+    cd piStrong
+    #curl -L https://download.strongswan.org/strongswan-$ssver.tar.bz2 -o strongswan-$ssver.tar.bz2
+    curl -L https://download.strongswan.org/strongswan-$ssver.tar.bz2 | tar -xjvf -
+#    if askin "Press any key to continue:" ; then echo ""; fi
+#    tar -xjvf ~//piStrong/strongswan-5.6.3.tar.bz2
+}
+
+function DoPreConf() {
+    gotoBuildDir
+    if askin "Press any key to start pre-make configuration:" ; then echo ""; fi
+    echo ""
+    echo ">> Performing pre-make configuration <<"
+    ./configure --prefix= --enable-eap-mschapv2 --enable-eap-identity --enable-openssl --enable-eap-md5 --enable-eap-tls --enable-eap-dynamic --enable-systemd --enable-swanctl --disable-charon --disable-stroke --disable-scepclient --enable-counters
+}
+
+function DoMake() {
+    gotoBuildDir
+    if askin "Press any key to start make:" ; then echo ""; fi
+    echo ">> Performing make <<"
+    make
+}
+
+function DoInstall() {
+    gotoBuildDir
+    if askin "Press any key to start install:"
+    then
+        make install
+    fi
+}
+
+function DoPostConf() {
+    vpnsubnet="10.1.10.0/24"
+    echo -n "Subnet for VPN clients [$vpnsubnet]: " ; read ans
+    [ "$ans" != "" ] && vpnsubnet=$ans
+    vpndns="192.168.1.1, 1.1.1.1"
+    echo -n "comma-separated list of DNS servers for VPN clients (local,internet) [$vpndns]: " ; read ans
+    [ "$ans" != "" ] && vpndns=$ans
+    echo ""
+    echo ">> Create /etc/swanctl/swanctl.conf"
+
+    emitSwanctl
+
+    if [ ! -f "/etc/swanctl/$dbfile.piStrongInstall" ]
+    then
+	echo ">> Create /etc/swanctl/$dbfile.json config file"
+	cat > /etc/swanctl/$dbfile.piStrongInstall <<EOF
+{
+    "config": {
+        "altsankey": "",
+        "calife": 3650,
+        "crllife": 7,
+        "uclife": 730,
+        "service": "strongswan-swanctl.service",
+        "version": "1.0",
+        "vpnsankey": "ipsec.vpn.net"
+    },
+    "users": {
+    }
+}
+EOF
+	[ -f "/etc/swanctl/$dbfile.json" ] && mv /etc/swanctl/$dbfile.json /etc/swanctl/$dbfile.json.bak
+	cp /etc/swanctl/$dbfile.piStrongInstall /etc/swanctl/$dbfile.json
+    fi
+    if [ ! -f "/etc/swanctl/$rcfile.piStrongInstall" ]
+    then
+	echo ">> Create ~/$rcfile config file"
+        cat > /etc/swanctl/$rcfile.piStrongInstall <<EOF
+{
+    "cmds":false,
+    "debug":false,
+    "mailfrom":"PiStrongVPN<root@mydomain.com>",
+    "random":true,
+    "smtppassword":"",
+    "smtpport":25,
+    "smtpserver":"127.0.0.1",
+    "smtpuser":"",
+    "smtpusetls":false,
+    "webdir":"tmp",
+    "weburl":"http://127.0.0.1"
+}
+EOF
+    fi
+    [ -f "/root/$rcfile" ] && mv /root/$rcfile /root/$rcfile.bak
+    cp /etc/swanctl/$rcfile.piStrongInstall /root/$rcfile
+
+    if [ ! -f "/etc/sysctl.d/pistrong.conf" ]
+    then
+	echo ">> Creating /etc/sysctl.d/92-pistrong.conf to set net.ipv4.ip_forward=1"
+	echo "net.ipv4.ip_forward=1" >> /etc/sysctl.d/92-pistrong.conf
+	sysctl -p /etc/sysctl/92-pistrong.conf > /dev/null
+    fi
+}
+
+function DoAll() {
+    DoPreReqs
+    DoDownload
+    DoPreConf
+    DoMake
+    DoInstall
+    DoPostConf
+
+    echo ">> Installation complete"
+    echo ">> "
+    echo ">> Edit ~/$rcfile to adjust for your configuration"
+    echo ">> Use 'pistrong makeca' to create the Certificate Authority (CA)"
+    echo ">> Use 'pistrong add' to create user certs"
+    echo ">> See pistrong help and pistrong --help for details"
+    echo ">> Other notes:"
+    echo ">>  Be sure to set net.ipv4.ip_forward = 1 in sysctl (see /etc/sysctl.d)"
+    echo ">> ..."
+    echo ">> To access the VPN from outside your LAN, you'll need external DNS setup. See ???"
+}
+#
+# Main
+#
+rcfile=".pistrongrc"
+dbfile="pistrongdb"
+
+if [[ ! $EUID -eq 0 ]];then
+    echo "? Please run as root"
+    echo "  Use 'sudo bash' to get to root"
+    exit 1
+fi
+
+cmd="$1"
+[ "$cmd" == "" ] && cmd="all"
+case "$cmd" in
+    "prereq")   DoPreReqs ;;
+    "download") DoDownload ;;
+    "preconf") DoPreConf ;;
+    "make") DoMake ;;
+    "install") DoInstall ;;
+    "postconf"|"post-configure") DoPostConf ;;
+    "all") DoAll ;;
+    *) echo "? Invalid command" ;
+       echo "? Commands: prereq|download|preconf|make|install|postconf|makeca|all" ;
+       exit 1
+       ;;
+esac
