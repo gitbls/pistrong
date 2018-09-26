@@ -3,7 +3,7 @@ Simplified CA and device cert manager for strongSwan
 
 ## Overview
 
-pistrong greatly simplifies well as configuring and managing
+pistrong greatly simplifies configuring and managing
 the strongSwan Certificate Authority (CA) and certificates for 
 user devices for the roadwarrior use case, and also provides a targetd strongSwan
 installer.
@@ -31,7 +31,7 @@ password for the certificate.
 * `pistrong createca --vpnsankey my.special.vpnsankey`
     Create a new Certificate Authority using the vpnsankey as specified. The VPN SAN key is required and provides an extra level of security for iOS device authentication. 
 
-* `pistrong add fred --device=iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random`
+* `pistrong add fred --device iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random`
 Add user fred, for the device named iPhone. Copy the necessary certs to `webdir`. Send fred email with links to the certs using `weburl`. The device name is optional and may help be used to help track where a cert is deployed. If --device is not specified, `dev` is used. In general, you should have `webdir`, `weburl`, and `random` configured in ~/.pistrongrc rather than specifying them on the command line.
 
 * `pistrong resend fred-iPhone --mail fred@otherdomain.com` Resend the email with the links to the certs to the specified email address. 
