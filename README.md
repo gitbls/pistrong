@@ -5,7 +5,7 @@ Simplified CA and device cert manager for strongSwan
 
 pistrong greatly simplifies configuring and managing
 the strongSwan Certificate Authority (CA) and certificates for 
-user devices for the roadwarrior use case, and also provides a targetd strongSwan
+user devices for the roadwarrior use case, and also provides a targeted strongSwan
 installer.
 
 pistrong consists of two components:
