@@ -1,5 +1,5 @@
 # pistrong
-Simple CA and device cert manager for strongSwan
+Simplified CA and device cert manager for strongSwan
 
 ## Overview
 
