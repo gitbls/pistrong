@@ -3,52 +3,21 @@ Simple CA and device cert manager for strongSwan
 
 ## Overview
 
-pistrong greatly simplifies installing the strongSwan VPN for
-the roadwarrior use case, as well as configuring and managing
+pistrong greatly simplifies well as configuring and managing
 the strongSwan Certificate Authority (CA) and certificates for 
-user devices.
+user devices for the roadwarrior use case, and also provides a targetd strongSwan
+installer.
 
 pistrong consists of two components:
 
+* `pistrong` - Provides day-to-day CA and roadwarrior user key/cert management
+
 * `InstallPiStrong` - Installs and configures strongSwan for the roadwarrior
-usage scenario
-
-* `pistrong` - Provides day-to-day CA and user key/cert management
-
-## InstallPiStrong 
-
-`InstallPiStrong` downloads the source and builds/installs the latest
-release of strongSwan (currently 5.6.3). It also creates
-the strongSwan configuration and required config files for `pistrong`. The
-installation has been fully tested on Raspbian. Support for openSuSE,
-Ubuntu, Debian, and Centos is implemented but not fully end-to-end
-tested.
-
-`InstallPiStrong` builds strongSwan from source rather than using the
-distro's strongSwan package since most distros are carrying older
-versions of strongSwan. Additionally, not all distros appear to have
-strongSwan built with `--enable-systemd`. `pistrong` only works with the
-new systemd model. The download/install/build process takes 15-20
-minutes on a Raspberry Pi 3B.
-
-`InstallPiStrong` has several phases. If no phase is specified, or **all** is specified,
-all phases will be run. The phases include:
-
-* **prereq** ensures that the required packages are installed on your system
-* **download** downloads the latest strongSwan release 
-* **preconf** runs `configure` on the strongSwan source
-* **make** compiles strongSwan
-* **install** installs strongSwan into the system
-* **postconf** or **post-configure** creates
-    * `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior use
-    * `/etc/swanctl/pistrongdb.json` pistrong CA database
-    * `~/.pistrongrc` pistrong config file for frequently-used settings rather than on the command line
-    * Copies (in /etc/swanctl) of the just-created files swanctl.piStrongInstall, pistrongdb.piStrongInstall, and .pistrongrc.piStrongInstall
-
-    Use this (`InstallPiStrong postconf`) if you install strongSwan with some other mechanism and want to use pistrong to manage your CA and user/device certs.
+use case
 
 ## pistrong
-`pistrong` is used to create the CA and manage users. `pistrong` provides
+
+`pistrong` creates the CA and manages users. `pistrong` provides
 commands to create (or delete) the CA, add, revoke, delete, or list
 users, and simple strongSwan service management (start, stop, restart,
 enable, disable, status).
@@ -63,9 +32,9 @@ password for the certificate.
     Create a new Certificate Authority using the vpnsankey as specified. The VPN SAN key is required and provides an extra level of security for iOS device authentication. 
 
 * `pistrong add fred --device=iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random`
-    Add user fred, for the device named iPhone. Copy the necessary certs to `webdir`. Send fred email with links to the certs using `weburl`. The device name is optional and may help you track where a cert is deployed. If --device is not specified, `dev` is used. In general, you should have `webdir`, `weburl`, and `random` configured in ~/.pistrongrc rather than specifying them on the command line.
+Add user fred, for the device named iPhone. Copy the necessary certs to `webdir`. Send fred email with links to the certs using `weburl`. The device name is optional and may help be used to help track where a cert is deployed. If --device is not specified, `dev` is used. In general, you should have `webdir`, `weburl`, and `random` configured in ~/.pistrongrc rather than specifying them on the command line.
 
-* pistrong resend fred-iPhone --mail fred@otherdomain.com Resend the email with the links to the certs to the specified email address. 
+* `pistrong resend fred-iPhone --mail fred@otherdomain.com` Resend the email with the links to the certs to the specified email address. 
 
 * `pistrong list fred --all [--full]`
     List all certs for user fred. Print the cert contents also if --full specified
@@ -73,12 +42,43 @@ password for the certificate.
 * `pistrong deleteca`
     Delete the whole CA including all user certs. You will be asked "are you sure", since this is irreversible and will require that **all** issued certs be replaced.
 
-* pistrong makevpncert --altsankey "IPAddress,FQDN,"
+* `pistrong makevpncert --altsankey "another.SAN.key[,yet.another.SAN.key]"`
     Create a new VPN key and cert with additional SAN keys. This can be done without re-installing client certs.
 
 * `pistrong help`
     Print some online help
 
+## InstallPiStrong 
+
+`InstallPiStrong` downloads the source and builds/installs the latest
+release of strongSwan (currently 5.6.3). It also creates
+the strongSwan configuration and required config files for `pistrong`. The
+installation has been fully tested on Raspbian. Support for openSuSE,
+Ubuntu, Debian, and Centos is implemented but not fully end-to-end
+tested.
+
+`InstallPiStrong` builds strongSwan from source rather than using the
+distro's strongSwan package since most distros are carrying older
+versions of strongSwan. Additionally, not all distros appear to have
+strongSwan built with `--enable-systemd`. `pistrong` only works with the
+new systemd model. The download/build/install process takes 15-20
+minutes on a Raspberry Pi 3B.
+
+`InstallPiStrong` has several phases. If no phase is specified or **all** is specified,
+all phases will be run. The phases include:
+
+* **prereq** ensures that the required packages are installed on your system
+* **download** downloads the latest strongSwan release 
+* **preconf** runs `configure` on the strongSwan source
+* **make** compiles strongSwan
+* **install** installs strongSwan into the system
+* **postconf** or **post-configure** creates
+    * `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior use
+    * `/etc/swanctl/pistrongdb.json` pistrong CA database
+    * `~/.pistrongrc` pistrong config file for frequently-used settings rather than on the command line
+    * Copies (in /etc/swanctl) of the just-created files swanctl.piStrongInstall, pistrongdb.piStrongInstall, and .pistrongrc.piStrongInstall
+
+    Use this (`InstallPiStrong postconf`) if you install strongSwan with some other mechanism and want to use pistrong to manage your CA and user/device certs.
 
 ## Hints
 
@@ -96,7 +96,7 @@ certificates.
         "weburl":"http://hostname/vpn",  
         "smtpserver":"ip address of smart smtp server",
 
-    Note that the last configuration line in .pistrongrc before the close brace must not have a comma. 
+    Note that the last configuration line in .pistrongrc (before the close brace) must not have a comma. 
 
 * Email server configuration is beyond the scope of this
 document. However, if you install postfix (on a Raspberry Pi), take all
