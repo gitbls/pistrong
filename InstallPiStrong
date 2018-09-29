@@ -329,7 +329,7 @@ case "$cmd" in
     "postconf"|"post-configure") DoPostConf ;;
     "all") DoAll ;;
     *) echo "? Invalid command" ;
-       echo "? Commands: prereq|download|preconf|make|install|postconf|makeca|all" ;
+       echo "? Commands: prereq|download|preconf|make|install|postconf|all" ;
        exit 1
        ;;
 esac
