@@ -51,7 +51,7 @@ Add user fred, for the device named iPhone. Copy the necessary certs to `webdir`
 ## InstallPiStrong 
 
 `InstallPiStrong` downloads the source and builds/installs the latest
-release of strongSwan (currently 5.6.3). It also creates
+release of strongSwan. It also creates
 the strongSwan configuration and required config files for `pistrong`. The
 installation has been fully tested on Raspbian. Support for openSuSE,
 Ubuntu, Debian, and Centos is implemented but not fully end-to-end
