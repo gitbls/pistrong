@@ -19,7 +19,7 @@ import sys
 import termios
 from email.mime.text import MIMEText
 
-version = "X1.1"
+version = "V1.1"
 rcfile = ".pistrongrc"
 helpmsg = "pistrong {} commands:\n\
 \n\
