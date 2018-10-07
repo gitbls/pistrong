@@ -19,7 +19,7 @@ import sys
 import termios
 from email.mime.text import MIMEText
 
-version = "V1.1"
+version = "V1.2"
 rcfile = ".pistrongrc"
 helpmsg = "pistrong {} commands:\n\
 \n\
@@ -391,10 +391,11 @@ def mailcert(newkey, newp12, newp12fn, cn):
     os.chmod(webfn, 0o644)
     certurl = fnpdir.format(dx['weburl'], newp12fn)
     cacerturl = fnpdir.format(dx['weburl'], swancertfn)
+    remoteid = imdb['config']['vpnsankey'] if args.remoteid is None else args.remoteid
     msg = "Your device certificate:  {}\nRoot CA cert (if needed): {}\n\n".format(certurl, cacerturl)
     msg += "iOS devices: Browse the links to install both certificates.\n"
     msg += "  Then create a new IKEV2 VPN connection using the iOS profile {} and this information:\n".format(cn)
-    msg += "          Server:    {}\n          Remote ID: {}\n          Local ID:  {}\n".format(hostfqdn, imdb['config']['vpnsankey'], cn)
+    msg += "          Server:    {}\n          Remote ID: {}\n          Local ID:  {}\n".format(hostfqdn, remoteid, cn)
     msg += "  And select the newly-installed device certificate.\n"
     msg += "\nOther devices: See the CertInstall.md guide at https://github.com/gitbls/pistrong\nfor details on importing the certificate onto your device and creating the VPN configuration\n"
     sendmsg(dx['mailfrom'], args.mail, "VPN Cert", msg)
@@ -663,6 +664,7 @@ parser.add_argument("--altsankey", help="Specify alternate VPN SAN key for makec
 parser.add_argument("--cnsuffix", help="Specify the X509 CN suffix [ipsec.vpn]")
 parser.add_argument("--onlyalt", help="Don't add any default SAN values, only use altsankey", action="store_true")
 parser.add_argument("--certfn", help="Specify filename (only) for makevpncert")
+parser.add_argument("--remoteid", help="Provide RemoteID for user to use instead of established VPN SAN key")
 parser.add_argument("--cmds", help="Display pki commands when run", action="store_true")
 parser.add_argument("--root", help="Alternate directory for CA root (for testing)")
 parser.add_argument("--debug", help="Debug mode. Use current directory ['.'] instead of /etc/swanctl", action="store_true")
