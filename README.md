@@ -100,8 +100,8 @@ certificates.
 
 * If you need to use multiple strongSwan connections (if different users need different subnets, for example), here is an outline of how to do this:
     * Establish the primary configuration with the desired VPN SAN key
-    * Create the secondary VPN cert/key using `pistrong makevpncert` with the secondary VPN SAN key
-    * Manually edit /etc/swanctl/swanctl.conf and add the second key with the secondary VPN SAN key and secondary VPN cert
+    * Create the secondary VPN cert/key using `pistrong makevpncert` to create the secondary VPN SAN key
+    * Manually edit /etc/swanctl/swanctl.conf and add the second connection which uses the secondary VPN SAN key and secondary VPN cert
     * Add users to the primary configuration normally
     * For users on the secondary configuration use --remoteid to specify the secondary VPN SAN key
     * NOTE: If you ever re-create the CA using `pistrong makeca` you'll need to redo these steps.
