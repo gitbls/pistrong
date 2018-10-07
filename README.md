@@ -98,6 +98,14 @@ certificates.
 
     Note that the last configuration line in .pistrongrc (before the close brace) must not have a comma. 
 
+* If you need to use multiple strongSwan connections (if different users need different subnets, for example), here is an outline of how to do this:
+    * Establish the primary configuration with the desired VPN SAN key
+    * Create the secondary VPN cert/key using `pistrong makevpncert` with the secondary VPN SAN key
+    * Manually edit /etc/swanctl/swanctl.conf and add the second key with the secondary VPN SAN key and secondary VPN cert
+    * Add users to the primary configuration normally
+    * For users on the secondary configuration use --remoteid to specify the secondary VPN SAN key
+    * NOTE: If you ever re-create the CA using `pistrong makeca` you'll need to redo these steps.
+
 * Email server configuration is beyond the scope of this
 document. However, if you install postfix (on a Raspberry Pi), take all
 the defaults, and select local mail delivery, pistrong will be able to
