@@ -19,7 +19,7 @@ import sys
 import termios
 from email.mime.text import MIMEText
 
-version = "V1.2"
+version = "V1.3"
 rcfile = ".pistrongrc"
 helpmsg = "pistrong {} commands:\n\
 \n\
@@ -414,7 +414,7 @@ def makevpncert(altsankey, mvpncert, mvpnkey):
     os.chmod(mvpnkey, 0o600)
     print("\n>> Create VPN Host Cert ({})\n".format(mvpncert))
     altsan = ""
-    if not altsankey == "":
+    if altsankey != "":
         for iakey in altsankey.split(","):
             altsan += " --san {}".format(iakey.strip())
     sanstring = ""
@@ -430,7 +430,7 @@ def makeca():
     """
     print("\n>> Creating strongSwan CA for host {} IP address {} ({}) in {}".format(hostfqdn, vpnip, swankey, swandir))
     altsan = ">>  with VPN san key {}".format(imdb['config']['vpnsankey'])
-    if not imdb['config']['altsankey'] == "":
+    if imdb['config']['altsankey'] != "":
         altsan += "\n>>  and alternate SAN keys {}".format(imdb['config']['altsankey'])
     print ("{}".format(altsan))
     for cadir in cadirlist:
