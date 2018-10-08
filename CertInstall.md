@@ -76,7 +76,7 @@ If you've set everything up correctly, it should, of course, *just work*. But, s
 
 * The server name or address in the Windows VPN connection properties must be included as a SAN value in the host VPN Cert. If the server name specified in the VPN Server name or address field is not found in the SAN values in a VPN Host Certificate, Windows will fail the connection. 
 
-    In other words, the connection will fail if Windows tries to connect to 'host.domain.com' and the host system VPN Cert only has a SAN with 'host', or vice versa. Or, if you are connecting from the Internet and are trying to use an IP address, and the VPN Cert does not have the IP address as a SAN. 
+    In other words, the connection will fail if Windows tries to connect to 'host.domain.com' and the host system VPN Cert only has a SAN with 'host', or vice versa. Similarly, if you are connecting from the Internet and are trying to use an IP address, if the VPN Cert does not have the IP address as a SAN the connection will fail.
 
     Proper use of dynamic DNS makes all this very simple. It can also be addressed by using --altsankey when creating the CA or VPN Cert. If you only have an IP address and no DNS name, include the external address as a SAN when you ceate the CA or additional VPN Cert, but this is not recommended, especially for dynamically assigned IP addresses.
 
