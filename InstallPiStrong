@@ -94,7 +94,7 @@ connections {
         local-1 {
              auth = pubkey
              certs = vpnHostCert.pem
-             id = ipsec.vpn.net
+#             id = not.used           # Not used for Windows authentication
         }
 
         remote-1 {
