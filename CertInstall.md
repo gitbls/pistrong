@@ -72,19 +72,23 @@ If you want to route all of your internet traffic over the VPN, as opposed to on
 
 ### Windows Connect Problems Hints and Tips
 
-If you've set everything up correctly, it should, of course, "just work". But there are a few gotchas. Here are the ones that I discovered.
+If you've set everything up correctly, it should, of course, *just work*. But, since there are a lot of moving parts involved, it may not. Here are some tips to consider as you create your CA and configure users.
 
-* The server name or address in the Windows VPN connection properties must be the same as the fully qualified name (FQDN) of the server. On Raspbian, this can be found in /etc/hostname. Other distros may use /etc/HOSTNAME, or something else altogether. It appears that the hostname specified in the VPN connection properties is checked against the altNames (SAN values) in the VPN Host Certificate, and there must be a match or Windows will fail the connection. 
+* The server name or address in the Windows VPN connection properties must be included as a SAN value in the host VPN Cert. If the server name specified in the VPN Server name or address field is not found in the SAN values in a VPN Host Certificate, Windows will fail the connection. 
 
-  In other words, the connection will fail if Windows tries to connect to 'host.domain.com' and the host system is configured internally with a host name of 'host'. Proper use of dynamic DNS makes this simple. It is possible to make the VPN work using an IP address rather than an FQDN, but this is not recommended.
+    In other words, the connection will fail if Windows tries to connect to 'host.domain.com' and the host system VPN Cert only has a SAN with 'host', or vice versa. Or, if you are connecting from the Internet and are trying to use an IP address, and the VPN Cert does not have the IP address as a SAN. 
 
-* After you install the certificate, you can see them in the certificate manager. After you've installed the certificates, you can Windows-R (run) certmgr.msc and you'll find the strongSwan root certificate in the Trusted Root Certification Authorities. To see the user/device certificate, use the following steps to look at the device certificates.
+    Proper use of dynamic DNS makes all this very simple. It can also be addressed by using --altsankey when creating the CA or VPN Cert. If you only have an IP address and no DNS name, include the external address as a SAN when you ceate the CA or additional VPN Cert, but this is not recommended, especially for dynamically assigned IP addresses.
+
+* After installing the certificate, they can be viewed in the certificate manager. After installing the certificates, use the following steps to look at the device certificates:
+
     * Windows-R mmc.exe
     * File | Add/Remove Snap-in... (or CTRL-M)
-    * Select Certificates and click Add
-    * Select Computer account and click Finish
+    * Select *Certificates *and click Add
+    * Select *Computer account *and click Finish
     * Click OK
     * User/device certificates can be found in the Personal Certificates store
+    * The strongSwan root certificate will be found in the Trusted Root Certification Authorities
 
 
 ## MacOS
