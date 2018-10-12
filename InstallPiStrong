@@ -65,7 +65,8 @@ connections {
 
         local-1 {
              auth = pubkey
-             certs = vpnHostCert.pem
+             cacerts = strongSwanCACert.pem
+             certs = default-strongSwanVPNCert.pem
              id = ipsec.vpn.net
         }
 
@@ -93,7 +94,8 @@ connections {
 
         local-1 {
              auth = pubkey
-             certs = vpnHostCert.pem
+             cacerts = strongSwanCACert.pem
+             certs = default-strongSwanVPNCert.pem
 #             id = not.used           # Not used for Windows authentication
         }
 
@@ -129,13 +131,15 @@ function DoPreReqs() {
     else
         osdistro="unknown"
     fi
+    osdistro=${osdistro%\"}
+    osdistro=${osdistro#\"}
     case "$osdistro" in
         ubuntu)
             echo "I'll try to install the required packages"
             apt-get install make gcc pkg-config libgmp10 libgmp-dev libsystemd-dev libssl-dev python3-pexpect
             echo "Check above to ensure everything got installed"
             ;;
-        opensuse)
+        opensuse*)
             echo "I'll try to install the required packages"
             zypper in make gcc gmp-devel systemd-devel libopenssl-1_1-devel python3-pexpect
             echo "Check above to ensure everything got installed"
@@ -188,15 +192,15 @@ function DoPreReqs() {
 
 function DoDownload() {
     cd ~/
-#    ssver="5.6.3"
     getssver
+#    ssver="5.6.3"  # If you want a specific version (and it's still available)
     echo "% Using Strongswan version $ssver"
     if askin "Press any key to start Strongswan download:" ; then echo ""; fi
     [ -d piStrong ] && rm -rf piStrong
     mkdir piStrong
     cd piStrong
-    #curl -L https://download.strongswan.org/strongswan-$ssver.tar.bz2 -o strongswan-$ssver.tar.bz2
     curl -L https://download.strongswan.org/strongswan-$ssver.tar.bz2 | tar -xjvf -
+#    curl -L https://download.strongswan.org/strongswan-$ssver.tar.bz2 -o strongswan-$ssver.tar.bz2
 #    if askin "Press any key to continue:" ; then echo ""; fi
 #    tar -xjvf ~//piStrong/strongswan-5.6.3.tar.bz2
 }
@@ -244,6 +248,7 @@ function DoPostConf() {
     "config": {
         "altsankey": "",
         "calife": 3650,
+        "cnsuffix": "ipsec.vpn",
         "crllife": 7,
         "uclife": 730,
         "service": "strongswan-swanctl.service",
@@ -279,10 +284,10 @@ EOF
     [ -f "/root/$rcfile" ] && mv /root/$rcfile /root/$rcfile.bak
     cp /etc/swanctl/$rcfile.piStrongInstall /root/$rcfile
 
-    if [ ! -f "/etc/sysctl.d/pistrong.conf" ]
+    if [ ! -f "/etc/sysctl.d/92-pistrong.conf" ]
     then
 	echo ">> Creating /etc/sysctl.d/92-pistrong.conf to set net.ipv4.ip_forward=1"
-	echo "net.ipv4.ip_forward=1" >> /etc/sysctl.d/92-pistrong.conf
+	echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/92-pistrong.conf
 	sysctl -p /etc/sysctl.d/92-pistrong.conf > /dev/null
     fi
 }
@@ -295,16 +300,14 @@ function DoAll() {
     DoInstall
     DoPostConf
 
-    echo ">> Installation complete"
+    echo ">> Installation complete <<"
     echo ">> "
-    echo ">> Edit ~/$rcfile to adjust for your configuration"
-    echo ">> Use 'pistrong makeca' to create the Certificate Authority (CA)"
-    echo ">> Use 'pistrong add' to create user certs"
-    echo ">> See pistrong help and pistrong --help for details"
-    echo ">> Other notes:"
-    echo ">>  Be sure to set net.ipv4.ip_forward = 1 in sysctl (see /etc/sysctl.d)"
+    echo ">> Post-installation steps:"
+    echo ">>   Edit ~/$rcfile to adjust for your configuration"
+    echo ">>   Use 'pistrong makeca' to create the Certificate Authority (CA)"
+    echo ">>   Use 'pistrong add' to create user certs"
+    echo ">>   See pistrong help and pistrong --help for details"
     echo ">> ..."
-    echo ">> To access the VPN from outside your LAN, you'll need external DNS setup. See ???"
 }
 #
 # Main
