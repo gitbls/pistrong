@@ -15,6 +15,8 @@ pistrong consists of two components:
 * `InstallPiStrong` - Installs and configures strongSwan for the roadwarrior
 use case
 
+NOTE: If you have previously created a CA using an earlier version of pistrong, do not upgrade to this release. The CA format and contents have changed. Sorry about that!
+
 ## pistrong
 
 `pistrong` creates the CA and manages users. `pistrong` provides
@@ -40,11 +42,11 @@ Add user fred, for the device named iPhone. Copy the necessary certs to `webdir`
     List all certs for user fred. Print the cert contents also if --full specified
 
 * `pistrong deleteca`
-    Delete the whole CA including all user certs. You will be asked "are you sure", since this is irreversible and will require that **all** issued certs be replaced.
+    Delete the whole CA including all user certs. You will be asked "are you sure", since this is irreversible and will require that **all** issued certs be replaced. Everything. Be really sure!
 
 * `pistrong makevpncert --altsankey "another.SAN.key[,yet.another.SAN.key]"`
-    Create a new VPN key and cert with additional SAN keys. This can be done without re-installing client certs.
-
+    Create a new VPN key and cert with additional SAN keys.
+    
 * `pistrong help`
     Print some online help
 
@@ -99,12 +101,12 @@ certificates.
     Note that the last configuration line in .pistrongrc (before the close brace) must not have a comma. 
 
 * If you need to use multiple strongSwan connections (if different users need different subnets, for example), here is an outline of how to do this:
-    * Establish the primary configuration with the desired VPN SAN key
-    * Create the secondary VPN cert/key using `pistrong makevpncert` to create the secondary VPN SAN key
-    * Manually edit /etc/swanctl/swanctl.conf and add the second connection using the secondary VPN SAN key and secondary VPN cert
-    * Add users to the primary configuration normally
-    * When adding users for the secondary configuration use --remoteid to specify the secondary VPN SAN key
-    * NOTE: If you ever re-create the CA using `pistrong makeca` you'll need to recreate the secondary cert/key and validate the connection in /etc/swanctl/swanctl.conf
+    * Establish the primary configuration with the desired CA Cert and VPN SAN key
+    * Create a secondary CA and a VPN cert/key in that secondary CA
+    * Manually edit /etc/swanctl/swanctl.conf and add the second connection using the secondary CA, VPN SAN key, and secondary VPN cert
+    * Add users to the primary configuration normally, using --cacert to specify the Cert name, and hence the connection for the user
+    * When adding users for the secondary configuration use --remoteid to specify the secondary VPN SAN key as needed
+    * NOTE: If you ever re-create the CA using `pistrong makeca` you'll need to recreate the secondary cert/key and validate the connection in /etc/swanctl/swanctl.conf, so don't do that unless you're really sure!
 
 * Email server configuration is beyond the scope of this
 document. However, if you install postfix (on a Raspberry Pi), take all
