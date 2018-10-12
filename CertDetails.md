@@ -1,4 +1,4 @@
-# pistrong Certificate Authority How To
+# pistrong Certificate Authority Deep Dive
 
 pistrong is designed to be easy-to-use with no need to for the administrator to know about Certificate Authority (CA) Certs/Keys and VPN Certs/Keys. However, in more complex configurations, learning more about this is probably unavoidable. That's what this document is for.
 
@@ -11,7 +11,9 @@ The strongSwan CA is maintained in /etc/swanctl, which is the structure used by 
 * **p12** - User/device Certs
 * **x509crl** - Revoked Cert list
 
-`pistrong makeca` creates a CA named *strongSwan*. If additional CAs are created, specify the CA name with --cacert. CA Cert names are of the form *caname*CACert. For example, the Cert name for the default CA is strongSwanCACert.
+`pistrong makeca` with no CA name specified creates a CA named *strongSwan*. If additional CAs are created, specify the CA name with --cacert. CA Cert names are of the form *caname*CACert. For example, the Cert name for the default CA is strongSwanCACert.
+
+If you are using multiple CAs, you must use --cacert on the add, showca, and makevpncert commands to ensure that your additions are added to the correct CA.
 
 ## VPN Cert
 
