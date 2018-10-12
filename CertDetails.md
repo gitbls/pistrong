@@ -17,7 +17,7 @@ If you are using multiple CAs, you must use --cacert on the add, showca, and mak
 
 ## VPN Cert
 
-the VPN Cert is used by the client to validate that it's connecting with the server that it thinks it is. VPN Cert names are of the form *vpncertname-cacertname*VPNCert. By default, when the default CA is created, a VPN Cert named default-strongSwanVPNCert is created.
+The VPN Cert is used by the client to validate that it's connecting with the server that it thinks it is. VPN Cert names are of the form *vpncertname-cacertname*VPNCert. By default, when the default CA is created, a VPN Cert named default-strongSwanVPNCert is created.
 
 Additional VPN Certs can be created. Use --vpncert to specify the Cert name. Use --cacert to specify the CA name when creating a VPN Cert for other than the default CA.
 
