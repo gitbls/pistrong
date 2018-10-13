@@ -19,7 +19,7 @@ import sys
 import termios
 from email.mime.text import MIMEText
 
-version = "V2.0"
+version = "V2.1"
 rcfile = ".pistrongrc"
 helpmsg = "pistrong {} commands:\n\
 \n\
@@ -518,9 +518,10 @@ def fnuserman():
         else:
             mkpkcs12zpw(cmd)
         dbupdate(newkey, "V", ipwd, swancertfn)
-        print("% Added {}".format(newkey))
         if args.mail != None:
             mailcert(newkey, newp12, newp12fn, cn)
+        reloadcreds()
+        print("% Added {}".format(newkey))
 
     elif piswancmd == "resend":
         if keyindb(newkey):
@@ -601,11 +602,11 @@ def fndeleteca():
         stopifrunning()
         for cadir in cadirlist:
             shutil.rmtree(cadir, ignore_errors=True)
+            if not os.path.isdir(cadir): os.mkdir(cadir, cadirlist[cadir])
         imdb['users'] = {}    # Delete all the users and flush certdb
         imdb['certs'] = {}
         dbflush()
-        for cadir in cadirlist:
-            if not os.path.isdir(cadir): os.mkdir(cadir, cadirlist[cadir])
+#        reloadcreds()   # Not needed since service stopped
         print("% CA Deleted. swanctl.conf and pistrongdb.json config NOT changed")
     else:
         print("% CA NOT deleted")
