@@ -19,7 +19,7 @@ import sys
 import termios
 from email.mime.text import MIMEText
 
-version = "V2.1"
+version = "V2.2"
 rcfile = ".pistrongrc"
 helpmsg = "pistrong {} commands:\n\
 \n\
@@ -506,6 +506,7 @@ def fnuserman():
             ipwd = getpwd()
         cmd = "pki --gen --type rsa --size 2048 --outform pem > {}".format(clientkey)
         dosystem(cmd)
+        os.chmod(clientkey, 0o600)
         cmd = "pki --issue --in {} --type rsa --lifetime {} --cacert {} --cakey {}".format(clientkey, imdb['config']['uclife'], swancert, swankey)
         cmd += " --dn \"C=US, O={}, CN={}\" --san {} --outform pem > {}".format(dnou, cn, cn, clientcert)
         dosystem(cmd)
@@ -620,7 +621,7 @@ def fnmisc():
         maxcert = maxcacertname()
         if newkey == "":
             for ukey in imdb['users']:
-                maxnam = max(maxnam, len(ukey))
+                maxnam = max(maxnam, max(len(ukey), len("Key name ")))
             if not args.full:
                 print("Status  {key:<{wid}} {date:<20}{cacert:<{camax}} Password".format(wid=maxnam, key="Key name", cacert="CA", camax=maxcert, date="Date"))
             listentries("V", "", maxnam, maxcert)
