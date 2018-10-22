@@ -8,5 +8,3 @@ curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/pistrong -o /us
 curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong
 chmod 755 /usr/local/bin/{pistrong,InstallPiStrong}
 /usr/local/bin/InstallPiStrong all < /dev/tty
-
-
