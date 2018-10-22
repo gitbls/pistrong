@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# EZ Installer. Run from the bash command line:
+#
+#    curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/EZPiStrongInstaller | bash
+
+curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/pistrong -o /usr/local/bin/pistrong
+curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong
+chmod 755 /usr/local/bin/{pistrong,InstallPiStrong}
+/usr/local/bin/InstallPiStrong download < /dev/tty
+
+
