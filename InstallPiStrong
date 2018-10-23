@@ -124,6 +124,49 @@ EOF
     cp /etc/swanctl/swanctl.conf /etc/swanctl/swanctl.piStrongInstall
 }
 
+function emitFirewall() {
+
+    if [ -f "/etc/os-release" ]
+    then
+        osdistro=$(grep ^ID= /etc/os-release | (IFS='='; read a b ; echo $b))
+    else
+        osdistro="unknown"
+    fi
+    osdistro=${osdistro%\"}
+    osdistro=${osdistro#\"}
+    case "$osdistro" in
+	debian|raspbian)
+	    [ -f /etc/swanctl/iptables.strongswan ] && return
+	    echo "Adding iptables POSTROUTING for strongSwan"
+	    echo "  See /etc/swanctl/iptables.strongswan and /etc/network/if-pre-up.d/fwstrongswan"
+	    cat > /etc/swanctl/iptables.strongswan <<EOF
+*nat
+:POSTROUTING ACCEPT [0:0]
+-A POSTROUTING -s $vpnsubnet -o eth0 -m policy --dir out --pol ipsec -j ACCEPT
+-A POSTROUTING -s $vpnsubnet -o eth0 -j MASQUERADE
+COMMIT
+EOF
+	    [ -f /etc/network/if-pre-up.d/fwstrongswan ] && return
+	    cat > /etc/network/if-pre-up.d/fwstrongswan <<EOF
+#!/bin/sh
+/sbin/iptables-restore < /etc/swanctl/iptables.strongswan
+EOF
+	    chmod 755 /etc/network/if-pre-up.d/fwstrongswan
+	    ;;
+	*)
+	    echo "% You must manually add iptables POSTROUTING entries for strongSwan"
+	    echo "  and in such a way that they will be instantiated when the system restarts"
+	    echo ""
+	    echo "Your iptables *nat POSTROUTING chain must contain"
+	    echo "*nat"
+	    echo ":POSTROUTING ACCEPT [0:0]"
+	    echo "-A POSTROUTING -s $vpnsubnet -o eth0 -m policy --dir out --pol ipsec -j ACCEPT"
+	    echo "-A POSTROUTING -s $vpnsubnet -o eth0 -j MASQUERADE"
+	    echo "COMMIT"
+	    ;;
+    esac
+}
+
 function DoPreReqs() {
     if [ -f "/etc/os-release" ]
     then
@@ -290,6 +333,8 @@ EOF
 	echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/92-pistrong.conf
 	sysctl -p /etc/sysctl.d/92-pistrong.conf > /dev/null
     fi
+
+    emitFirewall
 }
 
 function DoAll() {
