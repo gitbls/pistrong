@@ -3,23 +3,28 @@ Simplified CA and device cert manager for strongSwan
 
 ## Overview
 
-pistrong greatly simplifies configuring and managing
-the strongSwan Certificate Authority (CA) and certificates for 
-user devices for the roadwarrior use case, and also provides a targeted strongSwan
-installer.
+pistrong greatly simplifies installing and configuring strongSwan, and managing
+the strongSwan Certificate Authority (CA) and Certificates for 
+user devices for the roadwarrior use case.
+
+pistrong includes installation, configuration, and management support for Raspbian/Debian distros. There is partial install/config support for openSuSE, Ubuntu, Debian, and Centos. pistrong is distro-independent, so can be used on any distro once strongSwan is properly installed and configured.
 
 pistrong consists of two components:
 
-* `pistrong` - Provides day-to-day CA and roadwarrior user key/cert management
+* `pistrong` - Provides day-to-day CA and roadwarrior user Key/Cert management
 
 * `InstallPiStrong` - Installs and configures strongSwan for the roadwarrior
 use case
 
-NOTE: If you have previously created a CA using an earlier version of pistrong, do not upgrade to this release. The CA format and contents have changed. Sorry about that!
+The easiest way to install pistrong is to use the bash command:
+
+    `curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/EZPiStrongInstaller | bash`
+
+This will download pistrong and InstallPiStrong to /usr/local/bin, and then start `InstallPiStrong all` to fully install and configure strongSwan. See the section on InstallPiStrong below for distro-specific details.
 
 ## pistrong
 
-`pistrong` creates the CA and manages users. `pistrong` provides
+Once strongSwan has been installed and configured, `pistrong` creates the CA and manages users. `pistrong` provides
 commands to create (or delete) the CA, add, revoke, delete, or list
 users, and simple strongSwan service management (start, stop, restart,
 enable, disable, status).
@@ -34,18 +39,18 @@ password for the certificate.
     Create a new Certificate Authority using the vpnsankey as specified. The VPN SAN key is required and provides an extra level of security for iOS device authentication. 
 
 * `pistrong add fred --device iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random`
-Add user fred, for the device named iPhone. Copy the necessary certs to `webdir`. Send fred email with links to the certs using `weburl`. The device name is optional and may help be used to help track where a cert is deployed. If --device is not specified, `dev` is used. In general, you should have `webdir`, `weburl`, and `random` configured in ~/.pistrongrc rather than specifying them on the command line.
+Add user *fred*, for the device named *iPhone*. Copy the necessary certs to `webdir`. Send *fred* email with links to the Certs using `weburl`. The device name is optional and may be helpful track where a Cert is targeted. If --device is not specified, *`dev`* is used. In general, you should have `webdir`, `weburl`, and `random` configured in ~/.pistrongrc rather than specifying them on the command line.
 
-* `pistrong resend fred-iPhone --mail fred@otherdomain.com` Resend the email with the links to the certs to the specified email address. 
+* `pistrong resend fred-iPhone --mail fred@otherdomain.com` Resend the email with the links to the Certs to the specified email address. 
 
 * `pistrong list fred --all [--full]`
-    List all certs for user fred. Print the cert contents also if --full specified
+    List all Certs for user *fred*. Print the cert contents also if --full specified
 
 * `pistrong deleteca`
-    Delete the whole CA including all user certs. You will be asked "are you sure", since this is irreversible and will require that **all** issued certs be replaced. Everything. Be really sure!
+    Delete the whole CA including all user Certs. You will be asked to confirm, since this is irreversible and will require that **all** issued Certs be replaced. Everything. Be really sure, especially if you have more than a couple of users.
 
 * `pistrong makevpncert --altsankey "another.SAN.key[,yet.another.SAN.key]"`
-    Create a new VPN key and cert with additional SAN keys.
+    Create a new VPN Key and Cert with additional SAN keys.
     
 * `pistrong help`
     Print some online help
@@ -67,7 +72,7 @@ new systemd model. The download/build/install process takes 15-20
 minutes on a Raspberry Pi 3B.
 
 `InstallPiStrong` has several phases. If no phase is specified or **all** is specified,
-all phases will be run. The phases include:
+all phases will be run. InstallPiStrong will pause at the start of each phase to provide time for reviewing the results of the previous phase. The phases include:
 
 * **prereq** ensures that the required packages are installed on your system
 * **download** downloads the latest strongSwan release 
@@ -80,7 +85,7 @@ all phases will be run. The phases include:
     * `~/.pistrongrc` pistrong config file for frequently-used settings rather than on the command line
     * Copies (in /etc/swanctl) of the just-created files swanctl.piStrongInstall, pistrongdb.piStrongInstall, and .pistrongrc.piStrongInstall
 
-    Use this (`InstallPiStrong postconf`) if you install strongSwan with some other mechanism and want to use pistrong to manage your CA and user/device certs.
+    Use `InstallPiStrong postconf` if you install strongSwan with some other mechanism and want to use pistrong to manage your CA and user/device Certs.
 
 ## Hints
 
@@ -100,13 +105,12 @@ certificates.
 
     Note that the last configuration line in .pistrongrc (before the close brace) must not have a comma. 
 
-* If you need to use multiple strongSwan connections (if different users need different subnets, for example), here is an outline of how to do this:
+* If you need to use multiple strongSwan connections (for different users accessing different local subnets, for example), here is an outline of how to do this:
     * Establish the primary configuration with the desired CA Cert and VPN SAN key
-    * Create a secondary CA and a VPN cert/key in that secondary CA
-    * Manually edit /etc/swanctl/swanctl.conf and add the second connection using the secondary CA, VPN SAN key, and secondary VPN cert
-    * Add users to the primary configuration normally, using --cacert to specify the Cert name, and hence the connection for the user
-    * When adding users for the secondary configuration use --remoteid to specify the secondary VPN SAN key as needed
-    * NOTE: If you ever re-create the CA using `pistrong makeca` you'll need to recreate the secondary cert/key and validate the connection in /etc/swanctl/swanctl.conf, so don't do that unless you're really sure!
+    * Create a secondary CA and a VPN Cert/Key in that secondary CA
+    * Manually edit /etc/swanctl/swanctl.conf and add the second connection using the secondary CA, VPN SAN Key, and secondary VPN Cert. Also add the secondary IP address pool.
+    * When adding users, always specify --cacert and --remoteid to specify the secondary VPN SAN Key to ensure that the user Cert is assigned to the correct connction.
+    * NOTE: If you ever re-create the CA using `pistrong makeca` you'll need to recreate the secondary Cert/Key and validate the connection in /etc/swanctl/swanctl.conf, so don't do that unless you're really sure!
 
 * Email server configuration is beyond the scope of this
 document. However, if you install postfix (on a Raspberry Pi), take all
