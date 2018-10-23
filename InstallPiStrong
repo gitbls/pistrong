@@ -146,12 +146,12 @@ function emitFirewall() {
 -A POSTROUTING -s $vpnsubnet -o eth0 -j MASQUERADE
 COMMIT
 EOF
-	    [ -f /etc/network/if-pre-up.d/fwstrongswan ] && return
-	    cat > /etc/network/if-pre-up.d/fwstrongswan <<EOF
+	    [ -f /etc/network/if-pre-up.d/fwpistrong ] && return
+	    cat > /etc/network/if-pre-up.d/fwpistrong <<EOF
 #!/bin/sh
 /sbin/iptables-restore < /etc/swanctl/iptables.strongswan
 EOF
-	    chmod 755 /etc/network/if-pre-up.d/fwstrongswan
+	    chmod 755 /etc/network/if-pre-up.d/fwpistrong
 	    ;;
 	*)
 	    echo "% You must manually add iptables POSTROUTING entries for strongSwan"
