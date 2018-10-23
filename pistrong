@@ -19,7 +19,7 @@ import sys
 import termios
 from email.mime.text import MIMEText
 
-version = "V2.2"
+version = "V2.3"
 rcfile = ".pistrongrc"
 helpmsg = "pistrong {} commands:\n\
 \n\
@@ -445,7 +445,7 @@ def makevpncert(altsankey, mvpncert, mvpnkey):
     mvpnkey = full path of VPN key
     """
     print("\n>> Create VPN Host Key ({})".format(mvpnkey))
-    dosystem("pki --gen --type rsa --size 4096 --outform pem > {}".format(mvpnkey))
+    dosystem("pki --gen --type rsa --size {} --outform pem > {}".format(keybits, mvpnkey))
     os.chmod(mvpnkey, 0o600)
     print("\n>> Create VPN Host Cert ({})\n".format(mvpncert))
     altsan = ""
@@ -464,7 +464,7 @@ def makecacert():
     """
     global dbmodified
     print("\n>> Creating CA Key ({})".format(swankey))
-    dosystem("pki --gen --type rsa --size 4096 --outform pem > {}".format(swankey))
+    dosystem("pki --gen --type rsa --size {} --outform pem > {}".format(keybits, swankey))
     os.chmod(swankey, 0o600)
     print("\n>> Create self-signed CA Cert ({})\n".format(swancert))
     dosystem("pki --self --ca --lifetime {} --in {} --type rsa\
@@ -504,7 +504,7 @@ def fnuserman():
             ipwd = genrandpwd()
         if not args.nopass and ipwd == "":
             ipwd = getpwd()
-        cmd = "pki --gen --type rsa --size 2048 --outform pem > {}".format(clientkey)
+        cmd = "pki --gen --type rsa --size {} --outform pem > {}".format(keybits, clientkey)
         dosystem(cmd)
         os.chmod(clientkey, 0o600)
         cmd = "pki --issue --in {} --type rsa --lifetime {} --cacert {} --cakey {}".format(clientkey, imdb['config']['uclife'], swancert, swankey)
@@ -708,7 +708,7 @@ parser = argparse.ArgumentParser(
     or delete a user's cert. A cert password can be provided on the command line, \
     randomly generated, or no password. Sending mail with a link to the cert provides an easy way \
     to get the cert loaded onto a device, but requires that you can send mail via local SMTP service or smarthost\
-    and have a web server. ** Be sure to review all settings in ~/{}".format(rcfile))
+    and have a web server.")
 
 # values for each command item: function to process, 0=perform key/cert check and load db
 cmdlist = {'add':[fnuserman,0], 'revoke':[fnuserman,0], 'resend':[fnuserman,0],\
@@ -719,29 +719,30 @@ cmdlist = {'add':[fnuserman,0], 'revoke':[fnuserman,0], 'resend':[fnuserman,0],\
            'makecacert':[fnmakecacert,1], 'showcert':[fnmisc,0], 'showconfig':[fnmisc,1],\
            'listca':[fnmisc,1], 'help':[fnmisc,1], 'version':[fnmisc,1]}
 parser.add_argument("command", choices=cmdlist)
-parser.add_argument("hostarg", nargs='?', help="username or host to add or revoke")
-parser.add_argument("--password", help="Password for new user's key")
-parser.add_argument("--device", help="User's device name (Stored in cert, displayed in log. Default=VPN)")
-parser.add_argument("--nopass", help="Do not set a password on this user's p12 cert", action="store_true")
-parser.add_argument("--random", help="Generate random password for user's p12 cert", action="store_true")
-parser.add_argument("--webdir", help="Copy client p12 cert to specified web server directory")
-parser.add_argument("--weburl", help="URL prefix for cert to use in email")
+parser.add_argument("hostarg", nargs='?', help="username to add or revoke or hostname")
+parser.add_argument("--password", help="Password for new user's Key")
+parser.add_argument("--device", help="User's device name (See CertDetails.md ['dev'])")
+parser.add_argument("--nopass", help="Do not set password on user's p12 Cert", action="store_true")
+parser.add_argument("--random", help="Generate random password for user's p12 Cert", action="store_true")
+parser.add_argument("--webdir", help="Copy client p12 Cert to specified web server directory")
+parser.add_argument("--weburl", help="URL prefix for Cert to use in email")
 parser.add_argument("--mail", help="Email address to send LAN URL link to (requires --weburl and --webdir)")
-parser.add_argument("--crllife", type=int, help="Lifetime of CRL in days [7]")
-parser.add_argument("--calife", type=int, help="Lifetime of CA cert in days [3650]")
-parser.add_argument("--uclife", type=int, help="Lifetime of user cert in days [730]")
+parser.add_argument("--crllife", type=int, help="CRL lifetime in days [7]")
+parser.add_argument("--calife", type=int, help="CA Cert lifetime in days [3650]")
+parser.add_argument("--uclife", type=int, help="User Cert lifetime in days [730]")
+parser.add_argument("--keybits", type=int, help="Private key bits [CA/VPN Keys:4096, Client:2048]")
 parser.add_argument("--mailfrom", help="email 'from' address")
-parser.add_argument("--full", help="Print user cert info in list command", action="store_true")
-parser.add_argument("--all", help="List all keys for specified user", action="store_true")
+parser.add_argument("--full", help="Print user Cert info in list command", action="store_true")
+parser.add_argument("--all", help="List all Certs for specified user", action="store_true")
 parser.add_argument("--config", help="Alternate config file [~/{}]".format(rcfile))
-parser.add_argument("--vpnsankey", help="Specify VPN SAN key for makeca command")
-parser.add_argument("--altsankey", help="Specify alternate VPN SAN key for makeca or makevpncert commands")
-parser.add_argument("--cnsuffix", help="Specify the X509 CN suffix [ipsec.vpn]")
-parser.add_argument("--onlyalt", help="Don't add any default SAN values, only use altsankey", action="store_true")
-parser.add_argument("--vpncert", help="Specify filename prefix for VPN Cert/Key [VPNHost]")
-parser.add_argument("--cacert", help="Specify filename prefix for CA Cert/Key [strongSwan]")
-parser.add_argument("--remoteid", help="Provide RemoteID for user to use instead of established VPN SAN key")
-parser.add_argument("--cmds", help="Display pki commands when run", action="store_true")
+parser.add_argument("--vpnsankey", help="VPN SAN key for makeca command")
+parser.add_argument("--altsankey", help="Alternate VPN SAN Key for makeca or makevpncert commands")
+parser.add_argument("--cnsuffix", help="X509 CN suffix [ipsec.vpn]")
+parser.add_argument("--onlyalt", help="Don't add default SAN values; Only use altsankey", action="store_true")
+parser.add_argument("--vpncert", help="VPN Cert/Key name prefix ['default']")
+parser.add_argument("--cacert", help="CA Cert/Key name prefix ['strongSwan' or non-null hostarg]")
+parser.add_argument("--remoteid", help="RemoteID for client instead of established VPN SAN key")
+parser.add_argument("--cmds", help="Display PKI commands when run", action="store_true")
 parser.add_argument("--root", help="Alternate directory for CA root (for testing)")
 parser.add_argument("--debug", help="Debug mode. Use current directory ['.'] instead of /etc/swanctl", action="store_true")
 #
@@ -790,6 +791,14 @@ if piswancmd == "makevpncert":
 if piswancmd == "showcert":
     if args.hostarg is None:
         perrorexit("% showcert requires cert file specification")
+keybits = args.keybits
+if keybits is None:
+    if piswancmd == "add":
+        keybits = 2048
+    else:
+        keybits = 4096
+else:
+    if keybits < 2048: keybits = 2048
 #
 # A fully-formed user cert name is username-devname-hostname@cnsuffix. 
 #
