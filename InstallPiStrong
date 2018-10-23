@@ -14,11 +14,23 @@
 # Start and stop the vpn via: pistrong start and pistrong stop
 #
 
-function getssver {
+function getssver() {
     vs1=$(curl -s -L https://www.strongswan.org/download.html | grep 'Current Release' | head -1)
     s1=${vs1##<h4>Current Release*normal\">}
     ssver=${s1%%<*}
     return 1
+}
+
+function getosdistro() {
+    [ "$osdistro" != "" ] &$ return
+    if [ -f "/etc/os-release" ]
+    then
+        osdistro=$(grep ^ID= /etc/os-release | (IFS='='; read a b ; echo $b))
+    else
+        osdistro="unknown"
+    fi
+    osdistro=${osdistro%\"}
+    osdistro=${osdistro#\"}
 }
 
 function askyn() {
@@ -33,6 +45,15 @@ function askyn() {
 function askin() {
     local ans
     echo -n "$1 "; read -n 1 ans
+}
+
+function askinall() {
+    if [ "$cmd" == "all" ]
+    then
+	# Flush input in case of typeahead
+	while read -e -t 0.1 ; do : ; done
+	askin "$1"
+    fi
 }
 
 function gotoBuildDir() {
@@ -126,20 +147,16 @@ EOF
 
 function emitFirewall() {
 
-    if [ -f "/etc/os-release" ]
-    then
-        osdistro=$(grep ^ID= /etc/os-release | (IFS='='; read a b ; echo $b))
-    else
-        osdistro="unknown"
-    fi
-    osdistro=${osdistro%\"}
-    osdistro=${osdistro#\"}
+    getosdistro
     case "$osdistro" in
 	debian|raspbian)
 	    [ -f /etc/swanctl/iptables.strongswan ] && return
 	    echo "Adding iptables POSTROUTING for strongSwan"
-	    echo "  See /etc/swanctl/iptables.strongswan and /etc/network/if-pre-up.d/fwstrongswan"
-	    cat > /etc/swanctl/iptables.strongswan <<EOF
+	    echo "  See /etc/swanctl/iptables.pistrong and /etc/network/if-pre-up.d/fwpistrong"
+	    cat > /etc/swanctl/iptables.pistrong <<EOF
+# This is invoked by /etc/network/if-pre-up.d/fwpistrong
+#  and adds the necessary iptables routes to enable VPN routing to the internet
+
 *nat
 :POSTROUTING ACCEPT [0:0]
 -A POSTROUTING -s $vpnsubnet -o eth0 -m policy --dir out --pol ipsec -j ACCEPT
@@ -149,15 +166,16 @@ EOF
 	    [ -f /etc/network/if-pre-up.d/fwpistrong ] && return
 	    cat > /etc/network/if-pre-up.d/fwpistrong <<EOF
 #!/bin/sh
-/sbin/iptables-restore < /etc/swanctl/iptables.strongswan
+/sbin/iptables-restore < /etc/swanctl/iptables.pistrong
 EOF
 	    chmod 755 /etc/network/if-pre-up.d/fwpistrong
 	    ;;
 	*)
 	    echo "% You must manually add iptables POSTROUTING entries for strongSwan"
-	    echo "  and in such a way that they will be instantiated when the system restarts"
+	    echo "  and in such a way that they will be instantiated when the system restarts."
+	    echo "  These entries enable VPN routing to the internet."
 	    echo ""
-	    echo "Your iptables *nat POSTROUTING chain must contain"
+	    echo "Your iptables *nat POSTROUTING chain must contain:"
 	    echo "*nat"
 	    echo ":POSTROUTING ACCEPT [0:0]"
 	    echo "-A POSTROUTING -s $vpnsubnet -o eth0 -m policy --dir out --pol ipsec -j ACCEPT"
@@ -168,14 +186,7 @@ EOF
 }
 
 function DoPreReqs() {
-    if [ -f "/etc/os-release" ]
-    then
-        osdistro=$(grep ^ID= /etc/os-release | (IFS='='; read a b ; echo $b))
-    else
-        osdistro="unknown"
-    fi
-    osdistro=${osdistro%\"}
-    osdistro=${osdistro#\"}
+    getosdistro
     case "$osdistro" in
         ubuntu)
             echo "I'll try to install the required packages"
@@ -195,7 +206,7 @@ function DoPreReqs() {
             ;;
         debian|raspbian)
             echo ">> Ensure your Pi is up to date"
-            echo " Your Pi must be up to date with the Raspbian repositories via these commands"
+            echo " Your Pi must be up to date with the Raspbian repositories by using these commands"
             echo "    apt-get update"
             echo "    apt-get upgrade"
             echo ""
@@ -238,7 +249,7 @@ function DoDownload() {
     getssver
 #    ssver="5.6.3"  # If you want a specific version (and it's still available)
     echo "% Using Strongswan version $ssver"
-    if askin "Press any key to start Strongswan download:" ; then echo ""; fi
+    if askinall "Press any key to start Strongswan download:" ; then echo ""; fi
     [ -d piStrong ] && rm -rf piStrong
     mkdir piStrong
     cd piStrong
@@ -250,7 +261,7 @@ function DoDownload() {
 
 function DoPreConf() {
     gotoBuildDir
-    if askin "Press any key to start pre-make configuration:" ; then echo ""; fi
+    if askinall "Press any key to start pre-make configuration:" ; then echo ""; fi
     echo ""
     echo ">> Performing pre-make configuration <<"
     ./configure --prefix= --enable-eap-mschapv2 --enable-eap-identity --enable-openssl --enable-eap-md5 --enable-eap-tls --enable-eap-dynamic --enable-systemd --enable-swanctl --disable-charon --disable-stroke --disable-scepclient --enable-counters
@@ -258,20 +269,18 @@ function DoPreConf() {
 
 function DoMake() {
     gotoBuildDir
-    if askin "Press any key to start make:" ; then echo ""; fi
+    if askinall "Press any key to start make:" ; then echo "" ; fi
     echo ">> Performing make <<"
     make
 }
 
 function DoInstall() {
     gotoBuildDir
-    if askin "Press any key to start install:"
-    then
-        make install
-    fi
+    if askinall "Press any key to start install:" ; then  make install ; fi
 }
 
 function DoPostConf() {
+    askinall "Press any key to start postconf:"
     vpnsubnet="10.1.10.0/24"
     echo -n "Subnet for VPN clients [$vpnsubnet]: " ; read ans
     [ "$ans" != "" ] && vpnsubnet=$ans
@@ -351,8 +360,9 @@ function DoAll() {
     echo ">>   Edit ~/$rcfile to adjust for your configuration"
     echo ">>   Use 'pistrong makeca' to create the Certificate Authority (CA)"
     echo ">>   Use 'pistrong add' to create user certs"
+    echo ">>   Use 'pistrong start' to start the strongSwan VPN"
+    echo ""
     echo ">>   See pistrong help and pistrong --help for details"
-    echo ">> ..."
 }
 #
 # Main
