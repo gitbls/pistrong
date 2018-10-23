@@ -7,7 +7,7 @@ pistrong greatly simplifies installing and configuring strongSwan, and managing
 the strongSwan Certificate Authority (CA) and Certificates for 
 user devices for the roadwarrior use case.
 
-pistrong includes installation, configuration, and management support for Raspbian/Debian distros. There is partial install/config support for openSuSE, Ubuntu, Debian, and Centos. pistrong is distro-independent, so can be used on any distro once strongSwan is properly installed and configured.
+pistrong includes complete installation, configuration, and management support for Raspbian/Debian distros. There is partial install/config support for openSuSE, Ubuntu, Debian, and Centos. pistrong is distro-independent, so can be used on any distro once strongSwan is properly installed and configured.
 
 pistrong consists of two components:
 
