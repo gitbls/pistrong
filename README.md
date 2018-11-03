@@ -20,6 +20,13 @@ The easiest way to install pistrong is to use the bash command:
 
 This will download pistrong and InstallPiStrong to /usr/local/bin, and then start `InstallPiStrong all` to fully install and configure strongSwan. See the section on InstallPiStrong below for distro-specific details.
 
+If you'd prefer to not feed an unknown script directly into bash, you can issue the following commands on your local system:
+
+    curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/pistrong -o /usr/local/bin/pistrong
+    curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong
+    chmod 755 /usr/local/bin/{pistrong,InstallPiStrong}
+    /usr/local/bin/InstallPiStrong all
+
 ## pistrong
 
 Once strongSwan has been installed and configured, `pistrong` creates the CA and manages users. `pistrong` provides
