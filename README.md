@@ -3,7 +3,7 @@ Simplified CA and device cert manager for the strongSwan VPN
 
 ## Overview
 
-pistrong greatly simplifies installing and configuring the strongSwan VPN. Once installed, use pistrong to easily manageme the the strongSwan Certificate Authority (CA) and Certificates for remote user devices connecting to the VPN (roadwarrior use case).
+pistrong greatly simplifies installing and configuring the strongSwan VPN. Once installed, use pistrong to easily managee the strongSwan Certificate Authority (CA) and Certificates for remote user devices connecting to the VPN. pistrong fully supports the roadwarrior use case (users on devices), and can be used to create and manage certs for other uses, such as host-to-host tunnels).
 
 pistrong includes complete installation, configuration, and management support for Raspbian/Debian distros. There is partial install/config support for openSuSE, Ubuntu, Debian, and Centos. pistrong is distro-independent, so can be used on any distro once strongSwan is properly installed and configured.
 
