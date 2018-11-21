@@ -16,7 +16,7 @@ use case
 
 The easiest way to install pistrong is to use the bash command:
 
-    `curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/EZPiStrongInstaller | bash`
+    curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/EZPiStrongInstaller | bash
 
 This will download pistrong and InstallPiStrong to /usr/local/bin, and then start `InstallPiStrong all` to fully install and configure strongSwan. See the section on InstallPiStrong below for distro-specific details.
 
