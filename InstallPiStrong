@@ -22,7 +22,7 @@ function getssver() {
 }
 
 function getosdistro() {
-    [ "$osdistro" != "" ] &$ return
+    [ "$osdistro" != "" ] && return
     if [ -f "/etc/os-release" ]
     then
         osdistro=$(grep ^ID= /etc/os-release | (IFS='='; read a b ; echo $b))
