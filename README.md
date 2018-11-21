@@ -58,7 +58,7 @@ Add user *fred*, for the device named *iPhone*. Copy the necessary certs to `web
     Create a new VPN Key and Cert with additional SAN keys.
     
 * `pistrong help`
-    Print some online help
+    Print detailed online help
 
 ## InstallPiStrong 
 
