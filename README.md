@@ -3,16 +3,15 @@ Simplified CA and device cert manager for the strongSwan VPN
 
 ## Overview
 
-pistrong greatly simplifies installing and configuring the strongSwan VPN. Once installed, use pistrong to easily manage the strongSwan Certificate Authority (CA) and Certificates for remote user devices connecting to the VPN. pistrong fully supports the roadwarrior use case (users on devices), and can be used to create and manage certs for other uses, such as host-to-host tunnels.
+`pistrong` greatly simplifies installing and configuring the strongSwan VPN. Once installed, use pistrong to easily manage the strongSwan Certificate Authority (CA) and Certificates for remote user devices connecting to the VPN. pistrong fully supports the roadwarrior use case (users on devices), and can be used to create and manage certs for other uses, such as host-to-host tunnels.
 
 pistrong includes complete installation, configuration, and management support for Raspbian/Debian distros. There is partial install/config support for openSuSE, Ubuntu, Debian, and Centos. pistrong is distro-independent, so can be used on any distro once strongSwan is properly installed and configured.
 
 pistrong consists of two components:
 
-* `pistrong` - Provides day-to-day CA and roadwarrior user Key/Cert management
+* `pistrong` - Provides day-to-day CA and user Key/Cert management
 
-* `InstallPiStrong` - Installs and configures strongSwan for the roadwarrior
-use case
+* `InstallPiStrong` - Installs and configures strongSwan
 
 The easiest way to install pistrong is to use the bash command:
 
@@ -41,7 +40,7 @@ password for the certificate.
 ### Example commands
 
 * `pistrong createca --vpnsankey my.special.vpnsankey`
-    Create a new Certificate Authority using the vpnsankey as specified. The VPN SAN key is required and provides an extra level of security for iOS device authentication. 
+    Create a new Certificate Authority using the vpnsankey as specified. The VPN SAN key is required and provides an extra level of security for iOS device authentication. See CertDetails.md for more information on VPN SAN keys.
 
 * `pistrong add fred --device iPhone --mail fred@domain.com --webdir /var/www/html/vpn --weburl http://myhost/vpn --random`
 Add user *fred*, for the device named *iPhone*. Copy the necessary certs to `webdir`. Send *fred* email with links to the Certs using `weburl`. The device name is optional and may be helpful track where a Cert is targeted. If --device is not specified, *`dev`* is used. In general, you should have `webdir`, `weburl`, and `random` configured in ~/.pistrongrc rather than specifying them on the command line.
@@ -54,8 +53,8 @@ Add user *fred*, for the device named *iPhone*. Copy the necessary certs to `web
 * `pistrong deleteca`
     Delete the whole CA including all user Certs. You will be asked to confirm, since this is irreversible and will require that **all** issued Certs be replaced. Everything. Be really sure, especially if you have more than a couple of users.
 
-* `pistrong makevpncert --altsankey "another.SAN.key[,yet.another.SAN.key]"`
-    Create a new VPN Key and Cert with additional SAN keys.
+* `pistrong makevpncert --vpncert mynewcert --vpnsankey the.other.clients`
+    Create a new VPN Key and Cert with a different SAN key
     
 * `pistrong help`
     Print detailed online help
@@ -148,4 +147,4 @@ Please refer to the issues list if you have ideas for improving this tool or hav
 
 Or, if you're so inclined, do it yourself and leave a pull request.
 
-Testing and documenting cert installation steps for Android and MacOS is another area where your help would be greatly appreciated, in addition to adding support to InstallPiStrong for more Linux distros.
+Testing and documenting cert installation steps for Android and MacOS is another area where I would really apprecaite your help, in addition to adding support to InstallPiStrong for more Linux distros.
