@@ -19,7 +19,7 @@ import sys
 import termios
 from email.mime.text import MIMEText
 
-version = "V2.3"
+version = "V2.4"
 rcfile = ".pistrongrc"
 helpmsg = "pistrong {} commands:\n\
 \n\
@@ -39,7 +39,6 @@ helpmsg = "pistrong {} commands:\n\
  listca         List all CA and VPN cert names\n\
  showca         Show CA and associated VPN certs\n\
  showcert       List cert contents\n\
- makecacert     Create an additional CA cert\n\
  makevpncert    Create a new VPN cert/key\n\
  showconfig     Print as-loaded config settings\n\
  install        Starts strongSwan installation via 'InstallPiStrong all'\n\
@@ -65,9 +64,9 @@ pistrong createca\n          Create a new CA in the root directory (/etc/swanctl
 pistrong createca --vpnsankey keyname\n          Create a new CA with a different vpnsankey (d:ipsec.vpn.net)\n\
 pistrong makeca --vpnsankey keyname --cnsuffix mydomain.com\n          Same but user ids are ...@mydomain.com instead of ...@ipsec.vpn\n\
 pistrong deleteca\n          Delete the CA, all certs, etc. Be really sure on this one!\n\
-pistrong makevpncert --onlyalt --altsankey key1,key2 --vpncert mycert\n\
-          Make an additional VPN cert/key named mycert. key1 and key2 will be\n\
-          the only altNames in the cert (--onlyalt)\n\
+pistrong makevpncert --vpnsankey key1,key2 --vpncert mycert\n\
+          Make an additional VPN cert/key named mycert. The hosts's FQDN, key1, and key2 will be\n\
+          the SAN names in the cert\n\
 pistrong add name\n          Add user 'name' and create a cert for it\n\
 pistrong add name --password abc\n          Provide the cert password on the command line\n\
 pistrong add name --device DEVICE\n          Name the cert name-DEVICE-servername@cnsuffix\n          (d: name-dev-servername...)\n\
@@ -87,7 +86,7 @@ For example, 'pistrong list bill --all' will list the certs for bill-iphone\n\
 and bill-laptop.\n\n\
 The revoke and resend commands always require a full name-dev.\n\
 \n\
-For security reasons, you MUST specify --vpnsankey when you create a CA.\n\
+For security reasons, you MUST specify --vpnsankey when you first create a CA.\n\
 \n\
 See the full documentation at https://github.com/gitbls/pistrong\n\
 ".format(version, rcfile, rcfile, rcfile)
@@ -289,8 +288,12 @@ def dbread():
         dbmodified = True
     if not 'config' in imdb:
         imdb['config'] = {"crllife":7, "calife":3650, "uclife":730,\
-                          "vpnsankey":"ipsec.vpn.net", "altsankey":"",\
+                          "version":"2.0", "vpnsankey":"ipsec.vpn.net",\
                           "cnsuffix":"ipsec.vpn", "service":"strongswan-swanctl.service"}
+    if not 'version' in imdb['config']:
+            if 'altsankey' in imdb['config']: del(imdb['config']['altsankey'])
+            imdb['config']['version'] = "2.0"
+            dbmodified = True
     if not 'certs' in imdb:
         imdb['certs'] = {}
         dbmodified = True
@@ -326,7 +329,7 @@ def dbupdate(keyname, newstatus, upwd, ca):
     imdb['users'][keyname]['state'] = newstatus
     imdb['users'][keyname]['date'] = datetime.datetime.strftime(datetime.datetime.now(), "%Y-%m-%d:%H:%M:%S")
     imdb['users'][keyname]['password'] = upwd
-    imdb['users'][keyname]['ca'] = ca.replace(".pem", "")
+    imdb['users'][keyname]['ca'] = ca
     dbflush()
 
 def validatekeyname(keyname):
@@ -337,23 +340,6 @@ def validatekeyname(keyname):
         perrorexit("% No client name specified")
     if " " in keyname:
         perrorexit("% Space not allowed in client name")
-
-def updateswanconf(newid):
-    with open ("{}/swanctl.conf".format(swandir), 'r' ) as f:
-        repstring = r"\1{}".format(newid)
-        with open("{}/swanctl.new".format(swandir), "w") as fw:
-            while True:
-                line = f.readline()
-                if not line: break
-                if "%any" in line:   # handle 'id=%any' separately. simplifies the re.sub pattern
-                    fw.write(line)
-                else:
-                    fw.write("{}".format(re.sub('(id *= *)([\w.]*)', repstring, line, flags = re.A)))
-    now = datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d%H%M")
-    print("% Saving current swanctl.conf as swanctl.conf-{}".format(now))
-    qrename("{}/swanctl.conf".format(swandir), "{}/swanctl.conf-{}".format(swandir, now))
-    qrename("{}/swanctl.new".format(swandir), "{}/swanctl.conf".format(swandir))
-
 
 def getcertkey(certfile, keyname):
     """
@@ -375,10 +361,10 @@ def maxcertname():
     """
     Find the longest cert name
     """
-    maxnam = maxcacertname()
+    maxnam = 0
     for fn in os.listdir(dx509):
         if fn.endswith("VPNCert.pem"):
-            maxnam = max(maxnam, len(os.fsdecode(fn))-4)
+            maxnam = max(maxnam, len(os.fsdecode(fn))-len("VPNCert.pem"))
     return maxnam
 
 def listentry(listkey, maxkey, maxcertlen):
@@ -426,7 +412,7 @@ def mailcert(newkey, newp12, newp12fn, cn):
     os.chmod(webfn, 0o644)
     certurl = fnpdir.format(dx['weburl'], newp12fn)
     cacerturl = fnpdir.format(dx['weburl'], swancertfn)
-    remoteid = imdb['config']['vpnsankey'] if args.remoteid is None else args.remoteid
+    remoteid = imdb['config']['vpnsankey'].split(',')[0] if args.remoteid is None else args.remoteid
     msg = "Your device certificate:  {}\nRoot CA cert (if needed): {}\n\n".format(certurl, cacerturl)
     msg += "iOS devices: Browse the links to install both certificates.\n"
     msg += "  Then create a new IKEV2 VPN connection using the iOS profile {} and this information:\n".format(cn)
@@ -437,10 +423,9 @@ def mailcert(newkey, newp12, newp12fn, cn):
     sendmsg(dx['mailfrom'], args.mail, "VPN Cert password", pwmsg)
     print("% Mail sent to {}".format(args.mail))
 
-def makevpncert(altsankey, mvpncert, mvpnkey):
+def makevpncert(mvpncert, mvpnkey):
     """
     Make a VPN cert
-    altsankey = alt SAN key values
     mvpncert = full path of VPN cert
     mvpnkey = full path of VPN key
     """
@@ -448,14 +433,11 @@ def makevpncert(altsankey, mvpncert, mvpnkey):
     dosystem("pki --gen --type rsa --size {} --outform pem > {}".format(keybits, mvpnkey))
     os.chmod(mvpnkey, 0o600)
     print("\n>> Create VPN Host Cert ({})\n".format(mvpncert))
-    altsan = ""
-    if altsankey != "" and not altsankey is None:
-        for iakey in altsankey.split(","):
-            altsan += " --san {}".format(iakey.strip())
-    sanstring = ""
-    if not args.onlyalt:
-       sanstring = "--san {} --san {} --san {}".format(hostfqdn, vpnip, imdb['config']['vpnsankey'])
-    cacmd = "pki --issue --in {} --type rsa --lifetime {} --cacert {} --cakey {} --dn \"C=US, O={}, CN={}\" {} {} --flag serverAuth --flag ikeIntermediate --outform pem > {}".format(mvpnkey, imdb['config']['calife'], swancert, swankey, dnou, hostfqdn, sanstring, altsan, mvpncert)
+    sankey = imdb['config']['vpnsankey']
+    sanstring = "--san {}".format(hostfqdn)
+    for iakey in sankey.split(","):
+            sanstring += " --san {}".format(iakey.strip())
+    cacmd = "pki --issue --in {} --type rsa --lifetime {} --cacert {} --cakey {} --dn \"C=US, O={}, CN={}\" {} --flag serverAuth --flag ikeIntermediate --outform pem > {}".format(mvpnkey, imdb['config']['calife'], swancert, swankey, dnou, hostfqdn, sanstring, mvpncert)
     dosystem(cacmd)
     dosystem("pki --print --in {}".format(mvpncert))
 
@@ -470,7 +452,7 @@ def makecacert():
     dosystem("pki --self --ca --lifetime {} --in {} --type rsa\
     --dn \"C=US, O={}, CN={}\" --outform pem > {}".format(imdb['config']['calife'], swankey, dnou, rootca, swancert))
     dosystem("pki --print --in {}".format(swancert))
-    imdb['certs'][swancertfn.replace(".pem","")] = getcertkey(swancert, "subjkey:")
+    imdb['certs'][swancertpfx.replace(".pem","")] = getcertkey(swancert, "subjkey:")
     dbmodified = True
 
 def makeca():
@@ -478,12 +460,10 @@ def makeca():
     Make the Certificate Authority (CA)
     """
     print("\n>> Creating strongSwan CA for host {} IP address {} ({}) in {}".format(hostfqdn, vpnip, swankey, swandir))
-    altsan = ">>  with VPN san key {}".format(imdb['config']['vpnsankey'])
-    if imdb['config']['altsankey'] != "":
-        altsan += "\n>>  and alternate SAN keys {}".format(imdb['config']['altsankey'])
-    print ("{}".format(altsan))
+    sankeys = ">>  with VPN SAN key(s) {}".format(imdb['config']['vpnsankey'])
+    print ("{}".format(sankeys))
     makecacert()
-    makevpncert(imdb['config']['altsankey'], vpnhostcert, vpnhostkey)
+    makevpncert(vpnhostcert, vpnhostkey)
 
 def fnuserman():
     """
@@ -518,11 +498,11 @@ def fnuserman():
             dosystem(cmd)
         else:
             mkpkcs12zpw(cmd)
-        dbupdate(newkey, "V", ipwd, swancertfn)
+        dbupdate(newkey, "V", ipwd, swancertpfx)
         if args.mail != None:
             mailcert(newkey, newp12, newp12fn, cn)
         reloadcreds()
-        print("% Added {}".format(newkey))
+        print("% Added {} using CA Cert {}".format(newkey, swancertpfx))
 
     elif piswancmd == "resend":
         if keyindb(newkey):
@@ -566,7 +546,7 @@ def fnmakevpncert():
         perrorexit("% CA Cert {} missing".format(swancert))
     if os.path.isfile(vpnhostcert) or os.path.isfile(vpnhostkey):
         perrorexit("% VPN Host Cert {} and/or VPN Host Key {} already exist".format(vpnhostcert, vpnhostkey))
-    makevpncert(args.altsankey, vpnhostcert, vpnhostkey)
+    makevpncert(vpnhostcert, vpnhostkey)
     reloadcreds()
     
 def fnmakecacert():
@@ -581,15 +561,15 @@ def fnmakeca():
     """
     makeca command execution
     """
+    for cadir in cadirlist:
+        if not os.path.isdir(cadir): os.mkdir(cadir, cadirlist[cadir])
     if os.path.isfile(swancert):
         perrorexit("% There is already a CA in this directory\n% Use 'pistrong deleteca' first")
     sts = stopifrunning()
     if imdb['config']['vpnsankey'] != "ipsec.vpn.net" and imdb['config']['vpnsankey'] != "":
         makeca()
         print("\n% CA created in {}".format(swandir))
-        if imdb['config']['vpnsankey'] != configsankey:
-            print("% Updating {}/swanctl.conf and {} to set VPN san key to '{}'".format(swandir, certdb, imdb['config']['vpnsankey']))
-            updateswanconf(imdb['config']['vpnsankey'])
+        print("% You may need to update {}/swanctl.conf to appropriately set the VPN SAN key".format(swandir))
     else:
         perrorexit("% For improved security you must specify --vpnsankey with a name other than the default 'ipsec.vpn.net'\n% This is used during client authentication")
     print ("% Don't forget to 'pistrong start' the service")
@@ -660,17 +640,17 @@ def fnmisc():
             dosystem("pki --print --in {} --type crl".format(revokecrl))
 
     elif piswancmd == "listca":
-        maxnam = maxcertname()
+        maxnam = maxcacertname()
+        maxvpncert = maxcertname()
         if maxnam <= 0: return    # no CA files found
-        cavpnmax = maxnam - 8
-        print("{h1:<{mx1}}      {h2}".format(h1="Cert Name", mx1=maxnam, h2="CA Cert Subject Key"))
+        print("\n{h1:<{mx1}}      {h2}".format(h1="Cert Name", mx1=maxnam, h2="CA Cert Subject Key"))
         for cacertfn in sorted(imdb['certs']):
-            print(" CA {cfn:<{mx1}}  {skey}".format(mx1=maxnam, cfn=cacertfn, skey=imdb['certs'][cacertfn]))
+            print(" \nCA {cfn:<{mx1}}  {skey}".format(mx1=maxnam, cfn=cacertfn, skey=imdb['certs'][cacertfn]))
             caname = cacertfn.replace("CACert", "")
             for fn2 in os.listdir(dx509):
                 filename = os.fsdecode(fn2)
                 if filename.endswith("{}VPNCert.pem".format(caname)):
-                    print("  VPN {cfn:<{mx1}}".format(mx1=maxnam, cfn=filename.replace(".pem","")))
+                    print("  VPN {cfn:<{mx1}} SAN: {skey}".format(mx1=maxvpncert, cfn=filename.replace("VPNCert.pem",""), skey=getcertkey("{}/{}".format(dx509,fn2), "altNames:")))
 
     elif piswancmd == "help":
         print(helpmsg)
@@ -711,13 +691,13 @@ parser = argparse.ArgumentParser(
     and have a web server.")
 
 # values for each command item: function to process, 0=perform key/cert check and load db
-cmdlist = {'add':[fnuserman,0], 'revoke':[fnuserman,0], 'resend':[fnuserman,0],\
-           'delete':[fnuserman,0], 'list':[fnmisc,0], 'showca':[fnmisc,0],\
-	       'start':[fnmisc,1], 'stop':[fnmisc,1], 'restart':[fnmisc,1], 'disable':[fnmisc,1],\
-           'enable':[fnmisc,1], 'status':[fnmisc,1], 'install':[fnmisc,1], 'makeca':[fnmakeca,1],\
-           'createca':[fnmakeca,1], 'deleteca':[fndeleteca,0], 'makevpncert':[fnmakevpncert,0],\
-           'makecacert':[fnmakecacert,1], 'showcert':[fnmisc,0], 'showconfig':[fnmisc,1],\
-           'listca':[fnmisc,1], 'help':[fnmisc,1], 'version':[fnmisc,1]}
+cmdlist = {'add':[fnuserman], 'revoke':[fnuserman], 'resend':[fnuserman],\
+           'delete':[fnuserman], 'list':[fnmisc], 'showca':[fnmisc],\
+	       'start':[fnmisc], 'stop':[fnmisc], 'restart':[fnmisc], 'disable':[fnmisc],\
+           'enable':[fnmisc], 'status':[fnmisc], 'install':[fnmisc], 'makeca':[fnmakeca],\
+           'createca':[fnmakeca], 'deleteca':[fndeleteca], 'makevpncert':[fnmakevpncert],\
+           'makecacert':[fnmakecacert], 'showcert':[fnmisc], 'showconfig':[fnmisc],\
+           'listca':[fnmisc], 'help':[fnmisc], 'version':[fnmisc]}
 parser.add_argument("command", choices=cmdlist)
 parser.add_argument("hostarg", nargs='?', help="username to add or revoke or hostname")
 parser.add_argument("--password", help="Password for new user's Key")
@@ -735,10 +715,8 @@ parser.add_argument("--mailfrom", help="email 'from' address")
 parser.add_argument("--full", help="Print user Cert info in list command", action="store_true")
 parser.add_argument("--all", help="List all Certs for specified user", action="store_true")
 parser.add_argument("--config", help="Alternate config file [~/{}]".format(rcfile))
-parser.add_argument("--vpnsankey", help="VPN SAN key for makeca command")
-parser.add_argument("--altsankey", help="Alternate VPN SAN Key for makeca or makevpncert commands")
+parser.add_argument("--vpnsankey", help="VPN SAN key(s) for makeca command")
 parser.add_argument("--cnsuffix", help="X509 CN suffix [ipsec.vpn]")
-parser.add_argument("--onlyalt", help="Don't add default SAN values; Only use altsankey", action="store_true")
 parser.add_argument("--vpncert", help="VPN Cert/Key name prefix ['default']")
 parser.add_argument("--cacert", help="CA Cert/Key name prefix ['strongSwan' or non-null hostarg]")
 parser.add_argument("--remoteid", help="RemoteID for client instead of established VPN SAN key")
@@ -810,7 +788,7 @@ if not dx['debug'] and os.geteuid() != 0: perrorexit("% Must be run as root or -
 
 hostfqdn = socket.getfqdn()
 shorthost = hostfqdn.split(".")[0]
-vpnip = socket.gethostbyname(socket.getfqdn())
+vpnip = socket.gethostbyname(hostfqdn)
 if vpnip.split(".")[0] == "127":
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -824,7 +802,7 @@ swandir = "." if dx['debug'] else "/etc/swanctl"
 if args.root != None:
     swandir = args.root
 certdb = "{}/pistrongdb.json".format(swandir)
-certdbak = "{}/pistrongdb.bak".format(swandir)
+certdbak = "{}/bak-pistrongdb.json".format(swandir)
 certdbtmp = "{}/pistrongdb.tmp".format(swandir)
 dnou = "{}-strongSwan".format(shorthost)
 dx509 = "{}/x509".format(swandir)
@@ -834,14 +812,12 @@ dprivate = "{}/private".format(swandir)
 dp12 = "{}/p12".format(swandir)
 rootca = "strongSwan {} Root CA".format(shorthost)
 swancertpfx = "strongSwan" if args.cacert is None else args.cacert
-if piswancmd == "makecacert" or piswancmd == "makeca" or piswancmd == "showca":
+if piswancmd == "makecacert" or piswancmd == "makevpncert" or piswancmd == "makeca" or piswancmd == "showca":
     swancertpfx = swancertpfx if args.hostarg is None else args.hostarg
 swancertfn = "{}CACert.pem".format(swancertpfx)
 swancert = "{}/{}".format(dx509ca, swancertfn)
 swankey = "{}/{}CAKey.pem".format(dprivate, swancertpfx)
 vpncertpfx = "default" if args.vpncert is None else args.vpncert
-if piswancmd == "makevpncert":
-    vpncertpfx = vpncertpfx if args.hostarg is None else args.hostarg
 vpnhostcert = "{}/{}-{}VPNCert.pem".format(dx509, vpncertpfx, swancertpfx)
 vpnhostkey = "{}/{}-{}VPNKey.pem".format(dprivate, vpncertpfx, swancertpfx)
 clientcertfmt = "{}/{}-{}Cert.pem"
@@ -858,30 +834,18 @@ if newkey != "" and not "-" in newkey:
 
 dbmodified = False
 dbread()
-#
-# Figure out the service name, either from the running system or rc
-#
-sn = servicename().decode('utf8')
-if sn != "":
-    imdb['config']['service'] = sn
-else:
-    if imdb['config']['service'] == "": perrorexit("% Can't determine strongSwan service name\n% Edit service name in {}".format(certdb))
+if imdb['config']['service'] == "":
+    perrorexit("% Can't determine strongSwan service name\n% Edit service name in {}".format(certdb))
 
-if cmdlist[piswancmd][1] == 0:
-    reqfiles = [swancert, swankey] ######, vpnhostcert, vpnhostkey]  # Ensure CA configured
-    for cf in reqfiles:
-        if not os.path.isfile(cf): perrorexit("% Required CA cert/key file {} is missing".format(cf))
 #
 # These are kept in imdb['config'] 
 #
-configsankey = imdb['config']['vpnsankey']
-if piswancmd != "makevpncert" and not (args.vpnsankey is None and args.altsankey is None\
-       and args.calife is None and args.uclife is None and args.crllife is None and args.cnsuffix is None):
-    dbmodified = True
+if not (args.vpnsankey is None and args.calife is None\
+                                       and args.uclife is None and args.crllife is None\
+                                       and args.cnsuffix is None):
+    if piswancmd != "makevpncert": dbmodified = True # Don't save updates to db if making a vpn cert
     if not args.vpnsankey is None:
         imdb['config']['vpnsankey'] = args.vpnsankey
-    if not args.altsankey is None:
-        imdb['config']['altsankey'] = args.altsankey
     if not args.calife is None:
         imdb['config']['calife'] = args.calife
     if not args.uclife is None:
