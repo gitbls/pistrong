@@ -2,7 +2,7 @@
 
 A client device must have the correct certificates installed in order to use the VPN. The details for installing certificate(s) and configuring the VPN vary by operating system. Here are step-by-step instructions for tested client operating systems.
 
-## iOS 10
+## iOS
 One method is to put the certificates on a web server and browse to them. `pistrong` can send email with URLs for the certificates. Browse to each file and follow the prompts to add both the .p12 file and the CA certificate. They can be installed in any order. Alternatively, you can use the Apple Configurator app to load certificates.
 
 After the certificates have been added, configure the VPN. 
@@ -13,7 +13,7 @@ After the certificates have been added, configure the VPN.
    * **Type:** IKEv2
    * **Description:** Descriptive name for the VPN
    * **Server:** the fully-qualified domain name provided in the mail from `pistrong`. Use the server (external) IP address if you don't have a DNS name for the server.
-   * **Remote ID:** The remote ID provided in the mail (This is the VPN san key)
+   * **Remote ID:** The remote ID provided in the mail (This is the VPN SAN key)
    * **Local ID:** the local ID given to you in the mail (this is also the certificate/profile name)
    * **User Authentication:** Certificate
    * **Certificate:** choose the certificate matching the Local ID you entered above
