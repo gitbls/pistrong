@@ -139,4 +139,4 @@ Please refer to the issues list if you have ideas for improving this tool or hav
 
 Or, if you're so inclined, do it yourself and leave a pull request.
 
-Testing and documenting cert installation steps for Android and MacOS is another area where I would really apprecaite your help.
+Testing and documenting cert installation steps for Android and MacOS is another area where I would really appreciate your help.
