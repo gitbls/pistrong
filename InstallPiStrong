@@ -11,7 +11,8 @@
 #   Creates /etc/swanctl/swanctl.conf
 #   Creates root CA and VPN cert
 # Use pistrong to manage users and certificates
-# Start and stop the vpn via: pistrong start and pistrong stop
+# Start and stop the VPN via: 'sudo pistrong service start' and 'sudo pistrong service stop' ...
+#   ...or 'sudo systemctl start strongswan' and 'sudo systemctl stop strongswan'
 #
 
 function getssver() {
@@ -87,8 +88,8 @@ connections {
         local-1 {
              auth = pubkey
              cacerts = strongSwanCACert.pem
-             certs = default-strongSwanVPNCert.pem
-             id = ipsec.vpn.net
+             certs = windows-strongSwanVPNCert.pem
+             id = ios.mycomputer.net
         }
 
         remote-1 {
@@ -116,7 +117,7 @@ connections {
         local-1 {
              auth = pubkey
              cacerts = strongSwanCACert.pem
-             certs = default-strongSwanVPNCert.pem
+             certs = windows-strongSwanVPNCert.pem
 #             id = not.used           # Not used for Windows authentication
         }
 
@@ -151,11 +152,10 @@ function emitFirewall() {
     case "$osdistro" in
 	debian|raspbian)
 	    [ -f /etc/swanctl/iptables.strongswan ] && return
-	    echo "Adding iptables POSTROUTING for strongSwan"
-	    echo "  See /etc/swanctl/iptables.pistrong and /etc/network/if-pre-up.d/fwpistrong"
+	    echo "Creating iptables POSTROUTING for strongSwan"
+	    echo "  See /etc/swanctl/iptables.pistrong"
 	    cat > /etc/swanctl/iptables.pistrong <<EOF
-# This is invoked by /etc/network/if-pre-up.d/fwpistrong
-#  and adds the necessary iptables routes to enable VPN routing to the internet
+#  Add the necessary iptables routes to enable VPN routing to the internet
 
 *nat
 :POSTROUTING ACCEPT [0:0]
@@ -163,12 +163,28 @@ function emitFirewall() {
 -A POSTROUTING -s $vpnsubnet -o eth0 -j MASQUERADE
 COMMIT
 EOF
-	    [ -f /etc/network/if-pre-up.d/fwpistrong ] && return
-	    cat > /etc/network/if-pre-up.d/fwpistrong <<EOF
-#!/bin/sh
-/sbin/iptables-restore < /etc/swanctl/iptables.pistrong
+	    [ -f /etc/systemd/system/pistrong-iptables-load.service ] && return
+	    cat > /etc/systemd/system/pistrong-iptables-load.service <<EOF
+[Unit]
+Description=Load iptables for strongSwan
+Requires=network-online.target
+
+[Service]
+ExecStart=/sbin/iptables-restore /etc/swanctl/iptables.pistrong
+User=root
+StandardInput=null
+StandardOutput=null
+StandardError=null
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
 EOF
-	    chmod 755 /etc/network/if-pre-up.d/fwpistrong
+	    chmod 644 /etc/systemd/system/pistrong-iptables-load.service
+	    echo "** I have created the service pistrong-iptables-load, but it is not enabled"
+	    echo "** If you have another way to load iptables, you must add the code from /etc/swanctl/iptables.pistrong to it"
+	    echo "** Otherwise you must sudo systemctl enable pistrong-iptables-load"
 	    ;;
 	*)
 	    echo "% You must manually add iptables POSTROUTING entries for strongSwan"
@@ -247,7 +263,7 @@ function DoPreReqs() {
 function DoDownload() {
     cd ~/
     getssver
-#    ssver="5.6.3"  # If you want a specific version (and it's still available)
+#    ssver="5.6.3"  # If you want a specific version (and it's still available, of course)
     echo "% Using Strongswan version $ssver"
     if askinall "Press any key to start Strongswan download:" ; then echo ""; fi
     [ -d piStrong ] && rm -rf piStrong
@@ -281,6 +297,8 @@ function DoInstall() {
 
 function DoPostConf() {
     askinall "Press any key to start postconf:"
+    echo ""
+    [ ! -d "/etc/swanctl" ] && mkdir /etc/swanctl
     vpnsubnet="10.1.10.0/24"
     echo -n "Subnet for VPN clients [$vpnsubnet]: " ; read ans
     [ "$ans" != "" ] && vpnsubnet=$ans
@@ -291,50 +309,6 @@ function DoPostConf() {
     echo ">> Create /etc/swanctl/swanctl.conf"
 
     emitSwanctl
-
-    if [ ! -f "/etc/swanctl/$dbfile.piStrongInstall" ]
-    then
-	echo ">> Create /etc/swanctl/$dbfile.json config file"
-	cat > /etc/swanctl/$dbfile.piStrongInstall <<EOF
-{
-    "config": {
-        "altsankey": "",
-        "calife": 3650,
-        "cnsuffix": "ipsec.vpn",
-        "crllife": 7,
-        "uclife": 730,
-        "service": "strongswan-swanctl.service",
-        "version": "1.0",
-        "vpnsankey": "ipsec.vpn.net"
-    },
-    "users": {
-    }
-}
-EOF
-	[ -f "/etc/swanctl/$dbfile.json" ] && mv /etc/swanctl/$dbfile.json /etc/swanctl/$dbfile.json.bak
-	cp /etc/swanctl/$dbfile.piStrongInstall /etc/swanctl/$dbfile.json
-    fi
-    if [ ! -f "/etc/swanctl/$rcfile.piStrongInstall" ]
-    then
-	echo ">> Create ~/$rcfile config file"
-        cat > /etc/swanctl/$rcfile.piStrongInstall <<EOF
-{
-    "cmds":false,
-    "debug":false,
-    "mailfrom":"PiStrongVPN<root@mydomain.com>",
-    "random":true,
-    "smtppassword":"",
-    "smtpport":25,
-    "smtpserver":"127.0.0.1",
-    "smtpuser":"",
-    "smtpusetls":false,
-    "webdir":"tmp",
-    "weburl":"http://127.0.0.1"
-}
-EOF
-    fi
-    [ -f "/root/$rcfile" ] && mv /root/$rcfile /root/$rcfile.bak
-    cp /etc/swanctl/$rcfile.piStrongInstall /root/$rcfile
 
     if [ ! -f "/etc/sysctl.d/92-pistrong.conf" ]
     then
@@ -357,22 +331,22 @@ function DoAll() {
     echo ">> Installation complete <<"
     echo ">> "
     echo ">> Post-installation steps:"
-    echo ">>   Edit ~/$rcfile to adjust for your configuration"
-    echo ">>   Use 'pistrong makeca' to create the Certificate Authority (CA)"
-    echo ">>   Use 'pistrong add' to create user certs"
-    echo ">>   Use 'pistrong start' to start the strongSwan VPN"
+    echo ">>   Set up iptables (see http://github/gitbls/pistrong/README.md)"
+    echo ">>   'sudo pistrong createca'      to create the Certificate Authority (CA)"
+    echo ">>   'sudo pistrong add'           to create user certs"
+    echo ">>   'sudo pistrong service start' to start the strongSwan VPN"
+    echo ">>   'sudo pistrong service enable' to enable strongSwan to restart after reboot"
+    echo ">> Reboot and test to make sure everything works"
     echo ""
+    echo ">>   See http://github/gitbls/??? for an easily customizable configuration script"
     echo ">>   See pistrong help and pistrong --help for details"
 }
 #
 # Main
 #
-rcfile=".pistrongrc"
-dbfile="pistrongdb"
 
 if [[ ! $EUID -eq 0 ]];then
-    echo "? Please run as root"
-    echo "  Use 'sudo bash' to get to root"
+    echo "? Please run as root: sudo $0 $1 $2"
     exit 1
 fi
 

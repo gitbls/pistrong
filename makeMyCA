@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# Run this script via sudo After strongSwan, postfix, and apache2 are installed
+#
+#
+# ** This is just a sample. Edit these variables as appropriate for your configuration
+#
+function askyn() {
+    local ans
+    echo -n "$1" '[y/n]? ' ; read $2 ans
+    case "$ans" in
+        y*|Y*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+thishost=$(hostname)        #This gets the hostname from Linux
+echo "Bbuild a prescriptive strongSwan CA for iOS and Windows devices"
+echo ""
+echo "** Your domain name is required to create the Certs"
+echo -n "Enter the domain name you want to use [noname.com]: " ; read thisdomain
+[ "$thisdomain" == "" ] && thisdomain="noname.com"
+thisfqdn="$thishost.$thisdomain"
+webdir="/var/www/html/vpn"
+weburl="http://$thisfqdn/vpn"
+ios="ios"
+windows="windows"
+ioskey="ios.$thisdomain"
+winkey="windows.$thisdomain"
+
+echo "Configuring strongSwan for host FQDN $thisfqdn"
+echo "** cnsuffix is a naming string only used inside user certs (e.g., username-device-host@cnsuffix)"
+echo -n "cnsuffix for your CA [myvpn.net]: "; read cnsuffix
+[ "$cnsuffix" == "" ] && cnsuffix="myvpn.net"
+echo ""
+echo "** This script will create a VPN cert ($ios-strongSwanVPNCert) with VPN SAN key $ios.$thisdomain for iOS"
+echo "   and a second VPN cert ($windows-strongSwanVPNCert) with VPN SAN key $windows.$thisdomain for Windows 10"
+echo "   Each VPN cert will also have the host FQDN ($thisfqdn) as a VPN SAN key"
+echo "   If you are connecting to the VPN server by IP address, you'll need to edit the script"
+echo ""
+echo "If you'd like to change these names you will need to edit the script"
+echo ""
+echo "See sudo pistrong config --list for a list of all the pistrong configuration parameters"
+echo " and make any changes necessary for your configuration"
+echo ""
+
+if ! askyn "Do you want to continue"
+then
+    exit
+fi
+
+if [ -d /etc/apache2 ];
+then
+    [ ! -f /etc/apache2/conf-enabled/servername.conf ] && echo "ServerName $thisfqdn" > /etc/apache2/conf-enabled/servername.conf
+    [ ! -d $webdir ] && mkdir $webdir
+fi
+
+pistrong config --cnsuffix $cnsuffix --mailfrom "PiStrongVPN<root@$thisfqdn>"
+pistrong config --webdir $webdir --weburl $weburl
+pistrong config --vpnsankey $ioskey--vpncertpfx ios
+
+# Make the CA and VPN certs (one for ios, one for Windows)
+pistrong createca --vpnsankey $windows.$thisdomain,$thisfqdn --vpncertpfx windows
+#pistrong makevpncert windows --vpnsankey $winkey,$thisfqdn   # Done on makeca
+pistrong makevpncert ios --vpnsankey $ioskey,$thisfqdn 
+
+echo ""
+echo "When adding ios     users use the switch --remoteid $ioskey"
+echo "When adding windows users use the switch --remoteid $winkey"
+echo ""
+echo "Your strongSwan CA is configured"
+echo ""
+echo "You must edit /etc/swanctl/swanctl.conf and change 'ios.mycomputer.net' to '$ioskey'"
+echo ""
