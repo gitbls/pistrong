@@ -15,7 +15,7 @@ function askyn() {
 }
 
 thishost=$(hostname)        #This gets the hostname from Linux
-echo "Bbuild a prescriptive strongSwan CA for iOS and Windows devices"
+echo "Build a prescriptive strongSwan CA for iOS and Windows devices"
 echo ""
 echo "** Your domain name is required to create the Certs"
 echo -n "Enter the domain name you want to use [noname.com]: " ; read thisdomain
