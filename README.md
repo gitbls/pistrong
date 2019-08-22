@@ -13,7 +13,7 @@ pistrong consists of a couple of components:
 
 * `InstallPiStrong` - Installs and configures strongSwan
 
-* `makeMyCA` - A sample script you can use to create your CA after completing the installation
+* `makeMyCA` - Script to create your custom CA after completing the installation
 
 The easiest way to install pistrong is to use the bash command:
 

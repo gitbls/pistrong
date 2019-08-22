@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# Run this script via sudo After strongSwan, postfix, and apache2 are installed
-#
+# Run this script via sudo After strongSwan is installed
+# If you intend to send mail to cert recipients, you'll need an email server and web server
+# These don't need to be installed before running this script, but it may simplify redoes based on incorrect assumptions
 #
 function askyn() {
     local ans
@@ -13,30 +14,70 @@ function askyn() {
 }
 
 thishost=$(hostname)        #This gets the hostname from Linux
-echo "Build a prescriptive strongSwan CA for iOS and Windows devices"
-echo ""
-echo "** Your domain name is required to create the Certs"
-echo -n "Enter the domain name you want to use [noname.com]: " ; read thisdomain
-[ "$thisdomain" == "" ] && thisdomain="noname.com"
-thisfqdn="$thishost.$thisdomain"
 webdir="/var/www/html/vpn"
-weburl="http://$thisfqdn/vpn"
 ios="ios"
 windows="windows"
+echo "Build a prescriptive strongSwan CA for iOS and Windows devices"
+echo ""
+echo "** You will be asked a series of configuration questions"
+echo "   and you will have an opportunity to quit"
+echo "   before any changes are made to your system"
+echo ""
+echo "** Your domain name is required to create the Certs"
+echo -n "Enter the domain name you want to use [noname.com]: " ; read tmp
+[ "$tmp" != "" ] && thisdomain="$tmp" || thisdomain="noname.com"
+thisfqdn="$thishost.$thisdomain"
 ioskey="ios.$thisdomain"
 winkey="windows.$thisdomain"
+weburl="http://$thisfqdn/vpn"
 
-echo "Configuring strongSwan for host FQDN $thisfqdn"
-echo "** cnsuffix is a naming string only used inside user certs (e.g., username-device-host@cnsuffix)"
+echo ""
+echo "** Configuring strongSwan for host FQDN $thisfqdn"
+echo ""
+echo "** 'cnsuffix' is a naming string only used inside user certs"
+echo "   (e.g., username-device-$thishost@cnsuffix)"
+echo "   This will be visible for strongSwan connections in the system log"
 echo -n "cnsuffix for your CA [myvpn.net]: "; read cnsuffix
 [ "$cnsuffix" == "" ] && cnsuffix="myvpn.net"
+
 echo ""
-echo "** This script will create a VPN cert ($ios-strongSwanVPNCert) with VPN SAN key $ios.$thisdomain for iOS"
-echo "   and a second VPN cert ($windows-strongSwanVPNCert) with VPN SAN key $windows.$thisdomain for Windows 10"
-echo "   Each VPN cert will also have the host FQDN ($thisfqdn) as a VPN SAN key"
-echo "   If you are connecting to the VPN server by IP address, you'll need to edit the script"
+echo "** webdir is the directory in the file system where certs will be shared via your web server"
+echo -n "webdir for your system [$webdir]: " ; read tmp
+[ "$tmp" != "" ] && webdir="$tmp"
+
 echo ""
-echo "If you'd like to change these names you will need to edit the script"
+echo "** weburl is the URL that will be used in emails to users with their certs"
+echo -n "weburl for your system [$weburl]: " ; read tmp
+[ "$tmp" != "" ] && weburl="$tmp"
+
+echo ""
+echo -n "VPN Cert name prefix for iOS VPN Certs [$ios]: " ; read tmp
+[ "$tmp" != "" ] && ios="$tmp"
+echo -n "VPN SAN Key for iOS users [$ioskey]: " ; read tmp
+[ "$tmp" != "" ] && ioskey="$tmp"
+
+echo -n "VPN Cert name prefix for Windows VPN Certs [$windows]: " ; read tmp
+[ "$tmp" != "" ] && windows="$tmp"
+# Get Windows VPN SAN Key even though it's not used for authentication
+echo -n "VPN SAN Key for Windows users [$winkey]: " ; read tmp
+[ "$tmp" != "" ] && winkey="$tmp"
+
+echo ""
+san2="$thisfqdn"
+echo "** The second VPN SAN Key is [$san2]"
+echo "   If you are using an IP address to acces your VPN, or a different FQDN, you must change this"
+echo -n "Second VPN SAN Key [$thisfqdn]: " ; read tmp
+[ "$tmp" != "" ] && san2="$tmp"
+
+echo ""
+echo "** This script will now create:"
+echo "      CA Cert:              strongSwanCACert.pem"
+echo "      VPN Cert for iOS:     $ios-strongSwanVPNCert.pem with VPN SAN key '$ioskey'"
+echo "      VPN Cert for Windows: $windows-strongSwanVPNCert.pem with VPN SAN key '$winkey'"
+echo ""
+echo "   Each VPN cert will have '$san2' as a second VPN SAN key"
+echo ""
+echo "** If you'd like to change anything, answer N to the next question and restart the script"
 echo ""
 echo "See sudo pistrong config --list for a list of all the pistrong configuration parameters"
 echo " and make any changes necessary for your configuration"
@@ -47,6 +88,9 @@ then
     exit
 fi
 
+#
+# Set hostname in apache config as a convenience, and make sure that the $webdir directory exists
+#
 if [ -d /etc/apache2 ];
 then
     [ ! -f /etc/apache2/conf-enabled/servername.conf ] && echo "ServerName $thisfqdn" > /etc/apache2/conf-enabled/servername.conf
@@ -55,18 +99,27 @@ fi
 
 pistrong config --cnsuffix $cnsuffix --mailfrom "PiStrongVPN<root@$thisfqdn>"
 pistrong config --webdir $webdir --weburl $weburl
-pistrong config --vpnsankey $ioskey--vpncertpfx ios
+pistrong config --vpnsankey $ioskey --vpncertpfx $ios
 
 # Make the CA and VPN certs (one for ios, one for Windows)
-pistrong createca --vpnsankey $windows.$thisdomain,$thisfqdn --vpncertpfx windows
-#pistrong makevpncert windows --vpnsankey $winkey,$thisfqdn   # Done on makeca
-pistrong makevpncert ios --vpnsankey $ioskey,$thisfqdn 
+pistrong createca --vpnsankey $winkey,$san2 --vpncertpfx $windows
+#pistrong makevpncert windows --vpnsankey $winkey,$san2   # Done on createca above
+pistrong makevpncert $ios --vpnsankey $ioskey,$san2
 
 echo ""
-echo "When adding ios     users use the switch --remoteid $ioskey"
-echo "When adding windows users use the switch --remoteid $winkey"
+echo "When adding iOS     users use the switch --remoteid $ioskey"
+echo "When adding Windows users use the switch --remoteid $winkey"
 echo ""
 echo "Your strongSwan CA is configured"
 echo ""
-echo "You must edit /etc/swanctl/swanctl.conf and change 'ios.mycomputer.net' to '$ioskey'"
+echo "Modifying /etc/swanctl/swanctl.conf to reflect your configuration"
+echo ""
+sed -i "s/ios-strongSwanVPNCert.pem/$ios-strongSwanVPNCert.pem/" /etc/swanctl/swanctl.conf
+sed -i "s/ios.mycomputer.net/$ioskey/" /etc/swanctl/swanctl.conf
+sed -i "s/windows-strongSwanVPNCert.pem/$windows-strongSwanVPNCert.pem/" /etc/swanctl/swanctl.conf
+echo ""
+echo " ** Next steps:"
+echo "    * Set up a mail server and web server if you want to email cert information to users"
+echo "    * Ensure that you've correctly established the necessary firewall rules (review InstallPiStrong source if needed)"
+echo "    * Establish port forwarding on your router to this system"
 echo ""

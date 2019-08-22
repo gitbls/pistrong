@@ -88,7 +88,7 @@ connections {
         local-1 {
              auth = pubkey
              cacerts = strongSwanCACert.pem
-             certs = windows-strongSwanVPNCert.pem
+             certs = ios-strongSwanVPNCert.pem
              id = ios.mycomputer.net
         }
 
@@ -331,15 +331,16 @@ function DoAll() {
     echo ">> Installation complete <<"
     echo ">> "
     echo ">> Post-installation steps:"
-    echo ">>   Set up iptables (see http://github/gitbls/pistrong/README.md)"
-    echo ">>   'sudo pistrong createca'      to create the Certificate Authority (CA)"
-    echo ">>   'sudo pistrong add'           to create user certs"
+    echo ">>   See http://github/gitbls/pistrong/blob/master/makeMyCA for a customizable configuration script"
+    echo ""
+    echo ">>   Set up iptables (see http://github/gitbls/pistrong/blob/master/README.md)"
+    echo ""
+    echo ">>   See pistrong help and pistrong --help for pistrong command details"
+    echo ""
     echo ">>   'sudo pistrong service start' to start the strongSwan VPN"
     echo ">>   'sudo pistrong service enable' to enable strongSwan to restart after reboot"
     echo ">> Reboot and test to make sure everything works"
     echo ""
-    echo ">>   See http://github/gitbls/??? for an easily customizable configuration script"
-    echo ">>   See pistrong help and pistrong --help for details"
 }
 #
 # Main
