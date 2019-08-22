@@ -3,7 +3,21 @@
 A client device must have the correct certificates installed in order to use the VPN. The details for installing certificate(s) and configuring the VPN vary by operating system. Here are step-by-step instructions for tested client operating systems.
 
 ## iOS
-One method is to put the certificates on a web server and browse to them. `pistrong` can send email with URLs for the certificates. Browse to each file and follow the prompts to add both the .p12 file and the CA certificate. They can be installed in any order. Alternatively, you can use the Apple Configurator app to load certificates.
+One method is to put the certificates on a web server and browse to them. `pistrong` can send email with URLs for the certificates. Browse to each file and follow the prompts to add both the .p12 file and the CA certificate. 
+
+### iOS Cert Installation
+
+As of iOS 12.4, the cert installation procedure has changed slightly if you're mailing the certs to a user. Here is the most efficient way to install the certs:
+
+* On the iPhone, open the message with the Cert password and select/copy the password
+* Open the message with the links to the Certs, and click on the CA Cert link. iOS will tell you that the Cert has been downloaded.
+* Go to the Settings App | General | Profiles. The newly-downloaded CA Cert will appear there.
+* Install the CA Cert
+* Go back to the email message and click on the user Cert link. Again, the Cert will be downloaded.
+* go back to the Settings App | General | Profiles. The newly-downloaded Identity (user) Cert will appear there.
+* Install the Identity Cert. If the Cert has a password, you'll be prompted for it as a late step in the installation. If you copied the password as suggested above, simply paste it in and click Next.
+
+Alternatively, you can use the Apple Configurator app to load certificates.
 
 After the certificates have been added, configure the VPN. 
 
@@ -11,8 +25,8 @@ After the certificates have been added, configure the VPN.
 * Open the VPN settings
 * Tap "Add VPN Configuration"
    * **Type:** IKEv2
-   * **Description:** Descriptive name for the VPN
-   * **Server:** the fully-qualified domain name provided in the mail from `pistrong`. Use the server (external) IP address if you don't have a DNS name for the server.
+   * **Description:** Your own descriptive name for the VPN
+   * **Server:** the server name (Fully-qualified domain name or IP address) provided in the mail from `pistrong`.
    * **Remote ID:** The remote ID provided in the mail (This is the VPN SAN key)
    * **Local ID:** the local ID given to you in the mail (this is also the certificate/profile name)
    * **User Authentication:** Certificate
@@ -78,7 +92,7 @@ If you've set everything up correctly, it should, of course, *just work*. But, s
 
     In other words, the connection will fail if Windows tries to connect to 'host.domain.com' and the host system VPN Cert only has a SAN with 'host', or vice versa. Similarly, if you are connecting from the Internet and are trying to use an IP address, if the VPN Cert does not have the IP address as a SAN the connection will fail.
 
-    Proper use of dynamic DNS makes all this very simple. It can also be addressed by using --altsankey when creating the CA or VPN Cert. If you only have an IP address and no DNS name, include the external address as a SAN when you ceate the CA or additional VPN Cert, but this is not recommended, especially for dynamically assigned IP addresses.
+    Proper use of dynamic DNS makes all this very simple. If you only have an IP address and no DNS name, include the external address as a SAN when you ceate the CA or additional VPN Cert, but this is not recommended, especially for dynamically assigned IP addresses. `makeMyCA` can help you set this up correctly.
 
 * After installing the certificate, they can be viewed in the certificate manager. After installing the certificates, use the following steps to look at the device certificates:
 
