@@ -10,12 +10,12 @@ One method is to put the certificates on a web server and browse to them. `pistr
 As of iOS 12.4, the cert installation procedure has changed slightly if you're mailing the certs to a user. Here is the most efficient way to install the certs:
 
 * On the iPhone, open the message with the Cert password and select/copy the password
-* Open the message with the links to the Certs, and click on the CA Cert link. iOS will tell you that the Cert has been downloaded.
+* Open the message with the links to the Certs, and click on the Root CA Cert link. iOS will tell you that the Cert has been downloaded.
 * Go to the Settings App | General | Profiles. The newly-downloaded CA Cert will appear there.
 * Install the CA Cert
-* Go back to the email message and click on the user Cert link. Again, the Cert will be downloaded.
-* go back to the Settings App | General | Profiles. The newly-downloaded Identity (user) Cert will appear there.
-* Install the Identity Cert. If the Cert has a password, you'll be prompted for it as a late step in the installation. If you copied the password as suggested above, simply paste it in and click Next.
+* Return to the email message and click on the device Cert link. Again, the Cert will be downloaded to the phone.
+* Go back to the Settings App | General | Profiles. The newly-downloaded Identity (device) Cert will appear there.
+* Install the Identity Cert. If the Cert has a password, you'll be prompted for it as a late step in the Cert installation. If you copied the password as suggested above, simply paste it in and click Next.
 
 Alternatively, you can use the Apple Configurator app to load certificates.
 
