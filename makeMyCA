@@ -3,8 +3,6 @@
 # Run this script via sudo After strongSwan, postfix, and apache2 are installed
 #
 #
-# ** This is just a sample. Edit these variables as appropriate for your configuration
-#
 function askyn() {
     local ans
     echo -n "$1" '[y/n]? ' ; read $2 ans
