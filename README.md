@@ -5,7 +5,7 @@ Simplified CA and device cert manager for the strongSwan VPN
 
 `pistrong` dramatically simplifies installing and configuring the strongSwan VPN. Once installed, use pistrong to easily manage the strongSwan Certificate Authority (CA) and Certificates for remote user devices connecting to the VPN. pistrong fully supports the roadwarrior use case (users on devices), and can be used to create and manage certs for other uses, such as host-to-host tunnels.
 
-pistrong includes complete installation, configuration, and management support for Raspbian/Debian distros. There is partial install/config support for openSuSE, Ubuntu, Debian, and Centos. pistrong is distro-independent, so can be used on any distro once strongSwan is properly installed and configured.
+pistrong includes complete installation, configuration, and management support for Raspbian/Debian distros. There is partial install/config support for openSuSE, Ubuntu, Debian, and Centos. pistrong itself is distro-independent, so can be used on any distro once strongSwan is properly installed and configured.
 
 pistrong consists of a couple of components:
 
@@ -34,7 +34,7 @@ If you'd prefer to not feed an unknown script directly into bash, you can issue 
 Once strongSwan has been installed and configured, use `pistrong` to create the CA and manage users. `pistrong` provides
 commands to create (or delete) the CA, add, revoke, delete, or list
 users, and simple strongSwan service management (start, stop, restart,
-enable, disable, status).
+enable, disable, status, and reload).
 
 If you have a webserver and an email server installed, `pistrong` can send email to the
 user with a link to the certificates, and a separate email with the
@@ -83,31 +83,29 @@ all phases will be run. InstallPiStrong will pause at the start of each phase to
 * **install** installs strongSwan into the system
 * **postconf** or **post-configure** creates
     * `/etc/swanctl/swanctl.conf` strongSwan config file for iOS and Windows roadwarrior use
-    * `/etc/swanctl/pistrongdb.json` pistrong CA database
-    * `/etc/swanctl/iptables.pistrong` required iptables addition. See Firewall section below
-    * Copies (in /etc/swanctl) of the just-created files swanctl.piStrongInstall and pistrongdb.piStrongInstall.
+    * `/etc/swanctl/iptables.pistrong` required iptables addition. See Firewall Considerations section below
+    * `/etc/swanctl/swanctl.piStrongInstall` copy of swanctl.conf for future reference if needed
 
     Use `InstallPiStrong postconf` if you install strongSwan with some other mechanism and want to use pistrong to manage your CA and user/device Certs.
 
 ## Firewall Considerations
 
-strongSwan requires changes to the Firewall. If you don't have a firewall installed, InstallPiStrong writes a new systemd service pistrong-iptables-load, which will install only the VPN-required Firewall rules. If you want to use this service, `sudo systemctl enable pistrong-iptables-load` before rebooting. Most users either have or want more than this minimal firewall. In that case, the iptables rules in /etc/swanctl/iptables.pistrong must be added to the inuse Firewall.
+strongSwan requires changes to the Firewall for proper operation. In case you don't have a firewall installed, InstallPiStrong writes a new systemd service pistrong-iptables-load, which contains only the VPN-required Firewall rules. If you want to use this service, `sudo systemctl enable pistrong-iptables-load` before rebooting. Most users either have or want more than this very minimal firewall. In that case, the iptables rules in /etc/swanctl/iptables.pistrong must be added to the Firewall rules for your system.
 
 ## Hints
 
-* Use the `pistrong config` command to quickly and easily configure pistrong for your system. See [makeMyCA](https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA) for an example you can edit and use.
+* Use the `pistrong config` command to quickly and easily configure pistrong for your system. See [makeMyCA](https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA), which creates a fully-functional CA for iOS and Windows roadwarriors.
 * Typically you'll want to include your host FQDN as one of the VPN SAN keys, unless you are using an IP address to access your VPN server, in which case, you'll need to include the IP address. pistrong does not apply the host FQDN or IP address as SAN keys. Be sure to put your VPN-specific SAN key first. For example, `--vpnsankey myipsec.home.vpn,myhost.mydomain.com`. pistrong will add both SAN keys to the VPN cert, but only sends the first SAN key to the user in email.
-* After adding/deleting/revoking users, use `pistrong service reload` to cause strongSwan to reload all the credentials.
+* After adding/deleting/revoking users, use `pistrong service reload` to cause strongSwan to reload all credentials.
 
 * If you need to use multiple strongSwan connections (for different users accessing different local subnets, for example), here is an outline of how to do this:
     * Establish the primary configuration with the desired CA Cert and VPN SAN keys.
     * Create a secondary CA and a VPN Cert/Key in that secondary CA with a different VPN SAN key
     * Manually edit /etc/swanctl/swanctl.conf and add the new connection using the secondary CA, VPN SAN Key, and secondary VPN Cert. Also add the secondary IP address pool.
     * When adding users, always specify --cacert and --remoteid to specify the secondary VPN SAN Key to ensure that the user Cert is assigned to the correct connction.
-    * NOTE: If you ever re-create the CA using deleteca/createca you'll need to recreate the secondary Cert/Key and validate the connection in /etc/swanctl/swanctl.conf, so don't unless you're really sure!
+    * NOTE: If you ever re-create the CA using deleteca/createca you'll need to recreate the secondary Cert/Key and validate the connection in /etc/swanctl/swanctl.conf, so don't deleteca unless you're really sure!
 
-* Email server configuration is beyond the scope of this
-document. There are lots of guides on the internet for this.
+* Email and web server configuration is beyond the scope of this document. There are lots of guides on the internet for this.
 
 ## Security considerations
 
@@ -115,9 +113,9 @@ For the most secure implementation, here are some things to consider:
 
 * Always use an FQDN hostname (hostname.domain.com) for a registered domain. If you do not have a static IP address, use a dynamic DNS service. The FQDN hostname helps ensure that your client is connecting to a known host, and is the most reliable way to connect to your VPN from the internet. This also insulates you from your ISP randomly changing your external, dynamically-assigned IP address.
 
-* If you don't have an FQDN for the VPN server, you will probably need to use `--vpnsankey my.san.key,yourExternalIPAddress` when you create the CA
+* If you don't have an FQDN for the VPN server, you will probably need to use `--vpnsankey my.san.key,yourExternalIPAddress` when you create the CA. `makeMyCA` offers this as an option.
 
-* pistrong easily enables a one certificate for multiple devices, or a one certificate per device scenario. The former is a wee bit easier, the latter provides finer granularity access control.
+* pistrong easily enables a one certificate for multiple user devices, or a one certificate per user device scenario. The former is a wee bit easier, the latter provides finer granularity access control.
 
 ## Not Yet Completed
 
@@ -127,15 +125,13 @@ For the most secure implementation, here are some things to consider:
 
   * More usage. Besides me, that is. 
 
-  * Improved username/keyname validation. Checks are very minimal now, and effects of strange characters are unknown, but do not pose any known security risk.
-
   * pistrong does not provide a way to delete a single CA or VPN Cert.
 
   * There is no upgrade from pistrong v1 to v3. If you need help with this, open an issue on github.
 
 ## If you're interested...
 
-Please refer to the issues list if you have ideas for improving this tool or have found a problem, and if nobody else has mentioned it, I would be very happy to hear from you. There's always the possibility of a bug that I missed ;), or a great feature that should be added.
+Please refer to the issues list if you have ideas for improving pistrong or have found a problem. I would be very happy to hear from you. There's always the possibility of a bug that I missed ;), or a great feature that should be added.
 
 Or, if you're so inclined, do it yourself and leave a pull request.
 
