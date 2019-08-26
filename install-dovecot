@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Derived from https://raspberrytips.com/mail-server-raspberry-pi/
+
+echo "Installing dovecot..."
+
+apt-get install dovecot-core dovecot-imapd
+
+maildirmake.dovecot /etc/skel/Mail
+maildirmake.dovecot /etc/skel/Mail/.Drafts
+maildirmake.dovecot /etc/skel/Mail/.Sent
+maildirmake.dovecot /etc/skel/Mail/.Spam
+maildirmake.dovecot /etc/skel/Mail/.Trash
+maildirmake.dovecot /etc/skel/Mail/.Templates
+
+cp /etc/dovecot/dovecot.conf /etc/dovecot/dovecot.conf.orig
+sed -i '1i listen=*' /etc/dovecot/dovecot.conf
+
+cp /etc/dovecot/conf.d/10-mail.conf /etc/dovecot/conf.d/10-mail.conf.orig
+sed -i 's/mail_location = mbox:~\/mail:INBOX=\/var\/mail\/%u/mail_location = maildir:~\/Mail/' /etc/dovecot/conf.d/10-mail.conf
+
+cp /etc/dovecot/conf.d/10-master.conf /etc/dovecot/conf.d/10-master.conf.orig
+sed -i '/\# Postfix smtp-auth/, /\#\}/ {/\#\}/ s/.*/\
+  unix_listener \/var\/spool\/postfix\/private\/auth \{\
+    mode = 0660\
+    user = postfix\
+    group = postfix\
+  \}/; t; d}' /etc/dovecot/conf.d/10-master.conf
+sed -i '0,/#port = 993/s//port = 993/' /etc/dovecot/conf.d/10-master.conf    # Only does first occurrence
+sed -i '0,/#ssl = 993/s//ssl = yes/' /etc/dovecot/conf.d/10-master.conf      # Ditto
+
+cp /etc/dovecot/conf.d/10-auth.conf /etc/dovecot/conf.d/10-auth.conf.orig
+sed -i '1i disable_plaintext_auth =  no' /etc/dovecot/conf.d/10-auth.conf
+sed -i 's/auth_mechanisms = plain/auth_mechanisms = plain login/' /etc/dovecot/conf.d/10-auth.conf
+
+cd /etc/dovecot
+mv private/dovecot.pem private/dovecot.pem.orig
+mv private/dovecot.key private/dovecot.key.orig
+
+echo ""
+echo "% Ignore error from openssl if directory listing following is OK"
+openssl req -new -x509 -nodes -config /usr/share/dovecot/dovecot-openssl.cnf -out private/dovecot.pem -keyout private/dovecot.key -days 768
+ls -l /etc/dovecot/private/dovecot.pem
+ls -l /etc/dovecot/private/dovecot.key
+
+echo ""
+echo "Updating /etc/postfix/main.cf..."
+sed -i 's/inet_protocols = all/inet_protocols = ipv4/' /etc/postfix/main.cf
+sed -i 's/inet_interfaces = loopback-only/#inet_interfaces = loopback-only/' /etc/postfix/main.cf
+cat >> /etc/main.cf <<EOF
+smtpd_sasl_type = dovecot
+smtpd_sasl_path = private/auth
+smtpd_sasl_auth_enable = yes
+smtpd_helo_restrictions =
+        permit_mynetworks,
+        permit_sasl_authenticated,
+        reject_invalid_helo_hostname,
+        reject_non_fqdn_helo_hostname,
+        reject_unknown_helo_hostname,
+        check_helo_access hash:/etc/postfix/helo_access
+
+# For incoming mail
+#
+home_mailbox = Mail/
+mailbox_command =
+EOF
+
+# do this for existing users if needed
+#cp -r /etc/skel/Mail /home/pi/
+#chown -R pi:pi /home/pi/Mail
+#chmod -R 700 /home/pi/Mail
+

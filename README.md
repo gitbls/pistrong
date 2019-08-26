@@ -38,7 +38,7 @@ enable, disable, status, and reload).
 
 If you have a webserver and an email server installed, `pistrong` can send email to the
 user with a link to the certificates, and a separate email with the
-password for the certificate. 
+password for the certificate. See section below on Local Mail for a quick and easy way to install a local-only email on your system.
 
 ### Example commands
 
@@ -95,17 +95,23 @@ strongSwan requires changes to the Firewall for proper operation. In case you do
 ## Hints
 
 * Use the `pistrong config` command to quickly and easily configure pistrong for your system. See [makeMyCA](https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA), which creates a fully-functional CA for iOS and Windows roadwarriors.
+
 * Typically you'll want to include your host FQDN as one of the VPN SAN keys, unless you are using an IP address to access your VPN server, in which case, you'll need to include the IP address. pistrong does not apply the host FQDN or IP address as SAN keys. Be sure to put your VPN-specific SAN key first. For example, `--vpnsankey myipsec.home.vpn,myhost.mydomain.com`. pistrong will add both SAN keys to the VPN cert, but only sends the first SAN key to the user in email.
+
 * After adding/deleting/revoking users, use `pistrong service reload` to cause strongSwan to reload all credentials.
 
 * If you need to use multiple strongSwan connections (for different users accessing different local subnets, for example), here is an outline of how to do this:
     * Establish the primary configuration with the desired CA Cert and VPN SAN keys.
-    * Create a secondary CA and a VPN Cert/Key in that secondary CA with a different VPN SAN key
-    * Manually edit /etc/swanctl/swanctl.conf and add the new connection using the secondary CA, VPN SAN Key, and secondary VPN Cert. Also add the secondary IP address pool.
-    * When adding users, always specify --cacert and --remoteid to specify the secondary VPN SAN Key to ensure that the user Cert is assigned to the correct connction.
-    * NOTE: If you ever re-create the CA using deleteca/createca you'll need to recreate the secondary Cert/Key and validate the connection in /etc/swanctl/swanctl.conf, so don't deleteca unless you're really sure!
 
-* Email and web server configuration is beyond the scope of this document. There are lots of guides on the internet for this.
+    * Create a secondary CA and a VPN Cert/Key in that secondary CA with a different VPN SAN key
+
+    * Manually edit /etc/swanctl/swanctl.conf and add the new connection using the secondary CA, VPN SAN Key, and secondary VPN Cert. Also add the secondary IP address pool.
+
+    * When adding users, always specify --cacert and --remoteid to specify the secondary VPN SAN Key to ensure that the user Cert is assigned to the correct connction.
+
+    * **NOTE:** If you ever re-create the CA using deleteca/createca you'll need to recreate the secondary Cert/Key and validate the connection in /etc/swanctl/swanctl.conf, so don't deleteca unless you're really sure!
+
+* Email and web server configuration is beyond the scope of this document. There are lots of guides on the internet for this, such as https://raspberrytips.com/mail-server-raspberry-pi/ 
 
 ## Security considerations
 
@@ -117,9 +123,21 @@ For the most secure implementation, here are some things to consider:
 
 * pistrong easily enables a one certificate for multiple user devices, or a one certificate per user device scenario. The former is a wee bit easier, the latter provides finer granularity access control.
 
+## Local Mail
+
+If your system does not have the capability to send email, you can easily install a local-only email system. Here are the steps:
+
+* Install postfix -- `sudo apt-get install bsd-mailx postfix libsasl2-modules` You don't really need bsd-mailx but it may be useful to have a local bash shell mail command for testing.
+
+* Install dovecot -- See the file https://raw.githubusercontent.com/gitbls/pistrong/install-dovecot. It will install and configure dovecot for local, non-ssl usage, which should be fine for installing pistrong-created certs to your Windows or iOS device.
+
+* You'll also need to have a webserver installed. If you `sudo apt-get install apache2` before running makeMyCA everything will be set up correctly. You may need to restart the apache2 service after running makeMyCA.
+
 ## Not Yet Completed
 
   * Android and MacOS testing - Certificate install testing and documentation for these devices.
+
+  * In-depth crypto performance/security tradeoff evaluation.
 
   * Install on other distros - Additional popular distros should be added to InstallPiStrong
 
