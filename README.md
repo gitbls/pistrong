@@ -129,7 +129,7 @@ If your system does not have the capability to send email, you can easily instal
 
 * Install postfix -- `sudo apt-get install bsd-mailx postfix libsasl2-modules` You don't really need bsd-mailx but it may be useful to have a local bash shell mail command for testing.
 
-* Install dovecot -- See the file https://raw.githubusercontent.com/gitbls/pistrong/install-dovecot. It will install and configure dovecot for local, non-ssl usage, which should be fine for installing pistrong-created certs to your Windows or iOS device.
+* Install dovecot -- See the file [install-dovecot](https://raw.githubusercontent.com/gitbls/pistrong/master/install-dovecot). It will install and configure dovecot for local, non-ssl usage, which should be fine for installing pistrong-created certs to your Windows or iOS device.
 
 * You'll also need to have a webserver installed. If you `sudo apt-get install apache2` before running makeMyCA everything will be set up correctly. You may need to restart the apache2 service after running makeMyCA.
 
