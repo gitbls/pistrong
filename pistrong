@@ -34,6 +34,8 @@ class pdat:
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = ""
 
 version = "3.0"
+dbversion = "3"
+
 helpmsg = "pistrong {} commands:\n\
 \n\
         * Manage user certs *\n\
@@ -316,6 +318,26 @@ def reloadcreds(pd):
         print("% Reloading strongSwan VPN credentials...")
         dosystem(pd, "swanctl --load-creds")  # reload credentials
 
+def gethostfqdn(pd, args):
+    pd.hostfqdn = socket.getfqdn()
+    pd.shorthost = pd.hostfqdn.split(".")[0]
+    pd.vpnip = socket.gethostbyname(pd.hostfqdn)
+    if pd.vpnip.split(".")[0] == "127":
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            pd.vpnip = s.getsockname()[0]
+        except:
+            pd.vpnip = "127.0.0.1"  # In case it came out as 127.0.1.1
+            print("% Couldn't divine host IP address. Using 127.0.0.1. Check /etc/hosts")
+        s.close()
+
+    if not "." in pd.hostfqdn:
+        if pd.db['config']['myfqdn']['value'] != "":
+            pd.hostfqdn = pd.db['config']['myfqdn']['value']
+        else:
+            if args.myfqdn == None: print("% Unable to obtain a fully-qualified domain name for this host\n  This may impact internet accessibility for the VPN\n  Use 'pistrong config --myfqdn' and/or see the pistrong README")
+
 def dbload(pd):
     """
     Read the cert database and build a dictionary
@@ -339,6 +361,7 @@ def dbload(pd):
                            "crllife":{"value":"7","help":"Cert Revocation List lifetime [7 days]"},\
                            "calife":{"value":"3650","help":"CA Lifetime [3650 days]"},\
                            "uclife":{"value":"730","help":"User Cert Lifetime [730 days]"},\
+                           "myfqdn":{"value":"","help":"VPN host FQDN (Fully Qualified Domain Name)"},\
                            "version":{"value":"3.0","help":"Database version"},\
                            "vpnsankey":{"value":"ipsec.vpn.net","help":"Default VPN SAN key"},\
                            "cnsuffix":{"value":"ipsec.vpn","help":"Suffix for user cert names"},\
@@ -354,8 +377,11 @@ def dbload(pd):
                            "smtpusetls":{"value":False,"help":"SMTP Mail use TLS auth [NYI]"},\
                            "webdir":{"value":"tmp","help":"Directory in file system corresponding to weburl"},\
                            "weburl":{"value":"http://127.0.0.1","help":"Web URL on which to append cert name"}}
-    if not ('version' in pd.db['config']) or (pd.db['config']['version']['value'] < "3.0"):
+    if not ('version' in pd.db['config']) or (pd.db['config']['version']['value'] < "3"):
             perrorexit("? {} is from a prior version. See documentation".format(pd.certdb))
+    pd.db['config']['version']['value'] = dbversion    # Force to current version. Will get written to DB first time a real update is done
+    if not 'myfqdn' in pd.db['config']:
+        pd.db['config']['myfqdn'] = {"value":"","help":"VPN host Fully Qualified Domain Name"}
     if not 'certs' in pd.db:
         pd.db['certs'] = {}
 
@@ -555,6 +581,7 @@ def cmd_config(pd, args):
     if args.cnsuffix:     pd.db['config']['cnsuffix']['value'] = args.cnsuffix
     if args.crllife:      pd.db['config']['crllife']['value'] = args.crllife
     if args.mailfrom:     pd.db['config']['mailfrom']['value'] = args.mailfrom
+    if args.myfqdn:       pd.db['config']['myfqdn']['value'] = args.myfqdn
     if args.random:       pd.db['config']['random']['value'] = trueorfalse(args.random)
     if args.rootca:       pd.db['config']['rootca']['value'] = args.rootca
     if args.service:      pd.db['config']['service']['value'] = args.service
@@ -569,7 +596,7 @@ def cmd_config(pd, args):
     if args.webdir:       pd.db['config']['webdir']['value'] = args.webdir
     if args.weburl:       pd.db['config']['weburl']['value'] = args.weburl
     if args.debug or args.cmds or args.cacert or args.calife or args.cnsuffix or\
-       args.crllife or args.mailfrom or args.random or args.service or (args.smtppassword != None) or\
+       args.crllife or args.mailfrom or args.myfqdn or args.random or args.service or (args.smtppassword != None) or\
        args.smtpport or args.smtpserver or args.smtpusetls or args.uclife or args.vpnsankey or\
        args.webdir or args.weburl: pd.dbmodified = True
     if args.list or not pd.dbmodified: listconfig(pd, args)
@@ -849,6 +876,7 @@ subparser_config.add_argument("--calife", help="CA cert lifetime")
 subparser_config.add_argument("--cnsuffix", help="Suffix appended to user certs")
 subparser_config.add_argument("--crllife", help="Cert revocation list lifetime")
 subparser_config.add_argument("--mailfrom", help="'From' string for emails")
+subparser_config.add_argument("--myfqdn", help="VPN host FQDN if pistrong needs help")
 subparser_config.add_argument("--random", help="Create random cert install passwords", choices=ynchoices)
 subparser_config.add_argument("--rootca", help="Name for root CA [strongSwan]")
 subparser_config.add_argument("--service", help="strongSwan service name")
@@ -862,40 +890,40 @@ subparser_config.add_argument("--vpncertpfx", help="Default VPN cert name [defau
 subparser_config.add_argument("--vpnsankey", help="Default VPN SAN key") # Sets the default if not specified on createca/makecacert/makevpncert
 subparser_config.add_argument("--webdir", help="Web server directory for users p12 and CA certs")
 subparser_config.add_argument("--weburl", help="URL prefix for Cert in email")
-subparser_config.set_defaults(func=cmd_config, swancertpfx=None, vpncertpfx=None)
+subparser_config.set_defaults(func=cmd_config, swancertpfx=None, vpncertpfx=None, usedb=True)
 
 subparser_createca = subparsers.add_parser("createca", help="Create a Certificate Authority", parents=[parent_parser])
 subparser_createca.add_argument("cacert", nargs='?', help="CA cert/key name prefix ['strongSwan']")
 subparser_createca.add_argument("--keybits", default="4096", help="Default cert key bits [CA/VPN keys: 4096, User:2048]")
 subparser_createca.add_argument("--vpncertpfx", help="VPN cert/key name prefix ['default']")
 subparser_createca.add_argument("--vpnsankey", help="VPN SAN key(s) for VPN cert")
-subparser_createca.set_defaults(func=cmd_createca, vpncertpfx=None)
+subparser_createca.set_defaults(func=cmd_createca, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_deleteca = subparsers.add_parser("deleteca", help="Delete the ENTIRE CA and all certs/keys", parents=[parent_parser])
-subparser_deleteca.set_defaults(func=cmd_deleteca, cacert=None, swancertpfx=None, vpncertpfx=None)
+subparser_deleteca.set_defaults(func=cmd_deleteca, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_showcert = subparsers.add_parser("showcert", help="Show cert contents", parents=[parent_parser])
 subparser_showcert.add_argument("certname", help="File spec for cert to show")
-subparser_showcert.set_defaults(func=cmd_showcert, cacert=None, swancertpfx=None, vpncertpfx=None)
+subparser_showcert.set_defaults(func=cmd_showcert, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_makevpncert = subparsers.add_parser("makevpncert", help="Make a VPN cert", parents=[parent_parser])
 subparser_makevpncert.add_argument("vpncertpfx", help="VPN cert/key name prefix ['default']")
 subparser_makevpncert.add_argument("--cacert", help="CA cert to use")
 subparser_makevpncert.add_argument("--keybits", default="4096", help="VPN cert key bits [4096]")
 subparser_makevpncert.add_argument("--vpnsankey", help="VPN SAN key(s)")
-subparser_makevpncert.set_defaults(func=cmd_makevpncert, swancertpfx=None)
+subparser_makevpncert.set_defaults(func=cmd_makevpncert, swancertpfx=None, myfqdn=None, usedb=True)
 
 subparser_makecacert = subparsers.add_parser("makecacert", help="Make an additional CA cert", parents=[parent_parser])
 subparser_makecacert.add_argument("cacert", help="Name for the cert")
 subparser_makecacert.add_argument("--keybits", default="4096", help="CA cert key bits [4096]")
-subparser_makecacert.set_defaults(func=cmd_makecacert, swancertpfx=None, vpncertpfx=None)
+subparser_makecacert.set_defaults(func=cmd_makecacert, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_showca = subparsers.add_parser("showca", help="Show the CA", parents=[parent_parser])
 subparser_showca.add_argument("cacert", nargs='?', help="Name of CA to show [strongSwan]")
-subparser_showca.set_defaults(func=cmd_showca, swancertpfx=None, vpncertpfx=None)
+subparser_showca.set_defaults(func=cmd_showca, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_listca = subparsers.add_parser("listca", help="List all CAs", parents=[parent_parser])
-subparser_listca.set_defaults(func=cmd_listca, cacert=None, swancertpfx=None, vpncertpfx=None)
+subparser_listca.set_defaults(func=cmd_listca, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_add = subparsers.add_parser("add", help="Add new user", parents=[parent_parser])
 subparser_add.add_argument("username", help="Username to add")
@@ -910,79 +938,65 @@ subparser_add.add_argument("--remoteid", help="Remote ID")
 subparser_add.add_argument("--uclife", help="User Cert lifetime")
 subparser_add.add_argument("--webdir", help="Web server directory for users p12 and CA certs")
 subparser_add.add_argument("--weburl", help="URL prefix for Cert in email")
-subparser_add.set_defaults(func=cmd_add, swancertpfx=None, vpncertpfx=None)
+subparser_add.set_defaults(func=cmd_add, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_delete = subparsers.add_parser("delete", help="Delete user cert/key", parents=[parent_parser])
 subparser_delete.add_argument("username", help="Username to delete")
 subparser_delete.add_argument("--device", help="Device name for identification")
-subparser_delete.set_defaults(func=cmd_delete, cacert=None, swancertpfx=None, vpncertpfx=None)
+subparser_delete.set_defaults(func=cmd_delete, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_revoke = subparsers.add_parser("revoke", help="Revoke a user's cert", parents=[parent_parser])
 subparser_revoke.add_argument("username", help="Username to revoke")
 subparser_revoke.add_argument("--device", help="Device name for identification")
-subparser_revoke.set_defaults(func=cmd_revoke, cacert=None, swancertpfx=None, vpncertpfx=None)
+subparser_revoke.set_defaults(func=cmd_revoke, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_list = subparsers.add_parser("list", help="List user certs", parents=[parent_parser])
 subparser_list.add_argument("username", nargs='?', help="List only specified username")
 subparser_list.add_argument("--all", help="List all certs for specified username", action='store_true')
 subparser_list.add_argument("--full", help="Show cert details as well", action='store_true')
-subparser_list.set_defaults(func=cmd_list, cacert=None, swancertpfx=None, vpncertpfx=None, device=None)
+subparser_list.set_defaults(func=cmd_list, cacert=None, swancertpfx=None, vpncertpfx=None, device=None, myfqdn=None, usedb=True)
 
 subparser_resend = subparsers.add_parser("resend", help="Resend the cert email to a user", parents=[parent_parser])
 subparser_resend.add_argument("username", help="Username for cert (already created)")
 subparser_resend.add_argument("--device", help="Device name for identification")
 subparser_resend.add_argument("--mail", help="User email address")
-subparser_resend.set_defaults(func=cmd_resend, cacert=None, swancertpfx=None, vpncertpfx=None)
+subparser_resend.set_defaults(func=cmd_resend, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 service_actions = ['reload', 'start', 'stop', 'restart', 'disable', 'enable', 'status']
 subparser_service = subparsers.add_parser("service", help="Control the strongSwan service", parents=[parent_parser])
 subparser_service.add_argument("action", help="", choices=service_actions)
-subparser_service.set_defaults(func=cmd_service, cacert=None, swancertpfx=None, vpncertpfx=None)
+subparser_service.set_defaults(func=cmd_service, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_install = subparsers.add_parser("install", help="Install strongSwan", parents=[parent_parser])
-subparser_install.set_defaults(func=cmd_install, cacert=None, swancertpfx=None, vpncertpfx=None)
+# myfqdn isn't used for this command, but defining it simplifies gethostfqdn
+subparser_install.set_defaults(func=cmd_install, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn="hack.domain.com", usedb=True)
 
 subparser_help = subparsers.add_parser("help", help="Print some help", parents=[parent_parser])
-subparser_help.set_defaults(func=cmd_help, cacert=None, swancertpfx=None, vpncertpfx=None)
+subparser_help.set_defaults(func=cmd_help, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=False)
 
 subparser_version = subparsers.add_parser("version", help="Print the pistrong version", parents=[parent_parser])
-subparser_version.set_defaults(func=cmd_version, cacert=None, swancertpfx=None, vpncertpfx=None)
+subparser_version.set_defaults(func=cmd_version, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=False)
 #
 # Parse the command and dispatch
 #
 args = parser.parse_args()
 
-pd.dx['debug'] = trueorfalse(args.debug) if args.debug else False # This isn't known yet :( pd.db['config']['debug']['value']
+if args.usedb:
+    pd.dx['debug'] = trueorfalse(args.debug) if args.debug else False # This isn't known yet :( pd.db['config']['debug']['value']
 
-pd.hostfqdn = socket.getfqdn()
-pd.shorthost = pd.hostfqdn.split(".")[0]
-pd.vpnip = socket.gethostbyname(pd.hostfqdn)
-if pd.vpnip.split(".")[0] == "127":
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        pd.vpnip = s.getsockname()[0]
-    except:
-        pd.vpnip = "127.0.0.1"  # In case it came out as 127.0.1.1
-        print("% Couldn't divine host IP address. Using 127.0.0.1. Check /etc/hosts")
-    s.close()
-
-if not "." in pd.hostfqdn:
-    print("% Unable to obtain a fully-qualified domain name for this host\n  This may impact internet accessibility for the VPN\n  See the pistrong README")
-
-pd.swandir = "." if pd.dx['debug'] else "/etc/swanctl"
-if (args.root != None):
-    pd.swandir = args.root
-if pd.swandir != "/etc/swanctl": print("% Using {} for CA root directory".format(pd.swandir))
-pd.certdb = "{}/pistrongdb.json".format(pd.swandir)
-pd.dbmodified = False
-dbload(pd)
-makefilenames(pd, args)
-pd.dx['debug'] = trueorfalse(args.debug) if args.debug else pd.db['config']['debug']['value']
-pd.dx['cmds'] = trueorfalse(args.cmds) if args.cmds else pd.db['config']['cmds']['value']
-
-if pd.db['config']['service']['value'] == "":
-    perrorexit("? Can't determine strongSwan service name\n% Edit service name in {}".format(pd.certdb))
+    pd.swandir = "." if pd.dx['debug'] else "/etc/swanctl"
+    if (args.root != None):
+        pd.swandir = args.root
+    if pd.swandir != "/etc/swanctl": print("% Using {} for CA root directory".format(pd.swandir))
+    pd.certdb = "{}/pistrongdb.json".format(pd.swandir)
+    pd.dbmodified = False
+    dbload(pd)
+    gethostfqdn(pd, args)
+    makefilenames(pd, args)
+    pd.dx['debug'] = trueorfalse(args.debug) if args.debug else pd.db['config']['debug']['value']
+    pd.dx['cmds'] = trueorfalse(args.cmds) if args.cmds else pd.db['config']['cmds']['value']
+    if pd.db['config']['service']['value'] == "":
+        perrorexit("? Can't determine strongSwan service name\n% Edit service name in {}".format(pd.certdb))
 
 args.func(pd, args)
 if pd.dbmodified: dbflush(pd)
