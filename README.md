@@ -13,7 +13,7 @@ pistrong consists of a couple of components:
 
 * `InstallPiStrong` - Installs and configures strongSwan
 
-* `makeMyCA` - Script to create your custom CA after completing the installation
+* `makeMyCA` - Script to create your custom CA after completing the installation. Or you can roll your own of course, using this as a model. Or not ;).
 
 The easiest way to install pistrong is to use the bash command:
 
@@ -73,6 +73,7 @@ strongSwan built with `--enable-systemd`. `pistrong` only works with the
 new systemd model. The download/build/install process takes about 20
 minutes on a Raspberry Pi 3B with a reasonable internet connection.
 
+
 `InstallPiStrong` has several phases. If no phase is specified or **all** is specified,
 all phases will be run. InstallPiStrong will pause at the start of each phase to provide time for reviewing the results of the previous phase. The phases include:
 
@@ -86,7 +87,9 @@ all phases will be run. InstallPiStrong will pause at the start of each phase to
     * `/etc/swanctl/iptables.pistrong` required iptables addition. See Firewall Considerations section below
     * `/etc/swanctl/swanctl.piStrongInstall` copy of swanctl.conf for future reference if needed
 
-    Use `InstallPiStrong postconf` if you install strongSwan with some other mechanism and want to use pistrong to manage your CA and user/device Certs.
+If you know that your distro is carrying strongSwan 5.8.0 or greater, and it has been built with --enable-systemd, you can install strongSwan from your distro and skip the download, preconf, make, and install phases. That is, you'll only need to do the preqreq and postconf phases.
+
+Use `InstallPiStrong postconf` if you install strongSwan with some other mechanism and want to use pistrong to manage your CA and user/device Certs.
 
 ## Firewall Considerations
 
@@ -145,7 +148,7 @@ If your system does not have the capability to send email, you can easily instal
 
   * pistrong does not provide a way to delete a single CA or VPN Cert.
 
-  * There is no upgrade from pistrong v1 to v3. If you need help with this, open an issue on github.
+  * There is no upgrade from earlier versions of pistrong to v3. If you need help with this, open an issue on github.
 
 ## If you're interested...
 
