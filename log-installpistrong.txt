@@ -1,0 +1,382 @@
+#
+# Before starting I did: sudo apt-get update ; sudo apt-get upgrade
+#
+rpi3p2~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/pistrong -o /usr/local/bin/pistrong
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+rpi3p2~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+rpi3p2~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA -o /usr/local/bin/makeMyCA
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+rpi3p2~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/install-dovecot -o /usr/local/bin/install-dovecot
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+#
+# First we'll install postfix and dovecot (not mandatory, but needed if you want to use the --mail feature)
+#
+rpi3p2~# apt-get install postfix
+The following packages were automatically installed and are no longer required:
+  libgnutls-dane0 libunbound8 rpi.gpio-common
+Use 'apt autoremove' to remove them.
+The following additional packages will be installed:
+  ssl-cert
+Suggested packages:
+  procmail postfix-mysql postfix-pgsql postfix-ldap postfix-pcre postfix-lmdb postfix-sqlite sasl2-bin | dovecot-common
+  libsasl2-modules | dovecot-common postfix-cdb ufw postfix-doc openssl-blacklist
+The following packages will be REMOVED:
+  exim4-base exim4-config exim4-daemon-light
+The following NEW packages will be installed:
+  postfix ssl-cert
+0 upgraded, 2 newly installed, 3 to remove and 0 not upgraded.
+Need to get 1,414 kB of archives.
+After this operation, 9,216 B disk space will be freed.
+Do you want to continue? [Y/n] y
+Get:1 http://mirror.web-ster.com/raspbian/raspbian buster/main armhf ssl-cert all 1.0.39 [20.8 kB]
+Get:2 http://mirror.web-ster.com/raspbian/raspbian buster/main armhf postfix armhf 3.4.5-1 [1,393 kB]
+ Fetched 1,414 kB in 1s (1,325 kB/s)
+Preconfiguring packages ...
+Postfix Configuration
+Please select the mail server configuration type that best meets your needs.
+Removing exim4-daemon-light (4.92-8+deb10u1) ...
+Removing exim4-base (4.92-8+deb10u1) ...
+Removing exim4-config (4.92-8+deb10u1) ...
+Selecting previously unselected package ssl-cert.
+Preparing to unpack .../ssl-cert_1.0.39_all.deb ...
+Unpacking ssl-cert (1.0.39) ...
+Selecting previously unselected package postfix.
+Preparing to unpack .../postfix_3.4.5-1_armhf.deb ...
+Unpacking postfix (3.4.5-1) ...
+Setting up ssl-cert (1.0.39) ...
+Setting up postfix (3.4.5-1) ...
+Adding group `postfix' (GID 117) ...
+Done.
+Adding system user `postfix' (UID 111) ...
+Adding new user `postfix' (UID 111) with group `postfix' ...
+Not creating home directory `/var/spool/postfix'.
+Creating /etc/postfix/dynamicmaps.cf
+Adding group `postdrop' (GID 118) ...
+Done.
+setting myhostname: rpi3p2.starwhite.net
+setting alias maps
+setting alias database
+mailname is not a fully qualified domain name.  Not changing /etc/mailname.
+setting destinations: $myhostname, rpi3p2, localhost.localdomain, localhost
+setting relayhost: 
+setting mynetworks: 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
+setting mailbox_size_limit: 0
+setting recipient_delimiter: +
+setting inet_interfaces: loopback-only
+setting default_transport: error
+setting relay_transport: error
+setting inet_protocols: all
+WARNING: /etc/aliases exists, but does not have a root alias.
+
+Postfix (main.cf) is now set up with a default configuration.  If you need to 
+make changes, edit /etc/postfix/main.cf (and others) as needed.  To view 
+Postfix configuration values, see postconf(1).
+
+After modifying main.cf, be sure to run 'service postfix reload'.
+
+Running newaliases
+Created symlink /etc/systemd/system/multi-user.target.wants/postfix.service → /lib/systemd/system/postfix.service.
+Processing triggers for systemd (241-5+rpi1) ...
+Processing triggers for man-db (2.8.5-2) ...
+Processing triggers for rsyslog (8.1901.0-1) ...
+
+rpi3p2~# install-dovecot 
+Installing dovecot...
+The following packages were automatically installed and are no longer required:
+  libgnutls-dane0 libunbound8 rpi.gpio-common
+Use 'apt autoremove' to remove them.
+The following additional packages will be installed:
+  libexttextcat-2.0-0 libexttextcat-data liblua5.3-0 libsodium23 libstemmer0d
+Suggested packages:
+  dovecot-gssapi dovecot-ldap dovecot-lmtpd dovecot-lucene dovecot-managesieved dovecot-mysql dovecot-pgsql dovecot-pop3d
+  dovecot-sieve dovecot-solr dovecot-sqlite dovecot-submissiond ntp ufw
+The following NEW packages will be installed:
+  dovecot-core dovecot-imapd libexttextcat-2.0-0 libexttextcat-data liblua5.3-0 libsodium23 libstemmer0d
+0 upgraded, 7 newly installed, 0 to remove and 0 not upgraded.
+Need to get 4,642 kB/5,107 kB of archives.
+After this operation, 11.8 MB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 http://mirror.web-ster.com/raspbian/raspbian buster/main armhf dovecot-core armhf 1:2.3.4.1-5+deb10u1 [3,494 kB]
+Get:2 http://mirror.web-ster.com/raspbian/raspbian buster/main armhf dovecot-imapd armhf 1:2.3.4.1-5+deb10u1 [1,148 kB]
+Preparing to unpack .../0-libstemmer0d_0+svn585-1_armhf.deb ...
+Unpacking libstemmer0d:armhf (0+svn585-1) ...
+Selecting previously unselected package libexttextcat-data.
+Preparing to unpack .../1-libexttextcat-data_3.4.5-1_all.deb ...
+Unpacking libexttextcat-data (3.4.5-1) ...
+Selecting previously unselected package libexttextcat-2.0-0:armhf.
+Preparing to unpack .../2-libexttextcat-2.0-0_3.4.5-1_armhf.deb ...
+Unpacking libexttextcat-2.0-0:armhf (3.4.5-1) ...
+Selecting previously unselected package liblua5.3-0:armhf.
+Preparing to unpack .../3-liblua5.3-0_5.3.3-1.1_armhf.deb ...
+Unpacking liblua5.3-0:armhf (5.3.3-1.1) ...
+Selecting previously unselected package libsodium23:armhf.
+Preparing to unpack .../4-libsodium23_1.0.17-1_armhf.deb ...
+Unpacking libsodium23:armhf (1.0.17-1) ...
+Selecting previously unselected package dovecot-core.
+Preparing to unpack .../5-dovecot-core_1%3a2.3.4.1-5+deb10u1_armhf.deb ...
+Unpacking dovecot-core (1:2.3.4.1-5+deb10u1) ...
+Selecting previously unselected package dovecot-imapd.
+Preparing to unpack .../6-dovecot-imapd_1%3a2.3.4.1-5+deb10u1_armhf.deb ...
+Unpacking dovecot-imapd (1:2.3.4.1-5+deb10u1) ...
+Setting up libsodium23:armhf (1.0.17-1) ...
+Setting up libexttextcat-data (3.4.5-1) ...
+Setting up liblua5.3-0:armhf (5.3.3-1.1) ...
+Setting up libstemmer0d:armhf (0+svn585-1) ...
+Setting up libexttextcat-2.0-0:armhf (3.4.5-1) ...
+Setting up dovecot-core (1:2.3.4.1-5+deb10u1) ...
+
+Creating config file /etc/dovecot/dovecot.conf with new version
+
+Creating config file /etc/dovecot/dovecot-dict-auth.conf.ext with new version
+
+Creating config file /etc/dovecot/dovecot-dict-sql.conf.ext with new version
+
+Creating config file /etc/dovecot/dovecot-sql.conf.ext with new version
+
+Creating config file /etc/dovecot/conf.d/10-auth.conf with new version
+
+Creating config file /etc/dovecot/conf.d/10-director.conf with new version
+
+Creating config file /etc/dovecot/conf.d/10-logging.conf with new version
+
+Creating config file /etc/dovecot/conf.d/10-mail.conf with new version
+
+Creating config file /etc/dovecot/conf.d/10-master.conf with new version
+
+Creating config file /etc/dovecot/conf.d/10-ssl.conf with new version
+
+Creating config file /etc/dovecot/conf.d/10-tcpwrapper.conf with new version
+
+Creating config file /etc/dovecot/conf.d/15-lda.conf with new version
+
+Creating config file /etc/dovecot/conf.d/15-mailboxes.conf with new version
+
+Creating config file /etc/dovecot/conf.d/90-acl.conf with new version
+
+Creating config file /etc/dovecot/conf.d/90-plugin.conf with new version
+
+Creating config file /etc/dovecot/conf.d/90-quota.conf with new version
+
+Creating config file /etc/dovecot/conf.d/auth-checkpassword.conf.ext with new version
+
+Creating config file /etc/dovecot/conf.d/auth-deny.conf.ext with new version
+
+Creating config file /etc/dovecot/conf.d/auth-dict.conf.ext with new version
+
+Creating config file /etc/dovecot/conf.d/auth-master.conf.ext with new version
+
+Creating config file /etc/dovecot/conf.d/auth-passwdfile.conf.ext with new version
+
+Creating config file /etc/dovecot/conf.d/auth-sql.conf.ext with new version
+
+Creating config file /etc/dovecot/conf.d/auth-static.conf.ext with new version
+
+Creating config file /etc/dovecot/conf.d/auth-system.conf.ext with new version
+
+Creating config file /etc/dovecot/conf.d/auth-vpopmail.conf.ext with new version
+Created symlink /etc/systemd/system/multi-user.target.wants/dovecot.service → /lib/systemd/system/dovecot.service.
+Setting up dovecot-imapd (1:2.3.4.1-5+deb10u1) ...
+
+Creating config file /etc/dovecot/conf.d/20-imap.conf with new version
+Processing triggers for systemd (241-7~deb10u1+rpi1) ...
+Processing triggers for man-db (2.8.5-2) ...
+Processing triggers for libc-bin (2.28-10+rpi1) ...
+Processing triggers for dovecot-core (1:2.3.4.1-5+deb10u1) ...
+
+% Ignore error from openssl if directory listing following is OK
+Generating a RSA private key
+.................+++++
+......+++++
+writing new private key to 'private/dovecot.key'
+-----
+Cannot write random bytes:
+1991618576:error:2407007A:random number generator:RAND_write_file:Not a regular file:../crypto/rand/randfile.c:183:Filename=/dev/urandom
+-rw-r--r-- 1 root root 1253 Sep 14 07:45 /etc/dovecot/private/dovecot.pem
+-rw------- 1 root root 1704 Sep 14 07:45 /etc/dovecot/private/dovecot.key
+
+Updating /etc/postfix/main.cf...
+#
+# Install and configure strongSwan
+#
+rpi3p2~# installlPiStrong all
+>> Ensure your Pi is up to date
+ Your Pi must be up to date with the Raspbian repositories by using these commands
+
+    apt-get update
+    apt-get upgrade
+
+  If you have not done this yet, respond n to exit and update your Pi
+  Then reboot your Pi and restart this procedure
+
+Press y to Continue, n to exit and update your Pi [y/n]? y
+>> Package libgmp10 already installed
+>> Installing package libgmp-dev
+The following packages were automatically installed and are no longer required:
+  libgnutls-dane0 libunbound8 rpi.gpio-common
+Use 'apt autoremove' to remove them.
+The following additional packages will be installed:
+  libgmpxx4ldbl
+Suggested packages:
+  gmp-doc libgmp10-doc libmpfr-dev
+The following NEW packages will be installed:
+  libgmp-dev libgmpxx4ldbl
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 592 kB of archives.
+After this operation, 1,578 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Selecting previously unselected package libgmpxx4ldbl:armhf.
+Preparing to unpack .../libgmpxx4ldbl_2%3a6.1.2+dfsg-4_armhf.deb ...
+Unpacking libgmpxx4ldbl:armhf (2:6.1.2+dfsg-4) ...
+Selecting previously unselected package libgmp-dev:armhf.
+Preparing to unpack .../libgmp-dev_2%3a6.1.2+dfsg-4_armhf.deb ...
+Unpacking libgmp-dev:armhf (2:6.1.2+dfsg-4) ...
+Setting up libgmpxx4ldbl:armhf (2:6.1.2+dfsg-4) ...
+Setting up libgmp-dev:armhf (2:6.1.2+dfsg-4) ...
+Processing triggers for libc-bin (2.28-10+rpi1) ...
+>> Installing package libsystemd-dev
+The following packages were automatically installed and are no longer required:
+  libgnutls-dane0 libunbound8 rpi.gpio-common
+Use 'apt autoremove' to remove them.
+The following NEW packages will be installed:
+  libsystemd-dev
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 321 kB of archives.
+After this operation, 880 kB of additional disk space will be used.
+Preparing to unpack .../libsystemd-dev_241-7~deb10u1+rpi1_armhf.deb ...
+Unpacking libsystemd-dev:armhf (241-7~deb10u1+rpi1) ...
+Setting up libsystemd-dev:armhf (241-7~deb10u1+rpi1) ...
+Processing triggers for man-db (2.8.5-2) ...
+>> Installing package libssl-dev
+The following packages were automatically installed and are no longer required:
+  libgnutls-dane0 libunbound8 rpi.gpio-common
+Use 'apt autoremove' to remove them.
+Suggested packages:
+  libssl-doc
+The following NEW packages will be installed:
+  libssl-dev
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 1,563 kB of archives.
+After this operation, 5,883 kB of additional disk space will be used.
+Preparing to unpack .../libssl-dev_1.1.1c-1_armhf.deb ...
+Unpacking libssl-dev:armhf (1.1.1c-1) ...
+Setting up libssl-dev:armhf (1.1.1c-1) ...
+>> Installing package python3-pexpect
+The following packages were automatically installed and are no longer required:
+  libgnutls-dane0 libunbound8 rpi.gpio-common
+Use 'apt autoremove' to remove them.
+The following additional packages will be installed:
+  python3-ptyprocess
+Suggested packages:
+  python-pexpect-doc
+The following NEW packages will be installed:
+  python3-pexpect python3-ptyprocess
+0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
+Need to get 65.5 kB of archives.
+After this operation, 259 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Preparing to unpack .../python3-ptyprocess_0.6.0-1_all.deb ...
+Unpacking python3-ptyprocess (0.6.0-1) ...
+Selecting previously unselected package python3-pexpect.
+Preparing to unpack .../python3-pexpect_4.6.0-1_all.deb ...
+Unpacking python3-pexpect (4.6.0-1) ...
+Setting up python3-ptyprocess (0.6.0-1) ...
+Setting up python3-pexpect (4.6.0-1) ...
+>> Installing package zip
+The following packages were automatically installed and are no longer required:
+  libgnutls-dane0 libunbound8 rpi.gpio-common
+Use 'apt autoremove' to remove them.
+The following NEW packages will be installed:
+  zip
+0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
+Need to get 212 kB of archives.
+After this operation, 542 kB of additional disk space will be used.
+Preparing to unpack .../archives/zip_3.0-11_armhf.deb ...
+Unpacking zip (3.0-11) ...
+Setting up zip (3.0-11) ...
+Processing triggers for man-db (2.8.5-2) ...
+% Using Strongswan version 5.8.1
+
+/root/piStrong
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+
+Press any key to continue:  
+strongswan-5.8.1/
+
+... many lines deleted for brevity ...
+
+strongswan-5.8.1/conf/
+strongswan-5.8.1/m4/config/
+strongswan-5.8.1/m4/config/ltversion.m4
+strongswan-5.8.1/m4/config/libtool.m4
+strongswan-5.8.1/m4/config/lt~obsolete.m4
+strongswan-5.8.1/m4/config/ltsugar.m4
+strongswan-5.8.1/m4/config/ltoptions.m4
+/root/piStrong/strongswan-5.8.1
+
+
+>> Performing pre-make configuration <<
+checking for a BSD-compatible install... /usr/bin/install -c
+... lines deleted for brevity ...
+config.status: executing libtool commands
+
+ strongSwan will be built with the following plugins
+-----------------------------------------------------
+libstrongswan: aes des rc2 sha2 sha1 md5 mgf1 random nonce x509 revocation constraints pubkey pkcs1 pkcs7 pkcs8 pkcs12 pgp dnskey sshkey pem openssl fips-prf gmp curve25519 xcbc cmac hmac
+libcharon:     attr kernel-netlink resolve socket-default vici updown eap-identity eap-md5 eap-mschapv2 eap-dynamic eap-tls xauth-generic counters
+libtnccs:     
+libtpmtss:    
+
+/root/piStrong/strongswan-5.8.1
+
+>> Performing make <<
+
+... many lines deleted for brevity ...
+
+make[1]: Leaving directory '/root/piStrong/strongswan-5.8.1'
+
+
+If you are only going to use the VPN Client on this system, answer N to the next question
+Note, however, 2 Server configuration questions will still be asked
+For Client use only, Press Enter to take the defaults
+The Server connections configuration file will be created, but disabled
+
+Do you want the VPN Server configuration enabled on this system [y/n]? y
+
+The VPN Subnet is used by the VPN server for hosting clients
+Suggest using a 10.*.*.* subnet although this is not mandatory
+It must not conflict with any other local subnets
+
+Subnet for VPN clients [10.1.10.0/24]: 
+
+A local DNS server provides local name service resoluton for remote VPN clients
+A remote DNS server is needed for internet name resolution
+You must provide at least one DNS server
+
+Comma-separated list of DNS servers for VPN clients (local,internet) [192.168.92.1, 1.1.1.1]: 
+
+>> Creating /etc/swanctl/conf.d/pistrong-ServerConnection.conf for IP address 127.0.1.1 and subnet 192.168.92.0/24
+>> Creating /etc/sysctl.d/92-pistrong.conf to set net.ipv4.ip_forward=1
+Creating iptables POSTROUTING for strongSwan
+  See /etc/swanctl/pistrong/iptables
+>> pistrong/strongSwan Installation complete <<
+>> 
+>> There are a few Post-installation steps:
+>>   See http://github/gitbls/pistrong/blob/master/makeMyCA for a usable, customizable CA configuration script
+
+>>   Set up iptables (see http://github/gitbls/pistrong/blob/master/README.md)
+
+>>   See pistrong help and pistrong --help for pistrong command details
+
+>>      'sudo pistrong service start' or 'sudo systemctl start strongswan' to start the strongSwan VPN
+>>      'sudo pistrong service enable' or 'sudo systemctl enable strongswan' to enable strongSwan to restart after reboot
+
+>> Reboot and make sure everything works
+
+rpi3p2~# 
