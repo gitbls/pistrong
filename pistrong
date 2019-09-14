@@ -617,14 +617,14 @@ def mailcert(pd, args, newkey):
         msg = "\nDownload this Client Cert Pack to your Linux VPN client system\n\nUse 'sudo pistrong client install <zipfile>' to install\n\n     "
         msg += pd.fnpdir.format(pd.dx['weburl'], zipfn)
         msg += "\n"
-        if pd.db['users'][newkey]['password'] != "":
-            msg += "\nThe Linux Client Cert Pack password will be sent in a separate email"
-        else:
-            msg += "\nThis Linux client Cert Pack does not have a password"
+#        if pd.db['users'][newkey]['password'] != "":
+#            msg += "\nThe Linux Client Cert Pack password will be sent in a separate email"
+#        else:
+#            msg += "\nThis Linux client Cert Pack does not have a password"
         sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert {}".format(pd.cn), msg)
-        if pd.db['users'][newkey]['password']:
-            pwmsg = "Use this password to install the Client Cert Pack onto your device: {}\n".format(pd.db['users'][newkey]['password'])
-            sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert password {}".format(pd.cn), pwmsg)
+#        if pd.db['users'][newkey]['password']:
+#            pwmsg = "Use this password to install the Client Cert Pack onto your device: {}\n".format(pd.db['users'][newkey]['password'])
+#            sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert password {}".format(pd.cn), pwmsg)
     else:
         if pd.db['users'][newkey]['password'] == "":
             pwmsg = "Your certificate does not have a password"
