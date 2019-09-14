@@ -104,6 +104,15 @@ If you've set everything up correctly, it should, of course, *just work*. But, s
     * User/device certificates can be found in the Personal Certificates store
     * The strongSwan root certificate will be found in the Trusted Root Certification Authorities
 
+## Linux Cert Installation
+
+Certs for Linux systems are created using pistrong with `sudo pistrong add username --linux` (plus other switches as required). The certs are stored in a Linux Client Cert Pack /etc/swanctl/pistrong/server-assets/username-devicename.zip.
+
+Copy the Cert Pack to your Linux client system in a convenient directory, then issue the command: `sudo pistrong client install username-devicename.zip`
+
+pistrong will display the unpack.sh file from the zip file. Once you approve, pistrong will add the certs and connection information to the strongSwan configuration. Restart the strongSwan server, and then connect using `sudo pistrong client connect server.fqdn.com`. 
+
+Use `sudo pistrong client stop` to disconnect the VPN connection.
 
 ## MacOS
 
