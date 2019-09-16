@@ -115,9 +115,9 @@ all phases will be run. InstallPiStrong will pause at the start of each phase to
 * **make** compiles and builds strongSwan
 * **install** installs strongSwan into the system
 * **postconf** or **post-configure** creates
-    * `/etc/swanctl/conf.d/pistrong-connections.conf` strongSwan config file for iOS and Windows roadwarrior use
+    * `/etc/swanctl/conf.d/pistrong-ServerConnection.conf` strongSwan config file for iOS and Windows roadwarrior use
     * `/etc/swanctl/pistrong/iptables` required iptables addition. See Firewall Considerations section below
-    * `/etc/swanctl/pistrong/backup/connections-pistrong.piStrongInstall` copy of the initial pistrong-connections.conf for future reference if needed
+    * `/etc/swanctl/pistrong/backup/connections-pistrong.piStrongInstall` copy of the initial pistrong-ServerConnection.conf for future reference if needed
 
 If you know that your distro is carrying strongSwan 5.8.0 or greater, and it has been built with --enable-systemd, you can install strongSwan from your distro and skip the download, preconf, make, and install phases. That is, you'll only need to do the preqreq and postconf phases.
 
@@ -176,7 +176,7 @@ Many users either have or want more than this very minimal firewall. In that cas
 
     * When adding users, always specify --cacert and --remoteid to specify the secondary VPN SAN Key to ensure that the user Cert is assigned to the correct connction.
 
-    * **NOTE:** If you ever re-create the CA using deleteca/createca you'll need to recreate the secondary Cert/Key and validate the connection details in /etc/swanctl/conf.d/pistrong-connections.conf, so don't deleteca unless you're really sure!
+    * **NOTE:** If you ever re-create the CA using deleteca/createca you'll need to recreate the secondary Cert/Key and validate the connection details in /etc/swanctl/conf.d/pistrong-ServerConnection.conf, so don't deleteca unless you're really sure!
 
 * Email and web server configuration is beyond the scope of this document. There are lots of guides on the internet for this, such as https://raspberrytips.com/mail-server-raspberry-pi/, but also see the section on Local Mail below.
 
