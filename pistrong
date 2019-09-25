@@ -978,7 +978,7 @@ def cmd_client_start(pd, args):
         return
     if isikeup(pd, ikename):
         for line in subp.stdout.decode('utf-8').split("\n"): print(line)          # Display the swanctl --initiate output
-        dosystem(pd, "swanctl --initiate --child net")
+        dosystem(pd, "swanctl --initiate --child nat-t")
         if not istunnelup(pd, "nat-t"):
             print("? The VPN tunnel was not correctly established")
             if askyn("* Should I close the IKE connection {}? ".format(ikename)):
@@ -1008,7 +1008,7 @@ def cmd_client_install(pd, args):
     dosystem(pd, "cat {}".format(ufn))
     if askyn("Do you want to install this VPN Connection? "):
         dosystem(pd, "/bin/bash {} {}".format(ufn, os.path.realpath(args.vpnorzip)))
-    print("% You must 'sudo pistrong restart' before using the connection")
+    print("% You must 'sudo pistrong service restart' before using the connection")
     return
 
 def cmd_client_status(pd, args):

@@ -146,6 +146,8 @@ pistrong supports Linux Roadwarrior users. The easiest approach is to use strong
 
     For instance, using the default CA built by makeMyCA, one might use `sudo pistrong add tomspi --device pi4 --remoteid linux.mydomain.com --linux`.
 
+    NOTE: For Linux clients, you must use the name of the Linux client system for the name. For example, the above command assumes that the hostname is tomspi.
+
     The `--linux` switch causes pistrong to create a Linux Client Cert Pack. Once the Cert Pack (zip file) has been copied to the Linux Roadwarror system, install the new connection with `sudo pistrong client install zip-file`. The zip file has the certificates and connection information for the remote VPN server.
 
 * Connect to the remote strongSwan VPN server with `sudo pistrong client start server.fqdn.com`
