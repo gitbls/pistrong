@@ -34,7 +34,8 @@ class pdat:
         self.clientcert = self.clientkey = self.newp12fn = self.newp12 = self.cn = ""
         self.linuxzip = self.tmpdir = ""
         self.fnpdir = "{}/{}"
-        self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = ""
+        self.dconfd = "conf.d"
+        self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
 version = "3.0"
 dbversion = "3"
@@ -113,6 +114,18 @@ def qdelfile(qfn):
     except OSError:
         pass
 
+def qdelwild(qdir, qfn):
+    """
+    Delete files in qdir that match qfn
+    """
+    for f in os.listdir(qdir):
+        if re.search(qfn, f):
+            try:
+                os.remove(os.path.join(qdir, f))
+            except OSError:
+                pass
+    return
+        
 def qrename(src, dst):
     """
     Rename the src file to be dst. Errors masked.
@@ -129,13 +142,17 @@ def qcopyfile(src, dst):
     print("% Copying '{}' to '{}'".format(src, dst))
     shutil.copy(src, dst)
 
+def enofile(fns, emsg):
+    msg = emsg if emsg != "" else "? Required file '{}' is missing"
+    if not os.path.isfile(fns): perrorexit(msg.format(fns))
+
 def askyn(question):
     """
     Prompt for an answer with the given question.
     Returns True if yes, False if anything else
     """
-    yni = input(question)
-    if yni == "y" or yni == "Y" or yni == "yes": return True
+    yni = input(question).lower()
+    if "yes".startswith(yni): return True
     return False
 
 def asktwice(question):
@@ -179,8 +196,12 @@ def dosystemrs(pd, docmd):
     Execute the string as a separate process, return output as procedure value
     """
     if pd.dx['cmds']: print("[{}]".format(docmd))
-    return subprocess.check_output(docmd, shell=True)
-
+    try:
+        r = subprocess.run(shlex.split(docmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+    except subprocess.CalledProcessError as e:
+        return ""
+    return r.stdout.decode('utf-8')
+    
 def dosystemx(pd, docmd):
     """
     Same as dosystem but never prints command
@@ -217,13 +238,13 @@ if strongswan was running before, as indicated by argument, restart it
 
 def isikeup(pd, ikename):
     # NOTE doesn't currently check IKE name
-    sas = dosystemrs(pd, "swanctl --list-sas").decode('utf-8')
+    sas = dosystemrs(pd, "swanctl --list-sas")
     if "ESTABLISHED" in sas: return True
     return False
 
 def istunnelup(pd, tunnelname):
     # NOTE doesn't currently check tunnel name
-    sas = dosystemrs(pd, "swanctl --list-sas").decode('utf-8')
+    sas = dosystemrs(pd, "swanctl --list-sas")
     if "INSTALLED" in sas: return True
     return False
 
@@ -248,6 +269,7 @@ def makefilenames(pd, args):
     pd.dx509crl = "{}/x509crl".format(pd.swandir)
     pd.dprivate = "{}/private".format(pd.swandir)
     pd.dp12 = "{}/p12".format(pd.swandir)
+    pd.dconfd = "{}/conf.d".format(pd.swandir)
     pd.rootca = "{} {} Root CA".format(pd.db['config']['rootca']['value'], pd.shorthost)
     pd.swancertpfx = pd.db['config']['swancertpfx']['value'] if args.cacert is None else args.cacert
     pd.swancertfn = "{}CACert.pem".format(pd.swancertpfx)
@@ -348,24 +370,25 @@ def reloadcreds(pd):
         dosystem(pd, "swanctl --load-creds")  # reload credentials
 
 def gethostfqdn(pd, args):
-    pd.hostfqdn = socket.getfqdn()
-    pd.shorthost = pd.hostfqdn.split(".")[0]
-    pd.vpnip = socket.gethostbyname(pd.hostfqdn)
-    if pd.vpnip.split(".")[0] == "127":
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            pd.vpnip = s.getsockname()[0]
-        except:
-            pd.vpnip = "127.0.0.1"  # In case it came out as 127.0.1.1
-            print("% Couldn't divine host IP address. Using 127.0.0.1. Check /etc/hosts")
-        s.close()
+    if pd.db['config']['myfqdn']['value'] != "":
+        pd.hostfqdn = pd.db['config']['myfqdn']['value']
+        pd.shorthost = pd.hostfqdn.split(".")[0]
+    else:
+        pd.hostfqdn = socket.getfqdn()
+        pd.shorthost = pd.hostfqdn.split(".")[0]
+        pd.vpnip = socket.gethostbyname(pd.hostfqdn)
+        if pd.vpnip.split(".")[0] == "127":
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                pd.vpnip = s.getsockname()[0]
+            except:
+                pd.vpnip = "127.0.0.1"  # In case it came out as 127.0.1.1
+                print("% Couldn't divine host IP address. Using 127.0.0.1. Check /etc/hosts")
+            s.close()
 
-    if not "." in pd.hostfqdn:
-        if pd.db['config']['myfqdn']['value'] != "":
-            pd.hostfqdn = pd.db['config']['myfqdn']['value']
-        else:
-            if args.myfqdn == None: print("% Unable to obtain a fully-qualified domain name for this host\n  This may impact internet accessibility for the VPN\n  Use 'pistrong config --myfqdn' and/or see the pistrong README")
+    if pd.hostfqdn == "" and args.myfqdn == None:
+        print("% Unable to obtain a fully-qualified domain name for this host\n  This may impact internet accessibility for the VPN\n  Use 'pistrong config --myfqdn' and/or see the pistrong README")
 
 def dbload(pd):
     """
@@ -396,6 +419,7 @@ def dbload(pd):
                            "cnsuffix":{"value":"ipsec.vpn","help":"Suffix for user cert names"},\
                            "service":{"value":"strongswan.service","help":"strongSwan service name"},\
                            "cmds":{"value":False,"help":"Echo executed commands"},\
+                           "lxscript":{"value":"pistrong-vpn-installer","help":"Linux VPN Config Pack script name"},\
                            "debug":{"value":False,"help":"Debug mode"},\
                            "random":{"value":True,"help":"Generate random cert passwords"},\
                            "mailfrom":{"value":"PiStrongVPN<root@mydomain.com>","help":"'From' string for cert email"},\
@@ -535,6 +559,7 @@ def listentries(pd, estatus, keyname, maxkey, maxcertlen, maxrid):
                 if listkey.split("-")[0] == keyname:
                     listentry(pd, listkey, maxkey, maxcertlen, maxrid)
 
+
 def findclientvpn(pd, args, vpnkey):
     found = []
     for file in os.listdir("{}/VPNClients".format(pd.pswandir)):
@@ -552,23 +577,25 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
     tmpswancertfn="{}-{}".format(pd.shorthost, pd.swancertfn)
     qrename(pd.fnpdir.format(pd.tmpdir,pd.swancertfn), tmpswancert)
     dosystem(pd, "zip -j {} {} {} {}".format(pd.linuxzip, tmpswancert, pd.clientcert, pd.clientkey))
-    tmpf = "{}/{}".format(pd.tmpdir, "unpack.sh")
+    tmpf = "{}/{}".format(pd.tmpdir, pd.db['config']['lxscript']['value'])
     with open(tmpf, 'w') as f:
         hypfqdn = pd.hostfqdn.replace(".","-")
-        f.write("#!/bin/bash\ncd /etc/swanctl\n")
-        f.write("# pistrong {} Linux Client VPN Installer\n".format(version))
+        f.write("#!/bin/bash\n")
+        f.write("# pistrong {} Linux VPN Configuration Installer\n".format(version))
         f.write("# Built on Host {} for {} at {}\n".format(pd.hostfqdn, newkey, datetime.datetime.strftime(datetime.datetime.now(), "%Y%m%d-%H%M%S")))
         f.write("zf=$1\n")
         f.write("zfn=$(basename $zf)\n")
-        f.write("unzip -d /etc/swanctl/x509ca $zf {}\n".format(tmpswancertfn))
-        f.write("unzip -d /etc/swanctl/x509 $zf {}\n".format(pd.clientcertfn))
-        f.write("unzip -d /etc/swanctl/private $zf {}\n".format(pd.clientkeyfn))
-        f.write("chmod 755 /etc/swanctl/x509ca/{}\n".format(tmpswancertfn))
-        f.write("chmod 755 /etc/swanctl/x509/{}\n".format(pd.clientcertfn))
-        f.write("chmod 600 /etc/swanctl/private/{}\n".format(pd.clientkeyfn))
-        f.write("cat > /etc/swanctl/conf.d/{}-ClientConnection.conf <<EOF\n".format(pd.hostfqdn))
+        f.write("swandir=${2:-/etc/swanctl}\n")
+        f.write("cd $swandir\n")
+        f.write("unzip -d  $swandir/x509ca  $zf {}\n".format(tmpswancertfn))
+        f.write("unzip -d  $swandir/x509    $zf {}\n".format(pd.clientcertfn))
+        f.write("unzip -d  $swandir/private $zf {}\n".format(pd.clientkeyfn))
+        f.write("chmod 755 $swandir/x509ca/{}\n".format(tmpswancertfn))
+        f.write("chmod 755 $swandir/x509/{}\n".format(pd.clientcertfn))
+        f.write("chmod 600 $swandir/private/{}\n".format(pd.clientkeyfn))
+        f.write("cat > $swandir/conf.d/{}-ClientConnection.conf <<EOF\n".format(pd.hostfqdn))
         f.write("connections {\n")
-        f.write("    {}-{} {{\n".format(args.username, hypfqdn))
+        f.write("    {} {{\n".format(hypfqdn))
         f.write("        version = 2\n")
         f.write("        remote_addrs = {}\n".format(pd.hostfqdn))
         f.write("        local_addrs  = %any\n")
@@ -594,11 +621,16 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
         f.write("    }\n")
         f.write("}\n")
         f.write("EOF\n")
-        f.write("cat > /etc/swanctl/pistrong/VPNClients/{} <<EOF\n".format(pd.hostfqdn))
-        f.write("# Assets for Client VPN {} connection\n".format(pd.hostfqdn))
-        f.write("private/{}\nx509/{}\nx509ca/{}\nconf.d/{}-ClientConnection.conf\npistrong/client-assets/$zfn\n".format(pd.clientkeyfn, pd.clientcertfn,tmpswancertfn, pd.hostfqdn))
+        f.write("cat > $swandir/pistrong/VPNClients/{} <<EOF\n".format(pd.hostfqdn))
+        f.write("# Client VPN {} connection assets\n".format(pd.hostfqdn))
+        f.write("conn={}\n".format(hypfqdn))
+        f.write("file=private/{}\n".format(pd.clientkeyfn))
+        f.write("file=x509/{}\n".format(pd.clientcertfn))
+        f.write("file=x509ca/{}\n".format(tmpswancertfn))
+        f.write("file=conf.d/{}-ClientConnection.conf\n".format(pd.hostfqdn))
+        f.write("file=pistrong/client-assets/$zfn\n")
         f.write("EOF\n")
-        f.write("cp $zf /etc/swanctl/pistrong/client-assets\n")
+        f.write("cp $zf $swandir/pistrong/client-assets\n")
         f.write('echo ""\n')
         f.write('echo "Please sudo systemctl restart strongswan to enable new VPN connection"\n')
         f.write('echo ">> Use sudo pistrong client start {} to start the new VPN connection"\n'.format(pd.hostfqdn))
@@ -614,17 +646,14 @@ def mailcert(pd, args, newkey):
         qcopyfile("{}/server-assets/{}".format(pd.pswandir, zipfn), pd.dx['webdir'])
         webfn = pd.fnpdir.format(pd.dx['webdir'],"{}".format(zipfn))
         os.chmod(webfn, 0o644)
-        msg = "\nDownload this Client Cert Pack to your Linux VPN client system\n\nUse 'sudo pistrong client install <zipfile>' to install\n\n     "
+        msg = "\nDownload this VPN Config Pack to your Linux VPN client system\n\nUse 'sudo pistrong client install <zipfile>' to install\n\n     "
         msg += pd.fnpdir.format(pd.dx['weburl'], zipfn)
         msg += "\n"
-#        if pd.db['users'][newkey]['password'] != "":
-#            msg += "\nThe Linux Client Cert Pack password will be sent in a separate email"
-#        else:
-#            msg += "\nThis Linux client Cert Pack does not have a password"
+        msg += "\nThis Linux VPN Config Pack does not have a password"
         sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert {}".format(pd.cn), msg)
-#        if pd.db['users'][newkey]['password']:
-#            pwmsg = "Use this password to install the Client Cert Pack onto your device: {}\n".format(pd.db['users'][newkey]['password'])
-#            sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert password {}".format(pd.cn), pwmsg)
+        #        if pd.db['users'][newkey]['password']:
+        #            pwmsg = "Use this password to install the VPN Config Pack onto your device: {}\n".format(pd.db['users'][newkey]['password'])
+        #            sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert password {}".format(pd.cn), pwmsg)
     else:
         if pd.db['users'][newkey]['password'] == "":
             pwmsg = "Your certificate does not have a password"
@@ -638,7 +667,7 @@ def mailcert(pd, args, newkey):
             os.chmod(webfn, 0o644)
             certurl = pd.fnpdir.format(pd.dx['weburl'], pd.newp12fn)
             cacerturl = pd.fnpdir.format(pd.dx['weburl'], pd.swancertfn)
-            msg = "\nRoot CA cert (if needed): {}\nYour device certificate:  {}\n\n".format(cacerturl, certurl)
+            msg = "\nRoot CA cert:             {}\nYour device certificate:  {}\n\n".format(cacerturl, certurl)
             msg += "iOS devices: Browse the links to install both certificates (Install CA Cert first).\n"
             msg += "  Then create a new IKEV2 VPN connection using the iOS profile {}\n  and this information:\n".format(pd.cn)
             msg += "          Server:    {}\n          Remote ID: {}\n          Local ID:  {}\n".format(pd.hostfqdn, pd.db['users'][newkey]['remoteid'], pd.cn)
@@ -681,11 +710,16 @@ def makecacert(pd, args):
     pd.db['certs'][pd.swancertpfx.replace(".pem","")] = getcertkey(pd.swancert, "subjkey:")
     pd.dbmodified = True
 
+def checkcaexist(pd):
+    enofile(pd.swancert, "% CA file '{}' not found")
+    enofile(pd.swankey, "% CA file '{}' not found")
+
+
 def makeca(pd, args):
     """
     Make the Certificate Authority (CA)
     """
-    print("\n>> Creating strongSwan CA for host {} in directory {}".format(pd.hostfqdn, pd.swandir))
+    print("\n>> Creating strongSwan CA for host {} in {}".format(pd.hostfqdn, pd.swandir))
     makecacert(pd, args)
     if not args.novpncert: makevpncert(pd, args)
     pd.dbmodified = True
@@ -733,6 +767,7 @@ def cmd_add(pd, args):
     newkey = makekeyname(pd, args)
     if newkey == "":
         perrorexit("? No user name specified")
+    checkcaexist(pd)
     makeclientfnames(pd, args, newkey)
     pd.dx['random'] = trueorfalse(args.random) if args.random else pd.db['config']['random']['value']
     pd.dx['uclife'] = args.uclife if args.uclife else pd.db['config']['uclife']['value']
@@ -768,13 +803,14 @@ def cmd_add(pd, args):
         mailcert(pd, args, newkey)
     print("% Added {} with Remote ID '{}' using CA Cert {}".format(newkey, newremoteid, pd.swancertpfx))
     if args.linux and args.mail == None:
-        print("% Linux Client Cert Pack for {} is in {}".format(newkey, pd.linuxzip))
+        print("% Linux VPN Config Pack for {} is in {}".format(newkey, pd.linuxzip))
     return
 
 def cmd_delete(pd, args):
     isrootordebug(pd, args)
     newkey = makekeyname(pd, args)
     makeclientfnames(pd, args, newkey)
+    checkcaexist(pd)
     if keyindb(pd, newkey):
         del pd.db['users'][newkey]
         dbflush(pd)
@@ -790,6 +826,7 @@ def cmd_revoke(pd, args):
     isrootordebug(pd, args)
     newkey = makekeyname(pd, args)
     makeclientfnames(pd, args, newkey)
+    checkcaexist(pd)
     if not keyindb(pd, newkey):
         perrorexit("? User cert '{}' not found".format(newkey))
     if not os.path.isfile(pd.clientcert):
@@ -809,6 +846,7 @@ def cmd_resend(pd, args):
     isrootordebug(pd, args)
     newkey = makekeyname(pd, args)
     makeclientfnames(pd, args, newkey)
+    checkcaexist(pd)
     if keyindb(pd, newkey):
         pd.dx['mailfrom'] = pd.db['config']['mailfrom']['value']
         pd.dx['webdir'] =   pd.db['config']['webdir']['value']
@@ -820,6 +858,7 @@ def cmd_resend(pd, args):
 
 def cmd_list(pd, args):
     isrootordebug(pd, args)
+    checkcaexist(pd)
     maxnam = 0
     maxcert = maxcacertname(pd)
     maxrid = max (maxremoteid(pd), len("Remote ID"))
@@ -859,7 +898,7 @@ def cmd_createca(pd, args):
         perrorexit("? There is already a CA in this directory\n% Use 'pistrong deleteca' first")
     sts = stopifrunning(pd)
     makevpnfns(pd, args)
-    if pd.dx['vpnsankey'] != "ipsec.vpn.net":
+    if args.novpncert or (pd.dx['vpnsankey'] != "ipsec.vpn.net"):
         makeca(pd, args)
         if not args.nocamsg:
             print("% CA created in {}".format(pd.swandir))
@@ -877,13 +916,19 @@ def cmd_deleteca(pd, args):
     print("% WARNING: This will delete all CA and user certs and all keys in {}".format(pd.swandir))
     if asktwice("Do you want to continue?"):
         stopifrunning(pd)
+        qdelfile("{}/pistrong-ServerConnection.conf".format(pd.dconfd))
         for cadir in pd.cadirlist:
             shutil.rmtree(cadir, ignore_errors=True)
             if not os.path.isdir(cadir): os.mkdir(cadir, pd.cadirlist[cadir])
+        qdelwild(pd.dconfd, "Tunnel.*\.conf$")
+        qdelwild(pd.dconfd, ".*ClientConnection.conf$")
+        qdelwild("{}/server-assets".format(pd.pswandir), ".*\.zip$")
+        qdelwild("{}/client-assets".format(pd.pswandir), ".*\.zip$")
+        qdelwild("{}/VPNClients".format(pd.pswandir), ".*$")
         pd.db['users'] = {}    # Delete all the users and flush certdb
         pd.db['certs'] = {}
         dbflush(pd)
-        print("% CA Deleted. pistrong database and connection definitions NOT changed")
+        print("% CA Deleted. pistrong configuration remains")
     else:
         print("% CA NOT deleted")
     return
@@ -893,8 +938,7 @@ def cmd_makevpncert(pd, args):
     Make a new VPN cert command. pistrong makevpncert --vpncert MyCert makes MyCertVPNCert/MyCertVPNKey
     """
     isrootordebug(pd, args)
-    if not os.path.isfile(pd.swancert):
-        perrorexit("? CA Cert {} missing".format(pd.swancert))
+    checkcaexist(pd)
     makevpnfns(pd, args)
     if os.path.isfile(pd.vpnhostcert) or os.path.isfile(pd.vpnhostkey):
         perrorexit("? VPN Host Cert {} and/or VPN Host Key {} already exist".format(pd.vpnhostcert, pd.vpnhostkey))
@@ -922,6 +966,7 @@ def cmd_showcert(pd, args):
 
 def cmd_showca(pd, args):
     isrootordebug(pd, args)
+    checkcaexist(pd)
     print("[CA Certificate {}]".format(pd.swancert))
     dosystem(pd, "pki --print --in {}".format(pd.swancert))
     for fn in os.listdir(pd.dx509):
@@ -937,6 +982,7 @@ def cmd_showca(pd, args):
 
 def cmd_listca(pd, args):
     isrootordebug(pd, args)
+    checkcaexist(pd)
     maxnam = maxcacertname(pd)
     maxvpncert = maxvpncertname(pd)
     if maxnam <= 0: return    # no CA files found
@@ -965,31 +1011,31 @@ def cmd_client_start(pd, args):
     vpnclients = findclientvpn(pd, args, vpnkey)
     if len(vpnclients) == 0: perrorexit("? No matching Client VPN configuration found")
     if len(vpnclients) > 1: perrorexit("? More than one Client VPN configuration matches")
-    dvpn = vpnclients[0].replace(".","-")
+    dvpn = vpnclients[0].replace(".","-")   # Read from connection file someday?
+    if isrunning(pd) != 0: perrorexit("? strongSwan not running\n  Do: sudo systemctl start strongswan")
     if isikeup(pd, ""): perrorexit("? VPN already started\n  Use 'sudo pistrong client stop' to stop VPN first")
-    ikename = "{}-{}".format(pd.shorthost, dvpn)
     waitsec = args.wait
     try:
-        subp = subprocess.run(shlex.split("swanctl --initiate --ike {}".format(ikename)), timeout=int(waitsec), stdout=subprocess.PIPE)
+        subp = subprocess.run(shlex.split("swanctl --initiate --ike {}".format(dvpn)), timeout=int(waitsec), stdout=subprocess.PIPE)
     except subprocess.TimeoutExpired:
-        killike(pd, ikename, True)
+        killike(pd, dvpn, True)
         print("? VPN IKE connection timed out after {} seconds".format(waitsec))
         print("  Check router port forwards for ports 500 and 4500")
         return
-    if isikeup(pd, ikename):
+    if isikeup(pd, dvpn):
         for line in subp.stdout.decode('utf-8').split("\n"): print(line)          # Display the swanctl --initiate output
         dosystem(pd, "swanctl --initiate --child nat-t")
         if not istunnelup(pd, "nat-t"):
             print("? The VPN tunnel was not correctly established")
-            if askyn("* Should I close the IKE connection {}? ".format(ikename)):
-                killike(pd, ikename, False)
+            if askyn("* Should I close the IKE connection {}? ".format(dvpn)):
+                killike(pd, dvpn, False)
             else:
-                print("% The IKEV2 connection {} is still up".format(ikename))
+                print("% The IKEV2 connection {} is still up".format(dvpn))
             return
     return
 
 def cmd_client_stop(pd, args):
-    sas = dosystemrs(pd, "swanctl --list-sas").decode('utf-8')
+    sas = dosystemrs(pd, "swanctl --list-sas")
     ikename = (sas.split("\n")[0]).split(':')[0]
     if isikeup(pd, ikename): killike(pd, ikename, False)
     return
@@ -998,17 +1044,17 @@ def cmd_client_install(pd, args):
     # NOTE: This is security hole if given a rogue "infected" script
     #       For now give installer option to back out after viewing script
     #       Needs work
-    if args.vpnorzip == None: perrorexit("? Full path to VPN Client Pack zip file required")
-    if not os.path.isfile(args.vpnorzip): perrorexit("? Cannot find VPN Client Pack '{}'".format(args.vpnorzip))
+    if args.vpnorzip == None: perrorexit("? Full path to VPN Config Pack zip file required")
+    if not os.path.isfile(args.vpnorzip): perrorexit("? Cannot find VPN Config Pack '{}'".format(args.vpnorzip))
     pd.tmpdir = mkdtemp(prefix="pistrong")
-    dosystem(pd, "unzip -d {} {} unpack.sh".format(pd.tmpdir, args.vpnorzip))
-    ufn = pd.fnpdir.format(pd.tmpdir,"unpack.sh")
+    dosystem(pd, "unzip -d {} {} {}".format(pd.tmpdir, args.vpnorzip, pd.db['config']['lxscript']['value']))
+    ufn = pd.fnpdir.format(pd.tmpdir,pd.db['config']['lxscript']['value'])
     os.chmod(ufn, 0o755)
-    askyn("\nPress Return when you are ready to review the Client VPN script: ")
+    askyn("\nPress Return when you are ready to review the Client VPN install script: ")
     dosystem(pd, "cat {}".format(ufn))
     if askyn("Do you want to install this VPN Connection? "):
         dosystem(pd, "/bin/bash {} {}".format(ufn, os.path.realpath(args.vpnorzip)))
-    print("% You must 'sudo pistrong service restart' before using the connection")
+        print("% You must 'sudo pistrong service restart' before using the connection")
     return
 
 def cmd_client_status(pd, args):
@@ -1031,10 +1077,10 @@ def cmd_client_delete(pd, args):
         with open(vpnconfig, 'r') as f:
             for line in f:
                 if not line.startswith('#'):
-                    tfn = "{}/{}".format(pd.swandir, line.strip())
-                    os.chmod(tfn, 0o755)
-                    qdelfile(tfn)
-        os.chmod(vpnconfig, 0o755)
+                    wds = line.split("=")
+                    if wds[0] == "file":
+                        tfn = "{}/{}".format(pd.swandir, wds[1].strip())
+                        qdelfile(tfn)
         qdelfile(vpnconfig)
         print("% Client VPN {} configuration deleted".format(dvpn))
     return
@@ -1132,7 +1178,7 @@ subparser_add.add_argument("username", help="Username to add")
 subparser_add.add_argument("--cacert", help="CA cert to use")
 subparser_add.add_argument("--device", help="Device name for identification")
 subparser_add.add_argument("--keybits", default="2048", help="User cert key bits [2048]")
-subparser_add.add_argument("--linux", help="Build a Linux Client package for this user", action='store_true')
+subparser_add.add_argument("--linux", help="Build a Linux VPN Config Pack for this user", action='store_true')
 subparser_add.add_argument("--mail", help="User email address")
 subparser_add.add_argument("--nopass", help="Cert install requires no password", action='store_true')
 subparser_add.add_argument("--password", help="Cert install password")
