@@ -2,7 +2,7 @@
 #
 # Run this script via sudo After strongSwan is installed
 # If you intend to send mail to cert recipients, you'll need an email server and web server
-# These don't need to be installed before running this script, but it may simplify redoes based on incorrect assumptions
+# These don't need to be installed before running this script, but doing so may simplify redoes based on incorrect assumptions
 #
 function askyn() {
     local ans
@@ -13,28 +13,19 @@ function askyn() {
     esac
 }
 
-if [ ! -f /etc/swanctl/conf.d/pistrong-ServerConnection.conf ]
-then
-    echo ""
-    echo "? The pistrong VPN Server is not enabled on this system"
-    echo "  Do sudo InstallPiStrong postconf and opt to enable the VPN Server"
-    echo "  Then re-run this script"
-    echo ""
-    exit
-fi
-
 thishost=$(hostname)        #This gets the hostname from Linux
 webdir="/var/www/html/vpn"
 ios="ios"
 windows="windows"
 linux="linux"
+myipaddr=$(hostname --ip-address)
+
 echo "Build a prescriptive strongSwan CA for iOS and Windows devices"
 echo ""
 echo "** You will be asked a series of configuration questions"
-echo "   and you will have an opportunity to quit"
-echo "   before any changes are made to your system"
+echo "   You will be prompted before any changes are made to your system"
 echo ""
-echo "** Your domain name is required to create the Certs"
+echo "** A domain name is required to create the CA"
 echo -n "Enter the domain name you want to use [noname.com]: " ; read tmp
 [ "$tmp" != "" ] && thisdomain="$tmp" || thisdomain="noname.com"
 thisfqdn="$thishost.$thisdomain"
@@ -78,7 +69,7 @@ echo -n "VPN SAN Key for iOS users [$ioskey]: " ; read tmp
 
 echo -n "VPN Cert name prefix for Windows VPN Cert [$windows]: " ; read tmp
 [ "$tmp" != "" ] && windows="$tmp"
-# Get Windows VPN SAN Key even though it's not used for authentication
+# Get Windows VPN SAN Key even though Windows IPSec stack doesn't use it currently
 echo -n "VPN SAN Key for Windows users [$winkey]: " ; read tmp
 [ "$tmp" != "" ] && winkey="$tmp"
 
@@ -96,11 +87,37 @@ echo -n "Second VPN SAN Key [$thisfqdn]: " ; read tmp
 [ "$tmp" != "" ] && san2="$tmp"
 
 echo ""
+echo "** VPN Server IP configuration"
+echo ""
+myipaddr=$(hostname --ip-address)
+echo -n "VPN Server local IP address [$myipaddr]: " ; read tmp
+[ "$tmp" != "" ] && myipaddr="$tmp"
+
+mysubnetx=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/.255//')
+mysub1=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/255/0/')
+mysubnet="$mysub1/$(ip -o -f inet addr show | awk '/scope global/{print $4}' | head -n 1 | (IFS='/'; read a b; echo $b))"
+   
+echo -n "VPN Server subnet [$mysubnet]: " ; read tmp
+[ "$tmp" != "" ] && mysubnet="$tmp"
+
+vpnsubnet="10.1.10.0/24"
+echo -n "Subnet for VPN clients [$vpnsubnet]: " ; read tmp
+[ "$tmp" != "" ] && vpnsubnet="$tmp"
+
+# Default to subnet.1 for DNS, since that's where most people's routers are
+vpndns="${mysubnetx}.1"
+echo -n "VPN Server DNS for clients [$vpndns]: " ; read tmp
+[ "$tmp" != "" ] && vpndns="$tmp"
+
+echo ""
 echo "** This script will now create:"
+echo "      Connection Config:    pistrong-ServerConnection.conf"
 echo "      CA Cert:              strongSwanCACert.pem"
 echo "      VPN Cert for iOS:     $ios-strongSwanVPNCert.pem with VPN SAN key '$ioskey'"
 echo "      VPN Cert for Windows: $windows-strongSwanVPNCert.pem with VPN SAN key '$winkey'"
 echo "      VPN Cert for Linux:   $linux-strongSwanVPNCert.pem with VPN SAN key '$linuxkey'"
+echo ""
+echo "   For VPN Server IP $myipaddr subnet $mysubnet with VPN Client DNS servers $vpndns"
 echo ""
 echo "   Each VPN cert will have '$san2' as a second VPN SAN key"
 echo ""
@@ -129,7 +146,7 @@ fi
 pistrong config --myfqdn $thisfqdn
 pistrong config --cnsuffix $cnsuffix --mailfrom "PiStrongVPN<root@$thisfqdn>"
 pistrong config --webdir $webdir --weburl $weburl
-# This sets the defaults SAN Key (remoteid) for the add command
+# This sets the default SAN Key (remoteid) for the add command
 pistrong config --vpnsankey $ioskey --vpncertpfx $ios
 
 # Make the CA and VPN certs (one for each: iOS, Windows, and Linux)
@@ -139,14 +156,108 @@ pistrong makevpncert $windows --vpnsankey $winkey,$san2
 pistrong makevpncert $linux --vpnsankey $linuxkey,$san2
 
 echo ""
-echo "When adding Certs for iOS     users use the switch --remoteid $ioskey"
-echo "When adding Certs for Windows users use the switch --remoteid $winkey"
-echo "When adding Certs for Linux   users use the switch --remoteid $linuxkey"
+echo "When adding iOS     users apply --remoteid $ioskey"
+echo "When adding Windows users apply --remoteid $winkey"
+echo "When adding Linux   users apply --remoteid $linuxkey --linux"
 echo ""
 echo "Your strongSwan CA is configured"
 echo ""
-echo "Modifying /etc/swanctl/conf.d/pistrong-ServerConnection.conf to reflect your configuration"
+echo "Creating /etc/swanctl/conf.d/pistrong-ServerConnection.conf to reflect your configuration"
 echo ""
+    echo ">> Creating /etc/swanctl/conf.d/pistrong-ServerConnection.conf for IP address $myipaddr and subnet $mysubnet"
+    cat > /etc/swanctl/conf.d/pistrong-ServerConnection.conf <<EOF
+connections {
+    linux-pubkey-ikev2 {
+        version = 2
+        proposals = aes192gcm16-aes128gcm16-prfsha256-ecp256-ecp521,aes192-sha256-modp3072,default
+        rekey_time = 0s
+        pools = primary-pool-ipv4
+        fragmentation = yes
+        local-1 {
+             auth = pubkey
+             cacerts = strongSwanCACert.pem
+             certs = linux-strongSwanVPNCert.pem
+             id = linux.mycomputer.net
+        }
+        remote-1 {
+             auth = pubkey
+        }
+        children {
+            net-linux {
+                remote_ts = $vpnsubnet
+                local_ts = $mysubnet
+                updown = /libexec/ipsec/_updown iptables
+		esp_proposals = aes128gcm128-x25519
+            }
+        }
+    }
+    ios-pubkey-ikev2 {
+        version = 2
+        proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,aes128-sha1-modp1536,aes128-sha256-modp1536,aes128-sha256-modp2048,default
+        rekey_time = 0s
+        pools = primary-pool-ipv4
+        fragmentation = no
+        dpd_delay = 30s
+        send_cert = always
+
+        local-1 {
+             auth = pubkey
+             cacerts = strongSwanCACert.pem
+             certs = ios-strongSwanVPNCert.pem
+             id = ios.mycomputer.net
+        }
+
+        remote-1 {
+             auth = eap-tls
+             id = %any
+        }
+
+        children {
+             net-ios {
+                 local_ts = 0.0.0.0/0
+                 rekey_time = 0s
+                 dpd_action = clear
+                 esp_proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,aes128-sha1-modp1536,aes128-sha256-modp1536,aes128-sha256-modp2048,default
+             }
+        }
+    }
+    windows-pubkey-ikev2 {
+        version = 2
+        proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,default
+        rekey_time = 0s
+        pools = primary-pool-ipv4
+        fragmentation = yes
+        dpd_delay = 30s
+
+        local-1 {
+             auth = pubkey
+             cacerts = strongSwanCACert.pem
+             certs = windows-strongSwanVPNCert.pem
+             id = windows.mycomputer.net           # Not used for Windows authentication
+        }
+
+        remote-1 {
+             id = %any
+        }
+
+        children {
+             net-windows {
+                 local_ts = 0.0.0.0/0
+                 rekey_time = 0s
+                 dpd_action = clear
+                 esp_proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,default
+             }
+        }
+    }
+}
+    pools {
+    primary-pool-ipv4 {
+        addrs = $vpnsubnet
+        dns = $vpndns
+    }
+}
+EOF
+# Done this way for readability, even though it's ugly
 sed -i "s/ios-strongSwanVPNCert.pem/$ios-strongSwanVPNCert.pem/"         /etc/swanctl/conf.d/pistrong-ServerConnection.conf
 sed -i "s/ios.mycomputer.net/$ioskey/"                                   /etc/swanctl/conf.d/pistrong-ServerConnection.conf
 sed -i "s/windows-strongSwanVPNCert.pem/$windows-strongSwanVPNCert.pem/" /etc/swanctl/conf.d/pistrong-ServerConnection.conf
@@ -155,8 +266,8 @@ sed -i "s/linux-strongSwanVPNCert.pem/$linux-strongSwanVPNCert.pem/"     /etc/sw
 sed -i "s/linux.mycomputer.net/$linuxkey/"                               /etc/swanctl/conf.d/pistrong-ServerConnection.conf
 echo ""
 echo " ** Next steps:"
-echo "    * Set up a mail server and web server if you want to email cert information to users"
 echo "    * Ensure that you've correctly established the necessary firewall rules"
 echo "      (review InstallPiStrong source if needed)"
-echo "    * Establish port forwarding on your router to this system for UDP ports 500 and 4500"
+echo "    * Establish port forwarding on your router to IP $myipaddr for UDP ports 500 and 4500"
+echo "    * Set up a mail server and web server if you want to email cert information to users"
 echo ""

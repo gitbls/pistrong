@@ -62,118 +62,6 @@ function gotoBuildDir() {
     for i in strongswan-*; do [ -d "$i" ] && cd $i ; done
 }
 
-function emitSwanctl() {
-
-    cd /etc/swanctl
-    [ ! -d pistrong ] && mkdir pistrong && mkdir pistrong/{client-assets,server-assets,VPNClients,backup}
-    chmod 700 pistrong/client-assets pistrong/server-assets
-    [ ! -d "p12" ] && mkdir p12 && chmod 750 p12
-    myipaddr=$(hostname --ip-address)
-    mysub1=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/255/0/')
-    mysubnet="$mysub1/$(ip -o -f inet addr show | awk '/scope global/{print $4}' | head -n 1 | (IFS='/'; read a b; echo $b))"
-    if [ -f conf.d/pistrong-ServerConnection.conf ]
-    then
-        echo "% Saving original conf.d/pistrong-ServerConnection.conf"
-        mv conf.d/pistrong-ServerConnection.conf /etc/swanctl/pistrong/backup/connections-pistrong.$(date +"%m%d%H%M%S")
-    fi
-    echo ">> Creating /etc/swanctl/conf.d/pistrong-ServerConnection.conf for IP address $myipaddr and subnet $mysubnet"
-    cat > /etc/swanctl/conf.d/pistrong-ServerConnection.conf <<EOF
-connections {
-    linux-pubkey-ikev2 {
-        version = 2
-        proposals = aes192gcm16-aes128gcm16-prfsha256-ecp256-ecp521,aes192-sha256-modp3072,default
-        rekey_time = 0s
-        pools = primary-pool-ipv4
-        fragmentation = yes
-	local_addrs = $myipaddr
-        local-1 {
-             auth = pubkey
-             cacerts = strongSwanCACert.pem
-             certs = linux-strongSwanVPNCert.pem
-             id = linux.mycomputer.net
-        }
-        remote-1 {
-             auth = pubkey
-        }
-        children {
-            net-linux {
-                remote_ts = $vpnsubnet
-                local_ts = $mysubnet
-                updown = /libexec/ipsec/_updown iptables
-		esp_proposals = aes128gcm128-x25519
-            }
-        }
-    }
-    ios-pubkey-ikev2 {
-        version = 2
-        proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,aes128-sha1-modp1536,aes128-sha256-modp1536,aes128-sha256-modp2048,default
-        rekey_time = 0s
-        pools = primary-pool-ipv4
-        fragmentation = no
-        dpd_delay = 30s
-        send_cert = always
-
-        local-1 {
-             auth = pubkey
-             cacerts = strongSwanCACert.pem
-             certs = ios-strongSwanVPNCert.pem
-             id = ios.mycomputer.net
-        }
-
-        remote-1 {
-             auth = eap-tls
-             id = %any
-        }
-
-        children {
-             net-ios {
-                 local_ts = 0.0.0.0/0
-                 rekey_time = 0s
-                 dpd_action = clear
-                 esp_proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,aes128-sha1-modp1536,aes128-sha256-modp1536,aes128-sha256-modp2048,default
-             }
-        }
-    }
-    windows-pubkey-ikev2 {
-        version = 2
-        proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,default
-        rekey_time = 0s
-        pools = primary-pool-ipv4
-        fragmentation = yes
-        dpd_delay = 30s
-
-        local-1 {
-             auth = pubkey
-             cacerts = strongSwanCACert.pem
-             certs = windows-strongSwanVPNCert.pem
-             id = windows.mycomputer.net           # Not used for Windows authentication
-        }
-
-        remote-1 {
-             id = %any
-        }
-
-        children {
-             net-windows {
-                 local_ts = 0.0.0.0/0
-                 rekey_time = 0s
-                 dpd_action = clear
-                 esp_proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,default
-             }
-        }
-    }
-}
-    pools {
-    primary-pool-ipv4 {
-        addrs = $vpnsubnet
-        dns = $vpndns
-    }
-}
-EOF
-
-    cp /etc/swanctl/conf.d/pistrong-ServerConnection.conf /etc/swanctl/pistrong/backup/ServerConnection-pistrong.piStrongInstall
-}
-
 function emitFirewall() {
 
     getosdistro
@@ -260,12 +148,13 @@ function DoPreReqs() {
             echo ""
             if askyn "Press y to Continue, n to exit and update your Pi" "-n 1"
             then
+		[ "$cmd" == "allx" ] && ally="-y" || ally=""
                 echo ""
                 for p in libgmp10 libgmp-dev libsystemd-dev libssl-dev python3-pexpect zip ; do
                     if ! dpkg-query -s $p > /dev/null 2>&1
                     then
                         echo ">> Installing package $p"
-                        apt-get install $p
+                        apt-get $ally install $p
                     else
                         echo ">> Package $p already installed"
                     fi
@@ -278,7 +167,7 @@ function DoPreReqs() {
             then
                 echo ""
                 echo "% Your hostname is still 'raspberrypi'"
-                echo "  We strongly suggest you change it via raspi-config Network Options before continuing"
+                echo "  We STRONGLY encourage you to change it via sudo raspi-config Network Options before continuing"
                 if askyn "Press y to exit and correct hostname, n to continue"
                 then
                     exit 1
@@ -294,7 +183,8 @@ function DoDownload() {
     getssver
 #    ssver="5.6.3"  # If you want a specific version (and it's still available, of course)
     echo "% Using Strongswan version $ssver"
-    if askinall "Press any key to start Strongswan download:" ; then echo ""; fi
+    askinall "Press any key to start Strongswan download: "
+    echo ""
     [ ! -d piStrong ] && mkdir piStrong
     cd piStrong
     [ -d strongswan-$ssver ] && rm -rf strongswan-$ssver
@@ -304,14 +194,15 @@ function DoDownload() {
     else
 	echo "% strongSwan $ssver .tar.bz2 file already exists here; using it"
     fi
-    if askin "Press any key to continue:" ; then echo ""; fi
+    askinall "Press any key to continue: "
+    echo ""
     tar -xjvf strongswan-$ssver.tar.bz2
 #    curl -L https://download.strongswan.org/strongswan-$ssver.tar.bz2 | tar -xjvf -
 }
 
 function DoPreConf() {
     gotoBuildDir
-    if askinall "Press any key to start pre-make configuration:" ; then echo ""; fi
+    askinall "Press any key to start pre-make configuration: "
     echo ""
     echo ">> Performing pre-make configuration <<"
     ./configure --prefix= --enable-eap-mschapv2 --enable-eap-identity --enable-openssl --enable-eap-md5 --enable-eap-tls --enable-eap-dynamic --enable-systemd --enable-swanctl --disable-charon --disable-stroke --disable-scepclient --enable-counters
@@ -319,71 +210,85 @@ function DoPreConf() {
 
 function DoMake() {
     gotoBuildDir
-    if askinall "Press any key to start make:" ; then echo "" ; fi
+    askinall "Press any key to start make: "
+    echo ""
     echo ">> Performing make <<"
     make
 }
 
 function DoInstall() {
     gotoBuildDir
-    if askinall "Press any key to start install:" ; then  make install ; fi
+    askinall "Press any key to start install: "
+    make install
 }
 
 function DoPostConf() {
     [ "$cmd" == "allx" ] && echo "" && echo "Reached postconf at $(date)"
-    askinall "Press any key to start postconf:"
+    askinall "Press any key to start postconf: "
     echo ""
     [ ! -d "/etc/swanctl/conf.d" ] && mkdir -p /etc/swanctl/conf.d
-    echo ""
-    echo "If you are only going to use the VPN Client on this system, answer N to the next question"
-    echo "Note, however, 2 Server configuration questions will still be asked"
-    echo "For Client use only, Press Enter to take the defaults"
-    echo "The Server connections configuration file will be created, but disabled"
-    echo ""
     fserver=1
-    if askyn "Do you want the VPN Server configuration enabled on this system"
+    echo ""
+    echo " VPN Server configuration includes:"
+    echo "   Enable IPV4 forwarding"
+    echo "   Write /etc/swanctl/pistrong/iptables"
+    echo "   Create (but not enabling) pistrong-iptables-load.service"
+    echo ""
+    if askyn "Configure this system to be a VPN Server"
     then
 	fserver=0
     fi
-    echo ""
-    echo "The VPN Subnet is used by the VPN server for hosting clients"
-    echo "Suggest using a 10.*.*.* subnet although this is not mandatory"
-    echo "It must not conflict with any other local subnets"
-    echo ""
-    vpnsubnet="10.1.10.0/24"
-    echo -n "Subnet for VPN clients [$vpnsubnet]: " ; read ans
-    [ "$ans" != "" ] && vpnsubnet=$ans
-    myipaddr=$(hostname --ip-address)
-    mysubnet=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/.255//')
-    dfdns="${mysubnet}.1"
-    vpndns="$dfdns, 1.1.1.1"
-    echo ""
-    echo "A local DNS server provides local name service resoluton for remote VPN clients"
-    echo "A remote DNS server is needed for internet name resolution"
-    echo "You must provide at least one DNS server"
-    echo ""
-    echo -n "Comma-separated list of DNS servers for VPN clients (local,internet) [$vpndns]: " ; read ans
-    [ "$ans" != "" ] && vpndns=$ans
-    echo ""
-    emitSwanctl
+    if [ $fserver -eq 0 ]
+    then
+	echo ""
+	echo "The VPN Subnet is used by the VPN server for hosting clients"
+	echo "Suggest using a 10.*.*.* subnet although this is not mandatory"
+	echo "It must not conflict with any other local subnets"
+	echo ""
+	vpnsubnet="10.1.10.0/24"
+	echo -n "Subnet for VPN clients [$vpnsubnet]: " ; read ans
+	[ "$ans" != "" ] && vpnsubnet=$ans
+    fi
+    cd /etc/swanctl
+    [ ! -d pistrong ] && mkdir pistrong && mkdir pistrong/{client-assets,server-assets,VPNClients,backup}
+    chmod 700 pistrong/client-assets pistrong/server-assets
+    [ ! -d "p12" ] && mkdir p12 && chmod 750 p12
 
     if [ ! -f "/etc/sysctl.d/92-pistrong.conf" ]
     then
-	[ $fserver -eq 0 ] && s="" || s="."
-	[ $fserver -eq 0 ] && echo ">> Creating /etc/sysctl.d/${s}92-pistrong.conf to set net.ipv4.ip_forward=1"
-	# Write it on client as well, just in case. But hidden.
+	s="."
+	[ $fserver -eq 0 ] && s="" && echo ">> Creating /etc/sysctl.d/${s}92-pistrong.conf to set net.ipv4.ip_forward=1"
+	# Write it on client as well...but hidden
 	echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/${s}92-pistrong.conf
 	[ $fserver -eq 0 ] && sysctl -p /etc/sysctl.d/92-pistrong.conf > /dev/null
     fi
-    if [ $fserver -eq 0 ]
-    then
-	emitFirewall
-    else
-	echo ">> Moving conf.d/pistrong-ServerConnection.conf to pistrong/backup since it will not be used"
-	mv /etc/swanctl/conf.d/pistrong-ServerConnection.conf /etc/swanctl/pistrong/backup/.pistrong-ServerConnection.conf.$(date +"%m%d%H%M%S")
-    fi
+    [ $fserver -eq 0 ] && emitFirewall
     # Tell systemd to reload the config files in case we wrote pistrong-iptables-load
     systemctl daemon-reload
+    echo ">> pistrong/strongSwan Installation complete <<"
+    echo ">> "
+    echo ">> Required Post-installation Steps:"
+    if [ $fserver -eq 0 ]
+    then
+	echo ">>   Add router port forwards for UDP ports 500 and 4500 to this system"
+	echo ""
+	echo ">>   See https://github.com/gitbls/pistrong/blob/master/makeMyCA for a CA configuration script"
+	echo ">>   Use it if you need to support iOS, Windows, or Linux VPN Clients"
+	echo ""
+	echo ">>   Set up iptables. See https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
+	echo ""
+	echo ">>   See pistrong help and pistrong --help for pistrong command details"
+    else
+	echo ">>   Once you have received the VPN Config Pack from the manager of the VPN Server"
+	echo ">>    install them into strongSwan using the 'sudo pistrong client install' command"
+	echo ">>   Then..."
+    fi
+    echo ""
+    echo ">>      'sudo pistrong service start' or 'sudo systemctl start strongswan' to start the strongSwan VPN"
+    echo ">>      'sudo pistrong service enable' or 'sudo systemctl enable strongswan' to enable strongSwan to restart after reboot"
+    echo ""
+    echo ">> Reboot and make sure everything works"
+    echo ""
 }
 
 function DoAll() {
@@ -394,28 +299,6 @@ function DoAll() {
     DoInstall
     fServer=0
     DoPostConf
-
-    echo ">> pistrong/strongSwan Installation complete <<"
-    echo ">> "
-    echo ">> There are a few Post-installation steps:"
-    if [ $fServer -eq 0 ]
-    then
-	echo ">>   See http://github/gitbls/pistrong/blob/master/makeMyCA for a usable, customizable CA configuration script"
-	echo ""
-	echo ">>   Set up iptables (see http://github/gitbls/pistrong/blob/master/README.md)"
-	echo ""
-	echo ">>   See pistrong help and pistrong --help for pistrong command details"
-    else
-	echo ">>   Once you have received the VPN Client assets from the VPN Server manager"
-	echo ">>    install them into strongSwan using the 'sudo pistrong client install' command"
-	echo ">>   Then..."
-    fi
-    echo ""
-    echo ">>      'sudo pistrong service start' or 'sudo systemctl start strongswan' to start the strongSwan VPN"
-    echo ">>      'sudo pistrong service enable' or 'sudo systemctl enable strongswan' to enable strongSwan to restart after reboot"
-    echo ""
-    echo ">> Reboot and make sure everything works"
-    echo ""
 }
 #
 # Main
