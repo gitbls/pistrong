@@ -7,27 +7,80 @@
 function askyn() {
     local ans
     echo -n "$1" '[y/N]? ' ; read $2 ans
+    [ "$dbl" != "" ] && echo ""
     case "$ans" in
         y*|Y*) return 0 ;;
         *) return 1 ;;
     esac
 }
 
+function askdefault () {
+    # $1=prompt, $2=return variable $3=default-for-prompt-plus-default $4=default-if-provided
+    local pmpt=$1 dfl="$3" ddfl="$4" tmp=""
+    echo -n "$pmpt [$dfl]: " ; read tmp
+    [ "$dbl" != "" ] && echo ""
+    if [ "$tmp" == "" ]
+    then
+	[ "$ddfl" != "" ] && tmp="$ddfl" || tmp="$dfl"
+    fi
+    eval "${2}=\"$tmp\""     # Defines a variable with the return value
+}
+
+function emitFirewall() {
+
+    [ -f /etc/swanctl/pistrong/CA-iptables ] && return
+    cat > /etc/swanctl/pistrong/CA-iptables <<EOF
+#  Add the necessary iptables routes to enable VPN routing to the internet
+
+*nat
+:POSTROUTING ACCEPT [0:0]
+-A POSTROUTING -s $vpnsubnet -o eth0 -m policy --dir out --pol ipsec -j ACCEPT
+-A POSTROUTING -s $vpnsubnet -o eth0 -j MASQUERADE
+COMMIT
+EOF
+    [ -f /etc/systemd/system/pistrong-iptables-load.service ] && return
+    cat > /etc/systemd/system/pistrong-iptables-load.service <<EOF
+[Unit]
+Description=Load iptables for strongSwan
+Requires=network-online.target
+
+[Service]
+ExecStart=/sbin/iptables-restore /etc/swanctl/pistrong/CA-iptables
+User=root
+StandardInput=null
+StandardOutput=null
+StandardError=null
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+    chmod 644 /etc/systemd/system/pistrong-iptables-load.service
+    echo "** I have created the service pistrong-iptables-load, but it is not enabled"
+    echo "** If you have another way to load iptables, you must add the code from /etc/swanctl/pistrong/CA-iptables to it"
+    echo "** Otherwise you must sudo systemctl enable pistrong-iptables-load"
+}
+
+dbl=""
 thishost=$(hostname)        #This gets the hostname from Linux
 webdir="/var/www/html/vpn"
 ios="ios"
 windows="windows"
 linux="linux"
 myipaddr=$(hostname --ip-address)
+caconf="/etc/swanctl/conf.d/pistrong-CAServerConnection.conf"
 
-echo "Build a prescriptive strongSwan CA for iOS and Windows devices"
+echo "Build a prescriptive strongSwan CA for iOS, Windows, and Linux devices"
 echo ""
 echo "** You will be asked a series of configuration questions"
 echo "   You will be prompted before any changes are made to your system"
 echo ""
-echo "** A domain name is required to create the CA"
-echo -n "Enter the domain name you want to use [noname.com]: " ; read tmp
-[ "$tmp" != "" ] && thisdomain="$tmp" || thisdomain="noname.com"
+echo "** The CA requires a domain name"
+echo "   If you have a registered domain name to use for the VPN, use that"
+echo "   If not, you can use a name of your choice"
+echo ""
+askdefault "Domain Name to use" thisdomain "noname.com"
 thisfqdn="$thishost.$thisdomain"
 ioskey="ios.$thisdomain"
 winkey="windows.$thisdomain"
@@ -41,77 +94,70 @@ echo "** 'cnsuffix' is a naming string only used in user certs"
 echo "   (e.g., username-device-$thishost@cnsuffix)"
 echo "   It is used by iOS for additional Cert validation"
 echo "   and will be visible for strongSwan connections in the system log"
-echo -n "cnsuffix for your CA [myvpn.net]: "; read cnsuffix
-[ "$cnsuffix" == "" ] && cnsuffix="myvpn.net"
+echo ""
+askdefault "cnsuffix for your CA" cnsuffix "myvpn.net"
 
 echo ""
-echo "** webdir is the directory in the file system where certs will be shared via your web server"
-echo -n "webdir for your system [$webdir]: " ; read tmp
-[ "$tmp" != "" ] && webdir="$tmp"
+echo "** 'webdir' is the directory in the file system where certs will be shared via your web server"
+echo ""
+askdefault "webdir for your system" webdir "$webdir"
+[ ! -d $webdir ] && echo "% Directory $webdir does not exist. Be sure to create it before using pistrong --mail"
 
 echo ""
-echo "** weburl is the URL that will be used in emails to users with their certs"
-echo -n "weburl for your system [$weburl]: " ; read tmp
-[ "$tmp" != "" ] && weburl="$tmp"
-
+echo "** 'weburl' is the URL that will be used in emails to users with their certs"
 echo ""
+askdefault "weburl for your system" weburl "$weburl"
+
 echo ""
 echo "** Configure the SAN Key (remoteid) and VPN Cert name for iOS, Windows, and Linux users"
-echo "   The VPN Cert name prefix is important only for managing your sanity"
+echo "   The VPN Cert name prefix is important because it helps you retain your sanity"
 echo "   The remoteid identifies the connection to strongSwan, and is assigned to users when they are added"
 echo "   The defaults are acceptable, but you may change them if you wish"
+echo ""
+askdefault "VPN Cert name prefix for iOS VPN Cert" ios "$ios"
+askdefault "VPN SAN key for iOS users" ioskey "$ioskey"
+
+askdefault "VPN Cert name prefix for Windows VPN Cert" windows "$windows"
+# Get Windows VPN SAN Key even though Windows IPSec stack (Win10 1903) currently doesn't use it
+askdefault "VPN SAN key for Windows users" winkey "$winkey"
+
+askdefault "VPN Cert name prefix for Linux VPN Cert" linux "$linux"
+askdefault "VPN SAN key for Linux users" linuxkey "$linuxkey"
 
 echo ""
-echo -n "VPN Cert name prefix for iOS VPN Cert [$ios]: " ; read tmp
-[ "$tmp" != "" ] && ios="$tmp"
-echo -n "VPN SAN Key for iOS users [$ioskey]: " ; read tmp
-[ "$tmp" != "" ] && ioskey="$tmp"
-
-echo -n "VPN Cert name prefix for Windows VPN Cert [$windows]: " ; read tmp
-[ "$tmp" != "" ] && windows="$tmp"
-# Get Windows VPN SAN Key even though Windows IPSec stack doesn't use it currently
-echo -n "VPN SAN Key for Windows users [$winkey]: " ; read tmp
-[ "$tmp" != "" ] && winkey="$tmp"
-
-echo -n "VPN Cert name prefix for Linux VPN Cert [$linux]: " ; read tmp
-[ "$tmp" != "" ] && linux="$tmp"
-echo -n "VPN SAN Key for Linux users [$linuxkey]: " ; read tmp
-[ "$tmp" != "" ] && linuxkey="$tmp"
-
-san2="$thisfqdn"
-echo ""
-echo "** The default second VPN SAN Key is [$san2]"
+echo "** The default second VPN SAN Key is '$thisfqdn'"
 echo "   If you are using a different FQDN or an IP address to access your VPN"
 echo "   you must change the second VPN SAN key"
-echo -n "Second VPN SAN Key [$thisfqdn]: " ; read tmp
-[ "$tmp" != "" ] && san2="$tmp"
+echo ""
+askdefault "Second VPN SAN Key" san2 "$thisfqdn"
 
 echo ""
 echo "** VPN Server IP configuration"
 echo ""
-myipaddr=$(hostname --ip-address)
-echo -n "VPN Server local IP address [$myipaddr]: " ; read tmp
-[ "$tmp" != "" ] && myipaddr="$tmp"
+askdefault "VPN Server Local LAN IP Address" myipaddr "$myipaddr"
 
 mysubnetx=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/.255//')
 mysub1=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/255/0/')
 mysubnet="$mysub1/$(ip -o -f inet addr show | awk '/scope global/{print $4}' | head -n 1 | (IFS='/'; read a b; echo $b))"
    
-echo -n "VPN Server subnet [$mysubnet]: " ; read tmp
-[ "$tmp" != "" ] && mysubnet="$tmp"
-
-vpnsubnet="10.1.10.0/24"
-echo -n "Subnet for VPN clients [$vpnsubnet]: " ; read tmp
-[ "$tmp" != "" ] && vpnsubnet="$tmp"
-
+askdefault "VPN Server Local LAN Subnet" mysubnet "$mysubnet"
+echo ""
+echo "** The Subnet for VPN Clients is a virtual subnet used between"
+echo "   the VPN Server and Clients. It must not be used on your network"
+echo "   and requires iptables configuration, which will be done"
+echo "   by this script (although you'll need to enable it)"
+echo ""
+askdefault "Subnet for VPN Clients" vpnsubnet "10.1.10.0/24"
 # Default to subnet.1 for DNS, since that's where most people's routers are
-vpndns="${mysubnetx}.1"
-echo -n "VPN Server DNS for clients [$vpndns]: " ; read tmp
-[ "$tmp" != "" ] && vpndns="$tmp"
+echo ""
+echo "** The DNS Server should be a DNS Server on your network"
+echo "   This can be your router (if so configured) or another DNS Server"
+echo ""
+askdefault "DNS Server for connected VPN Clients" vpndns "${mysubnetx}.1"
 
 echo ""
 echo "** This script will now create:"
-echo "      Connection Config:    pistrong-ServerConnection.conf"
+echo "      Connection Config:    $caconf"
 echo "      CA Cert:              strongSwanCACert.pem"
 echo "      VPN Cert for iOS:     $ios-strongSwanVPNCert.pem with VPN SAN key '$ioskey'"
 echo "      VPN Cert for Windows: $windows-strongSwanVPNCert.pem with VPN SAN key '$winkey'"
@@ -121,10 +167,12 @@ echo "   For VPN Server IP $myipaddr subnet $mysubnet with VPN Client DNS server
 echo ""
 echo "   Each VPN cert will have '$san2' as a second VPN SAN key"
 echo ""
-echo "** If you'd like to change anything, answer N to the next question and restart the script"
+echo "   The VPN will use virtual subnet $vpnsubnet for VPN Clients"
 echo ""
-echo "See sudo pistrong config --list for a list of all the pistrong configuration parameters"
-echo " and make any changes necessary for your configuration"
+#echo "See sudo pistrong config --list for a list of all the pistrong configuration parameters"
+#echo " and make any changes necessary for your configuration"
+#echo ""
+echo "** If you'd like to change anything, answer N to the next question and restart the script"
 echo ""
 
 if ! askyn "Do you want to continue"
@@ -140,7 +188,7 @@ then
     then
 	echo "ServerName $thisfqdn" > /etc/apache2/conf-enabled/servername.conf
     fi
-    [ ! -d $webdir ] && mkdir $webdir
+    [ ! -d $webdir ] && mkdir -p $webdir
 fi
 
 pistrong config --myfqdn $thisfqdn
@@ -162,10 +210,10 @@ echo "When adding Linux   users apply --remoteid $linuxkey --linux"
 echo ""
 echo "Your strongSwan CA is configured"
 echo ""
-echo "Creating /etc/swanctl/conf.d/pistrong-ServerConnection.conf to reflect your configuration"
-echo ""
-    echo ">> Creating /etc/swanctl/conf.d/pistrong-ServerConnection.conf for IP address $myipaddr and subnet $mysubnet"
-    cat > /etc/swanctl/conf.d/pistrong-ServerConnection.conf <<EOF
+echo "Creating /etc/swanctl/pistrong/CA-iptables with firewall rules"
+emitFirewall
+echo "Creating $caconf with the new VPN Server definitions"
+cat > $caconf <<EOF
 connections {
     linux-pubkey-ikev2 {
         version = 2
@@ -176,8 +224,8 @@ connections {
         local-1 {
              auth = pubkey
              cacerts = strongSwanCACert.pem
-             certs = linux-strongSwanVPNCert.pem
-             id = linux.mycomputer.net
+             certs = $linux-strongSwanVPNCert.pem
+             id = $linuxkey
         }
         remote-1 {
              auth = pubkey
@@ -203,8 +251,8 @@ connections {
         local-1 {
              auth = pubkey
              cacerts = strongSwanCACert.pem
-             certs = ios-strongSwanVPNCert.pem
-             id = ios.mycomputer.net
+             certs = $ios-strongSwanVPNCert.pem
+             id = $ioskey
         }
 
         remote-1 {
@@ -232,8 +280,8 @@ connections {
         local-1 {
              auth = pubkey
              cacerts = strongSwanCACert.pem
-             certs = windows-strongSwanVPNCert.pem
-             id = windows.mycomputer.net           # Not used for Windows authentication
+             certs = $windows-strongSwanVPNCert.pem
+             id = $winkey
         }
 
         remote-1 {
@@ -257,17 +305,12 @@ connections {
     }
 }
 EOF
-# Done this way for readability, even though it's ugly
-sed -i "s/ios-strongSwanVPNCert.pem/$ios-strongSwanVPNCert.pem/"         /etc/swanctl/conf.d/pistrong-ServerConnection.conf
-sed -i "s/ios.mycomputer.net/$ioskey/"                                   /etc/swanctl/conf.d/pistrong-ServerConnection.conf
-sed -i "s/windows-strongSwanVPNCert.pem/$windows-strongSwanVPNCert.pem/" /etc/swanctl/conf.d/pistrong-ServerConnection.conf
-sed -i "s/windows.mycomputer.net/$winkey/"                               /etc/swanctl/conf.d/pistrong-ServerConnection.conf
-sed -i "s/linux-strongSwanVPNCert.pem/$linux-strongSwanVPNCert.pem/"     /etc/swanctl/conf.d/pistrong-ServerConnection.conf
-sed -i "s/linux.mycomputer.net/$linuxkey/"                               /etc/swanctl/conf.d/pistrong-ServerConnection.conf
+
 echo ""
 echo " ** Next steps:"
 echo "    * Ensure that you've correctly established the necessary firewall rules"
-echo "      (review InstallPiStrong source if needed)"
+echo "      Review /etc/swanctl/pistrong/CA-iptables"
+echo "       and https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
 echo "    * Establish port forwarding on your router to IP $myipaddr for UDP ports 500 and 4500"
 echo "    * Set up a mail server and web server if you want to email cert information to users"
 echo ""
