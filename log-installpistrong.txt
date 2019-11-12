@@ -1,23 +1,24 @@
 #
 # Before starting I did: sudo apt-get update ; sudo apt-get upgrade
 #
-rpi3p2~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/pistrong -o /usr/local/bin/pistrong
+rpi42~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/pistrong -o /usr/local/bin/pistrong
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
-rpi3p2~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong
+rpi42~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
-rpi3p2~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA -o /usr/local/bin/makeMyCA
+rpi42~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA -o /usr/local/bin/makeMyCA
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
 
-rpi3p2~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/install-dovecot -o /usr/local/bin/install-dovecot
+rpi42~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/install-dovecot -o /usr/local/bin/install-dovecot
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
+
 #
 # First we'll install postfix and dovecot (not mandatory, but needed if you want to use the --mail feature)
 #
-rpi3p2~# apt-get install postfix
+rpi42~# apt-get install postfix
 The following packages were automatically installed and are no longer required:
   libgnutls-dane0 libunbound8 rpi.gpio-common
 Use 'apt autoremove' to remove them.
@@ -59,11 +60,11 @@ Not creating home directory `/var/spool/postfix'.
 Creating /etc/postfix/dynamicmaps.cf
 Adding group `postdrop' (GID 118) ...
 Done.
-setting myhostname: rpi3p2.starwhite.net
+setting myhostname: rpi42.starwhite.net
 setting alias maps
 setting alias database
 mailname is not a fully qualified domain name.  Not changing /etc/mailname.
-setting destinations: $myhostname, rpi3p2, localhost.localdomain, localhost
+setting destinations: $myhostname, rpi42, localhost.localdomain, localhost
 setting relayhost: 
 setting mynetworks: 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
 setting mailbox_size_limit: 0
@@ -86,7 +87,7 @@ Processing triggers for systemd (241-5+rpi1) ...
 Processing triggers for man-db (2.8.5-2) ...
 Processing triggers for rsyslog (8.1901.0-1) ...
 
-rpi3p2~# install-dovecot 
+rpi42~# install-dovecot 
 Installing dovecot...
 The following packages were automatically installed and are no longer required:
   libgnutls-dane0 libunbound8 rpi.gpio-common
@@ -204,179 +205,67 @@ Updating /etc/postfix/main.cf...
 #
 # Install and configure strongSwan
 #
-rpi3p2~# installlPiStrong all
->> Ensure your Pi is up to date
+rpi42~# InstallPiStrong
+** Ensure your Pi is up to date
  Your Pi must be up to date with the Raspbian repositories by using these commands
 
-    apt-get update
-    apt-get upgrade
+    sudo apt-get update
+    sudo apt-get upgrade
 
   If you have not done this yet, respond n to exit and update your Pi
   Then reboot your Pi and restart this procedure
 
 Press y to Continue, n to exit and update your Pi [y/n]? y
->> Package libgmp10 already installed
->> Installing package libgmp-dev
-The following packages were automatically installed and are no longer required:
-  libgnutls-dane0 libunbound8 rpi.gpio-common
-Use 'apt autoremove' to remove them.
-The following additional packages will be installed:
-  libgmpxx4ldbl
-Suggested packages:
-  gmp-doc libgmp10-doc libmpfr-dev
-The following NEW packages will be installed:
-  libgmp-dev libgmpxx4ldbl
-0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
-Need to get 592 kB of archives.
-After this operation, 1,578 kB of additional disk space will be used.
-Do you want to continue? [Y/n] y
-Selecting previously unselected package libgmpxx4ldbl:armhf.
-Preparing to unpack .../libgmpxx4ldbl_2%3a6.1.2+dfsg-4_armhf.deb ...
-Unpacking libgmpxx4ldbl:armhf (2:6.1.2+dfsg-4) ...
-Selecting previously unselected package libgmp-dev:armhf.
-Preparing to unpack .../libgmp-dev_2%3a6.1.2+dfsg-4_armhf.deb ...
-Unpacking libgmp-dev:armhf (2:6.1.2+dfsg-4) ...
-Setting up libgmpxx4ldbl:armhf (2:6.1.2+dfsg-4) ...
-Setting up libgmp-dev:armhf (2:6.1.2+dfsg-4) ...
-Processing triggers for libc-bin (2.28-10+rpi1) ...
->> Installing package libsystemd-dev
-The following packages were automatically installed and are no longer required:
-  libgnutls-dane0 libunbound8 rpi.gpio-common
-Use 'apt autoremove' to remove them.
-The following NEW packages will be installed:
-  libsystemd-dev
-0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
-Need to get 321 kB of archives.
-After this operation, 880 kB of additional disk space will be used.
-Preparing to unpack .../libsystemd-dev_241-7~deb10u1+rpi1_armhf.deb ...
-Unpacking libsystemd-dev:armhf (241-7~deb10u1+rpi1) ...
-Setting up libsystemd-dev:armhf (241-7~deb10u1+rpi1) ...
-Processing triggers for man-db (2.8.5-2) ...
->> Installing package libssl-dev
-The following packages were automatically installed and are no longer required:
-  libgnutls-dane0 libunbound8 rpi.gpio-common
-Use 'apt autoremove' to remove them.
-Suggested packages:
-  libssl-doc
-The following NEW packages will be installed:
-  libssl-dev
-0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
-Need to get 1,563 kB of archives.
-After this operation, 5,883 kB of additional disk space will be used.
-Preparing to unpack .../libssl-dev_1.1.1c-1_armhf.deb ...
-Unpacking libssl-dev:armhf (1.1.1c-1) ...
-Setting up libssl-dev:armhf (1.1.1c-1) ...
->> Installing package python3-pexpect
-The following packages were automatically installed and are no longer required:
-  libgnutls-dane0 libunbound8 rpi.gpio-common
-Use 'apt autoremove' to remove them.
-The following additional packages will be installed:
-  python3-ptyprocess
-Suggested packages:
-  python-pexpect-doc
-The following NEW packages will be installed:
-  python3-pexpect python3-ptyprocess
-0 upgraded, 2 newly installed, 0 to remove and 0 not upgraded.
-Need to get 65.5 kB of archives.
-After this operation, 259 kB of additional disk space will be used.
-Do you want to continue? [Y/n] y
-Preparing to unpack .../python3-ptyprocess_0.6.0-1_all.deb ...
-Unpacking python3-ptyprocess (0.6.0-1) ...
-Selecting previously unselected package python3-pexpect.
-Preparing to unpack .../python3-pexpect_4.6.0-1_all.deb ...
-Unpacking python3-pexpect (4.6.0-1) ...
-Setting up python3-ptyprocess (0.6.0-1) ...
-Setting up python3-pexpect (4.6.0-1) ...
->> Installing package zip
-The following packages were automatically installed and are no longer required:
-  libgnutls-dane0 libunbound8 rpi.gpio-common
-Use 'apt autoremove' to remove them.
-The following NEW packages will be installed:
-  zip
-0 upgraded, 1 newly installed, 0 to remove and 0 not upgraded.
-Need to get 212 kB of archives.
-After this operation, 542 kB of additional disk space will be used.
-Preparing to unpack .../archives/zip_3.0-11_armhf.deb ...
-Unpacking zip (3.0-11) ...
-Setting up zip (3.0-11) ...
-Processing triggers for man-db (2.8.5-2) ...
-% Using Strongswan version 5.8.1
+Package libgmp10 already installed
+Package libgmp-dev already installed
+Package libsystemd-dev already installed
+Package libssl-dev already installed
+Package python3-pexpect already installed
+Package zip already installed
 
-/root/piStrong
+Using Strongswan version 5.8.1
+
+** The strongSwan download/build process can take several minutes (fast RPi4)
+   or close to an hour (RPi0W).
+
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
                                  Dload  Upload   Total   Spent    Left  Speed
+100 4412k  100 4412k    0     0  2126k      0  0:00:02  0:00:02 --:--:-- 2126k
 
-Press any key to continue:  
-strongswan-5.8.1/
+** 2019-11-12 11:10:08 Unpacking source archive [Log: /root/piStrong/pistrong-untar.log]
 
-... many lines deleted for brevity ...
+** 2019-11-12 11:10:15 Performing pre-make configuration [Log: /root/piStrong/pistrong-configure.log]
+   Config exit status: 0 (No errors)
 
-strongswan-5.8.1/conf/
-strongswan-5.8.1/m4/config/
-strongswan-5.8.1/m4/config/ltversion.m4
-strongswan-5.8.1/m4/config/libtool.m4
-strongswan-5.8.1/m4/config/lt~obsolete.m4
-strongswan-5.8.1/m4/config/ltsugar.m4
-strongswan-5.8.1/m4/config/ltoptions.m4
-/root/piStrong/strongswan-5.8.1
+** 2019-11-12 11:11:34 Performing make [Log: /root/piStrong/pistrong-make.log]
+   Make exit status: 0 (No errors)
 
+** 2019-11-12 11:20:47 Performing install [Log: /root/piStrong/pistrong-install.log]
+   Install exit status: 0 (No errors)
 
->> Performing pre-make configuration <<
-checking for a BSD-compatible install... /usr/bin/install -c
-... lines deleted for brevity ...
-config.status: executing libtool commands
+ VPN Server configuration includes:
+   Enable IPV4 forwarding
 
- strongSwan will be built with the following plugins
------------------------------------------------------
-libstrongswan: aes des rc2 sha2 sha1 md5 mgf1 random nonce x509 revocation constraints pubkey pkcs1 pkcs7 pkcs8 pkcs12 pgp dnskey sshkey pem openssl fips-prf gmp curve25519 xcbc cmac hmac
-libcharon:     attr kernel-netlink resolve socket-default vici updown eap-identity eap-md5 eap-mschapv2 eap-dynamic eap-tls xauth-generic counters
-libtnccs:     
-libtpmtss:    
+Configure this system to be a VPN Server [y/n]? y
+** Creating /etc/swanctl/pistrong directories...
+** Creating /etc/sysctl.d/92-pistrong.conf to set net.ipv4.ip_forward=1
 
-/root/piStrong/strongswan-5.8.1
+** pistrong/strongSwan Installation complete
 
->> Performing make <<
+** Required Post-installation Steps:
+     Add router port forwards for UDP ports 500 and 4500 to this system
 
-... many lines deleted for brevity ...
+     See https://github.com/gitbls/pistrong/blob/master/makeMyCA to fully configure a CA
+     that supports iOS, Windows, and Linux VPN Clients
 
-make[1]: Leaving directory '/root/piStrong/strongswan-5.8.1'
+     Set up iptables. See https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
 
+     See pistrong help and pistrong --help for pistrong command details
 
-If you are only going to use the VPN Client on this system, answer N to the next question
-Note, however, 2 Server configuration questions will still be asked
-For Client use only, Press Enter to take the defaults
-The Server connections configuration file will be created, but disabled
+        'sudo pistrong service start' or 'sudo systemctl start strongswan' to start the strongSwan VPN
+        'sudo pistrong service enable' or 'sudo systemctl enable strongswan' to enable strongSwan to restart after reboot
 
-Do you want the VPN Server configuration enabled on this system [y/n]? y
+   Reboot and make sure everything works
 
-The VPN Subnet is used by the VPN server for hosting clients
-Suggest using a 10.*.*.* subnet although this is not mandatory
-It must not conflict with any other local subnets
+rpi42~#
 
-Subnet for VPN clients [10.1.10.0/24]: 
-
-A local DNS server provides local name service resoluton for remote VPN clients
-A remote DNS server is needed for internet name resolution
-You must provide at least one DNS server
-
-Comma-separated list of DNS servers for VPN clients (local,internet) [192.168.92.1, 1.1.1.1]: 
-
->> Creating /etc/swanctl/conf.d/pistrong-ServerConnection.conf for IP address 127.0.1.1 and subnet 192.168.92.0/24
->> Creating /etc/sysctl.d/92-pistrong.conf to set net.ipv4.ip_forward=1
-Creating iptables POSTROUTING for strongSwan
-  See /etc/swanctl/pistrong/iptables
->> pistrong/strongSwan Installation complete <<
->> 
->> There are a few Post-installation steps:
->>   See http://github/gitbls/pistrong/blob/master/makeMyCA for a usable, customizable CA configuration script
-
->>   Set up iptables (see http://github/gitbls/pistrong/blob/master/README.md)
-
->>   See pistrong help and pistrong --help for pistrong command details
-
->>      'sudo pistrong service start' or 'sudo systemctl start strongswan' to start the strongSwan VPN
->>      'sudo pistrong service enable' or 'sudo systemctl enable strongswan' to enable strongSwan to restart after reboot
-
->> Reboot and make sure everything works
-
-rpi3p2~# 
