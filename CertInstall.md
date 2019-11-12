@@ -3,13 +3,13 @@
 A client device must have the correct certificates installed in order to use the VPN. The details for installing certificate(s) and configuring the VPN vary by operating system. Here are step-by-step instructions for tested client operating systems.
 
 ## iOS
-One method is to put the certificates on a web server and browse to them. `pistrong` can send email with URLs for the certificates. Browse to each file and follow the prompts to add both the .p12 file and the CA certificate. 
+One OK-for-LAN-only method is to put the certificates on a web server and browse to them. Alternatively, `pistrong` can send email with URLs for the certificates. Browse to each file and follow the prompts to add both the .p12 file and the CA certificate. 
 
 ### iOS Cert Installation
 
-As of iOS 12.4, the cert installation procedure has changed slightly if you're mailing the certs to a user. Here is the most efficient way to install the certs:
+Here is the most efficient method to install the Certs:
 
-* On the iPhone, open the message with the Cert password and select/copy the password
+* On the iPhone, open the email message with the Cert password and select/copy the password
 * Open the message with the links to the Certs, and click on the Root CA Cert link. iOS will tell you that the Cert has been downloaded.
 * Go to the Settings App | General | Profiles. The newly-downloaded CA Cert will appear there.
 * Install the CA Cert
@@ -106,7 +106,7 @@ If you've set everything up correctly, it should, of course, *just work*. But, s
 
 ## Linux Cert Installation
 
-Certs for Linux systems are created using pistrong with `sudo pistrong add username --linux` (plus other switches as required). The certs are stored in a Linux Client Cert Pack /etc/swanctl/pistrong/server-assets/username-devicename.zip.
+Certs for Linux systems are created using pistrong with `sudo pistrong add username --linux` (plus other switches as required). The certs are stored in a Linux Client Cert Pack at /etc/swanctl/pistrong/server-assets/username-devicename.zip.
 
 Copy the Cert Pack to your Linux client system in a convenient directory, then issue the command: `sudo pistrong client install username-devicename.zip`
 
