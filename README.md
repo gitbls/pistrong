@@ -1,9 +1,9 @@
 # pistrong
-Simplified CA and device cert manager for the strongSwan VPN
+Certificate-based authentication manager for the strongSwan VPN
 
 ## Overview
 
-`pistrong` dramatically simplifies installing and configuring the strongSwan VPN. Once installed, pistrong simplifies managing the strongSwan Certificate Authority (CA) and Certificates for remote user devices connecting to the VPN. pistrong fully supports the Cert-authenticated roadwarrior use case (users on devices), and can be used to create and manage certs for other VPN scenarios, such as host-to-host or site-to-site tunnels.
+`pistrong` dramatically simplifies installing and configuring the strongSwan VPN. Once installed, pistrong simplifies managing the strongSwan Certificate Authority (CA) and Certificates for remote user devices connecting to the VPN. pistrong fully supports the Cert-authenticated roadwarrior use case (users on devices), and can be used to create and manage certs for other strongSwan VPN scenarios, such as host-to-host or site-to-site tunnels.
 
 The pistrong software package includes complete installation, configuration, and management support for Raspbian/Debian distros. There is basic install/config support for openSuSE, Ubuntu, Debian, and Centos. pistrong itself is distro-independent, so can be used on any distro once strongSwan is properly installed and configured.
 
@@ -15,11 +15,11 @@ pistrong components include:
 
 * `InstallPiStrong` - Install and configure strongSwan
 
-* `makeMyCA` - Use makeMyCA to create your secure custom CA after completing the installation. Or you can roll your own of course, using this as a model. Or not ;).
+* `makeMyCA` - Use makeMyCA to create your secure custom CA supporting iOS, Windows, and Linux Clients after completing the installation. Or you can roll your own of course, using this as a model.
 
 ## Up and Running Nearly Instantly!
 
-Before diving in, decide if you're going to use a DNS name (strongly preferred!) for external VPN access.Your public DNS IP address can be static or dynamic, depending on your Internet connection or ISP provider. If you don't use a DNS name, then you'll need to use your external IP address to access the VPN.
+Before diving in, decide if you're going to use a DNS name (highly recommended!) for external VPN access.Your public DNS IP address can be static or dynamic, depending on your Internet connection or ISP provider. If you don't use a DNS name, then you'll need to use your external IP address to access the VPN.
 
 If you're going to use a DNS name, it's best to ensure this is properly set up before proceeding. If you don't have a static external IP address, you can use a dynamic DNS service such as www.dyn.com, www.noip.com, etc. NoIP, for example, provides a small Linux tool that will monitor your external IP address and if it changes, updates selected DNS names.
 
@@ -51,7 +51,7 @@ Now that you've attended to the external network considerations, it's time to in
 
     `sudo /usr/local/bin/makeMyCA`
 
-* **Create your CA** You can do this manually, or use the makeMyCA script. makeMyCA uses pistrong to create a complete CA for iOS, Windows, and Linux clients. See below for details.
+* **Create your CA** You can do this manually, or use the makeMyCA script. makeMyCA uses pistrong to create a complete, secure, and ready-to-use CA for iOS, Windows, and Linux clients. See below for details.
 
 * **Add your users and devices.** These examples assume the username is *username*, and are taking the default *dev* for the device name. You can ease your management by adding `--dev something` which directs pistrong to add the string *something* to the name of this user. This is especially important if a user has multiple devices and you want to use a different cert on each device. Conversely, if a user's cert is going to be used across multiple devices, you don't need to use `--dev`.
     *  iOS users: `pistrong add username --remoteid ios.yourdomain.com`
@@ -59,11 +59,12 @@ Now that you've attended to the external network considerations, it's time to in
     *  Linux users: `pistrong add username --remoteid linux.yourdomain.com --linux`
     * `sudo systemctl enable --now strongswan` - Enable and start the strongSwan service
 
-    You can create multiple certs for a user with multiple devices in the following manner. Note that the value provided to --dev is strictly for your use to keep track of different devices, so can be anything you want.
+    Create multiple certs for a user with multiple devices in the following manner. Note that the value provided to --dev is strictly for your use to keep track of different devices, so can be anything you want.
 
     * `pistrong add username --dev iphone8 --remoteid ios.yourdomain.com`
     * `pistrong add username --dev ipad --remoteid ios.yourdomain.com`
     * `pistrong add username --dev surface --remoteid windows.yourdomain.com`
+    * `pistrong add myportapi --linux --remoteid linux.yourdomain.com`
 
 Once the certs for a client device or system have been created, you need to install and configure the VPN on the client or device. Follow the OS-specific Cert installation instructions at [Client Certificate Installation and VPN Configuration](https://github.com/gitbls/pistrong/blob/master/CertInstall.md) to install the Cert and configure the VPN.
 
@@ -114,20 +115,26 @@ minutes on a Raspberry Pi 3B with a reasonable internet connection.
 
 
 `InstallPiStrong` has several phases. If no phase is specified or **all** is specified,
-all phases will be run. InstallPiStrong will pause at the start of each phase to provide time for reviewing the results of the previous phase. The phases include:
+all phases will be run. InstallPiStrong does not pause at the start of each phase. If you it to pause at the start of each phase, use **allx ** as the command line argument. The phases include:
 
-* **allx** the same as **all** but does not pause until the postconf phase
+* **allx** the same as **all** but pauses at the start of each phase
 * **prereq** ensures that the required packages are installed on your system
 * **download** downloads the latest strongSwan source tarball 
 * **preconf** runs `configure` on the strongSwan source to ensure proper system configuration
 * **make** compiles and builds strongSwan
 * **install** installs strongSwan into the system
 * **postconf** or **post-configure** creates
-    * `/etc/swanctl/conf.d/pistrong-ServerConnection.conf` strongSwan config file for iOS and Windows roadwarrior use
-    * `/etc/swanctl/pistrong/iptables` required iptables addition. See Firewall Considerations section below
-    * `/etc/swanctl/pistrong/backup/connections-pistrong.piStrongInstall` copy of the initial pistrong-ServerConnection.conf for future reference if needed
+    * `/etc/sysctl.d/92-pistrong.conf` if configuring a VPN Server or `/etc/sysctl.d/.92-pistrong.conf` if configuring a Client  enables IPV4 forwarding. The Client version is for reference only and not used since it starts with a ".".
 
-If you know that your distro is carrying strongSwan 5.8.0 or greater, and it has been built with --enable-systemd, you can install strongSwan from your distro and skip the download, preconf, make, and install phases. Use `InstallPiStrong prereq` followed by `InstallPiStrong postconf` in this case. 
+If you know that your distro is carrying strongSwan 5.8.0 or greater, and it has been built with --enable-systemd, you can install strongSwan from your distro and skip the download, preconf, make, and install phases. Just use `sudo InstallPiStrong prereq` followed by `sudo InstallPiStrong postconf` in this case.
+
+## makeMyCA
+
+makeMyCA builds a complete CA configured for use with iOS, Windows, and Linux roadwarrior clients.  
+makeMyCA prompts for all the configuration information and provides explanations of each item. In addition to the necessary Certs, makeMyCA also creates
+
+* `/etc/swanctl/conf.d/pistrong-CAServerConnection.conf` strongSwan config file for iOS, Windows, and Linux roadwarrior VPN connections
+* `/etc/swanctl/pistrong/CA-iptables` required iptables addition. See Firewall Considerations section below
 
 ## Resetting Everything
 
@@ -145,11 +152,11 @@ pistrong supports Linux Roadwarrior users (Linux Client devices connecting to th
 * Download pistrong and InstallPiStrong onto the Linux client system as described above
 * `sudo InstallPiStrong` - Download, build, and install strongSwan
     * In the *postconf* phase, InstallPiStrong will ask if the VPN server should be enabled. For a client-only system, answer No. You can change your mind and enable this in the future if desired.
-* The VPN Server manager adds Linux clients by using `sudo pistrong add clientname --remoteid linux-remoteid --linux`.
+* The VPN Server Manager adds Linux clients by using `sudo pistrong add clientname --remoteid linux-remoteid --linux`.
 
     For instance, using the default CA built by makeMyCA, one might use `sudo pistrong add tomspi --device pi4 --remoteid linux.mydomain.com --linux`.
 
-    The `--linux` switch causes pistrong to create a Linux VPN Config Pack. Once the VPN Config Pack (zip file) has been copied to the Linux Roadwarrior client system, install the new connection with `sudo pistrong client install /path/to/zip-file`. 
+    The `--linux` switch causes pistrong to create a Linux VPN Config Pack. Once the VPN Config Pack (zip file) has been copied to the Linux Roadwarrior client system, install the new connection on the client with `sudo pistrong client install /path/to/zip-file`. 
 
 * Connect to the remote strongSwan VPN server with `sudo pistrong client start servername.fqdn.com`. The remote name can be abbreviated to its uniqueness.
 
@@ -159,7 +166,7 @@ pistrong supports Linux Roadwarrior users (Linux Client devices connecting to th
 
 strongSwan requires changes to the Firewall on the VPN Server for proper operation. This is not required on the Linux VPN Client system, or any other client for that matter. In case you don't have a firewall installed, InstallPiStrong writes a new systemd service *pistrong-iptables-load*, which contains only the VPN-required Firewall rules. If you want to use this service, `sudo systemctl enable pistrong-iptables-load` before rebooting.
 
-Many users either have or want more than this very minimal firewall. In that case, the iptables rules in /etc/swanctl/pistrong/iptables must be added to the Firewall rules for your system.
+Many users either have or want more than this very minimal firewall. In that case, the iptables rules in /etc/swanctl/pistrong/CA-iptables must be added to the Firewall rules for your system.
 
 ## Hints
 
@@ -172,7 +179,7 @@ Many users either have or want more than this very minimal firewall. In that cas
 * After adding/deleting/revoking users, use `pistrong service reload` to cause strongSwan to reload all credentials.
 
 * If you need to use multiple strongSwan connections (for different users accessing different local subnets, for example), here is an outline of how to do this:
-    * Establish the primary configuration with the desired CA Cert and VPN SAN keys.
+    * Establish the primary configuration with the desired CA Cert and VPN SAN keys, for instance, by using makeMyCA.
 
     * Create a secondary CA and a VPN Cert/Key in that secondary CA with a different VPN SAN key
 
@@ -180,7 +187,7 @@ Many users either have or want more than this very minimal firewall. In that cas
 
     * When adding users, always specify --cacert and --remoteid to specify the secondary VPN SAN Key to ensure that the user Cert is assigned to the correct connction.
 
-    * **NOTE:** If you ever re-create the CA using deleteca/createca you'll need to recreate the secondary Cert/Key and validate the connection details in /etc/swanctl/conf.d/pistrong-ServerConnection.conf, so don't deleteca unless you're really sure!
+    * **NOTE:** If you ever re-create the CA using deleteca/createca you'll need to recreate the secondary Cert/Key and validate the connection details the secondary .conf file in /etc/swanctl/conf.d/
 
 * Email and web server configuration is beyond the scope of this document. There are lots of guides on the internet for this, such as https://raspberrytips.com/mail-server-raspberry-pi/, but also see the section on Local Mail below.
 
@@ -198,7 +205,7 @@ For the most secure implementation, here are some things to consider:
 
 * If you don't have an FQDN for the VPN server, you will probably need to use `--vpnsankey my.san.key,yourExternalIPAddress` when you create the CA. `makeMyCA` offers this as an option.
 
-* pistrong easily enables a one certificate for multiple user devices, or a one certificate per user device scenario. The former is a wee bit easier to manage, the latter provides finer granularity access and management/monitoring control.
+* pistrong easily enables a one certificate for multiple user devices, or a one certificate per user device scenario. The former is easier to manage, the latter provides finer granularity access and management/monitoring control.
 
 ## Local Mail
 
