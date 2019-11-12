@@ -241,7 +241,7 @@ rpi42~# pistrong add bls --device laptop --remoteid windows.mydom.com
 % Added bls-laptop with Remote ID 'windows.mydom.com' using CA Cert strongSwan
 rpi42~# # Whoops forgot to send mail
 rpi42~# pistrong resend bls-laptop --mail bls
-% Copying '/etc/swanctl/p12/bls-iphone2-rpi42.p12' to '/var/www/html/vpn/bls-iphone2-rpi42.p12'
+% Copying '/etc/swanctl/p12/bls-laptop-rpi42.p12' to '/var/www/html/vpn/bls-laptop-rpi42.p12'
 % Copying '/etc/swanctl/x509ca/strongSwanCACert.pem' to '/var/www/html/vpn/strongSwanCACert.pem'
 % Mail sent to bls
 rpi42~# pistrong list
