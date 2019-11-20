@@ -1,5 +1,5 @@
 # pistrong
-Certificate-based authentication manager for the strongSwan VPN
+Simple, Secure Certificate-based authentication manager for the strongSwan VPN
 
 ## Overview
 
