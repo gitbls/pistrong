@@ -1,0 +1,530 @@
+#!/bin/bash
+#
+# makeTunnel V1.1
+#
+# Run this script via sudo After strongSwan is installed
+# Builds a tunnel
+#     - Client Cert Pack for the remote end of a tunnel
+#     - Configuration updated for this end of the tunnel
+#
+# Configuration information required
+#
+#     For each end of the Tunnel
+#          VPN Server name
+#          VPN Server LAN IP address
+#          VPN Server LAN CIDR (e.g., ip.ad.dr.0/24)
+#          VPN Server WAN address (typically your public IP address or public DNS name)
+#
+# Notes
+#    If you want the CA to have a hostname other than the current hostname
+#      use pistrong --myfqdn fqdn.hostname.you.want before this script
+#    For instance: pistrong --myfqdn BobsCA.noname.com
+#
+#    For hosts other than the VPN server to have access to the remote LAN
+#    Need to add the VPN server as a router for the remote LAN.
+#    If the VPN Server is 10.1.10.2 and 10.2.10.0/24 is the remote LAN,
+#    you'd do something like this on a Linux system on the 10.1.10.0 LAN:
+#      route add -net 10.2.10.0 gw 10.1.10.2 netmask 255.255.255.0
+#
+
+function askyn() {
+    local ans
+    echo -n "$1" '[y/N]? ' ; read $2 ans
+    [ "$dbl" != "" ] && echo ""
+    case "$ans" in
+        y*|Y*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+function pingcheck() {
+    ping -n -c 1 -w 2 $1 >/dev/null 2>&1
+}
+
+function mustanswer() {
+    # $1 = prompt string
+    # Returns the answer in the variable named by $2
+    # $3 = default
+    local pmpt=$1 ans="" dfl="$3"
+
+    while [ "$ans" == "" ] ;
+    do
+	echo -n "$pmpt [$dfl]: " ; read ans
+	[ "$dbl" != "" ] && echo ""
+    done
+    eval "${2}=\"$ans\""
+}
+
+function askdefault () {
+    # $1=prompt, $2=return variable $3=default-for-prompt-plus-default $4=default-if-provided
+    local pmpt=$1 dfl="$3" ddfl="$4" tmp=""
+    echo -n "$pmpt [$dfl]: " ; read tmp
+    [ "$dbl" != "" ] && echo ""
+    if [ "$tmp" == "" ]
+    then
+	[ "$ddfl" != "" ] && tmp="$ddfl" || tmp="$dfl"
+    fi
+    eval "${2}=\"$tmp\""     # Defines a variable with the return value
+}
+function makeconnconf() {
+# $1=cfgfile $1=ikename $3=remoteip $4=thisvpncert $5=thisid $6=remotevpncert $7=remoteid $8=thisrange $9=remoterange
+    local tcnfile="$1" tike="$2" trip="$3" tvpnf="$4" tid="$5"
+    local rvpnf="$6" rid="$7" trange="$8" rrange="$9"
+    cat > $tcnfile <<EOF
+connections {
+    $tike {
+      local_addrs  = %any
+      remote_addrs = $trip
+      fragmentation = yes
+      local {
+         auth = pubkey
+         cacerts = $cacertfn
+         certs = $tvpnf
+         id = $tid
+      }
+      remote {
+         auth = pubkey
+         cacerts = $cacertfn
+         certs = $rvpnf
+         id = $rid
+      }
+      children {
+         $tike {
+EOF
+    [ $fsite == 0 ] && echo "            local_ts  = $trange" >> $tcnfile
+    cat >> $tcnfile <<EOF
+            remote_ts = $rrange
+            updown = /libexec/ipsec/_updown iptables
+            rekey_time = 5400
+            rekey_bytes = 500000000
+            rekey_packets = 1000000
+            esp_proposals = aes128gcm128-x25519
+         }
+      }
+      version = 2
+      mobike = no
+      reauth_time = 10800
+      proposals = aes128-sha256-x25519
+    }
+}
+EOF
+}
+
+function makeInstallScript() {
+# $1=hostname, $2=myip $3=otherhost $4=cnfile $5=ipfile $6=fwfile $7=ikename
+    local thost=$1 tip=$2 tother=$3 tcnfile=$4 tipfile=$5 tfwfile=$6 ikenm=$7
+
+    cat >> pistrong-vpn-installer <<EOF
+#!/bin/bash
+# pistrong 3.1 Linux VPN Configuration Installer
+# Built on Host '$thishostx' for '$thost' at $(date +"%Y%m%d-%H%M%S")
+zf=\$1
+zfn=\$(basename \$zf)
+swandir=\${2:-/etc/swanctl}
+unzip -d \$swandir/x509ca    \$zf $cacertfn
+unzip -d \$swandir/x509      \$zf $myvpncertfn
+unzip -d \$swandir/x509      \$zf $rmvpncertfn
+unzip -d \$swandir/private   \$zf ${myvpnf}VPNKey.pem
+unzip -d \$swandir/private   \$zf ${rmvpnf}VPNKey.pem
+unzip -d \$swandir/conf.d    \$zf $tcnfile
+[ -f \$swandir/pistrong/$tipfile ] && rm -f \$swandir/pistrong/$tipfile
+unzip -d \$swandir/pistrong  \$zf $tipfile
+[ -f \$swandir/pistrong/$tfwfile ] && rm -f \$swandir/pistrong/$tfwfile
+unzip -d \$swandir/pistrong  \$zf $tfwfile
+cp \$zf \$swandir/pistrong/client-assets
+cat >> \$swandir/pistrong/VPNClients/$tother-Tunnel <<IEOF
+# Tunnel Client VPN $tother-Tunnel connection assets
+conn=$tother-Tunnel
+file=x509ca/$cacertfn
+file=x509/$myvpncertfn
+file=x509/$rmvpncertfn
+file=private/${myvpnf}VPNKey.pem
+file=private/${rmvpnf}VPNKey.pem
+file=conf.d/$tcnfile
+file=pistrong/client-assets/\$zfn
+IEOF
+cp \$zf \$swandir/pistrong/client-assets
+echo ""
+if [ ! -f /etc/systemd/system/pistrong-iptables-load.service ]
+then
+    cat > /etc/systemd/system/pistrong-iptables-load.service <<DEOF
+[Unit]
+Description=Load iptables for strongSwan
+Requires=network-online.target
+
+[Service]
+ExecStart=/sbin/iptables-restore /etc/swanctl/pistrong/iptables
+User=root
+StandardInput=null
+StandardOutput=null
+StandardError=null
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+DEOF
+chmod 644 /etc/systemd/system/pistrong-iptables-load.service
+systemctl daemon-reload
+fi
+echo "You must update your iptables firewall configuration for this VPN"
+echo ""
+echo "If you have a firewall or iptables configuration already, add the contents"
+echo " of $tfwfile to it"
+echo ""
+echo "If you do not have a firewall:"
+echo "  Add the contents of /etc/swanctl/pistrong/$tfwfile to /etc/swanctl/pistrong/iptables"
+echo "  sudo systemctl enable --now pistrong-iptables-load"
+echo ""
+echo "Then sudo start strongswan"
+echo "When everything works correctly sudo systemctl enable --now strongswan"
+echo ""
+EOF
+    if [ "$tip" == "%any" ]
+    then
+	cat >> pistrong-vpn-installer <<EOF
+echo "This tunnel can only be initiated from the remote host ($tother)"
+EOF
+    else
+	cat >> pistrong-vpn-installer <<EOF
+echo "To start the tunnel:"
+echo "  pistrong client start $tother-Tunnel"
+echo "To start the tunnel automatically at system boot...TBD"
+echo ""
+EOF
+    fi
+}
+
+function makevpniptables() {
+    local cnfile=$1 therange=$2
+    [ -f $cnfile ] && rm -f $cnfile
+    cat > $cnfile <<EOF
+# These firewall rules must be added to iptables on this VPN Server host
+#
+*nat
+:POSTROUTING ACCEPT [0:0]
+-A POSTROUTING -s $therange -o eth0 -m policy --dir out --pol ipsec -j ACCEPT
+-A POSTROUTING -s $therange -o eth0 -j MASQUERADE
+COMMIT
+EOF
+}
+
+function makefwiptables() {
+
+    local fn=$1 vpnip=$2
+    cat > $fn <<EOF
+# V1.1
+#
+# This is not required for a typical pistrong configuration
+#
+# These are the Linux firewall rules needed to support a strongSwan VPN server
+# running behind the firewall. These are only needed on a Linux router 
+# operating as the firewall. Other firewalls may need equivalent changes
+# via port forwarding, virtual servers, etc.
+# If a VPN Server hosts multiple firewalls, add the rules only once.
+#
+# Rules assume that eth0=LAN and eth1=WAN
+#
+*nat
+:PREROUTING ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+
+-A PREROUTING -i eth1 -p udp -m udp --dport 500  -j DNAT --to-destination $vpnip
+-A PREROUTING -i eth1 -p udp -m udp --dport 4500 -j DNAT --to-destination $vpnip
+# Example of how to port forward ssh via an alternate port
+#-A PREROUTING -i eth1 -p tcp -m tcp --dport 23   -j DNAT --to-destination $vpnip:22
+
+-A POSTROUTING -o eth1 -p udp -m udp --dport 500 -j MASQUERADE
+-A POSTROUTING -o eth1 -j MASQUERADE
+
+COMMIT
+
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+
+-A INPUT -i lo -j ACCEPT
+-A OUTPUT -o lo -j ACCEPT
+-A INPUT -i eth0 -j ACCEPT
+
+-A FORWARD -p esp -j ACCEPT
+-A FORWARD -p ah -j ACCEPT
+-A FORWARD -i eth0 -j ACCEPT
+-A FORWARD -i eth0 -o eth1 -j ACCEPT
+-A FORWARD -i eth1 -o eth0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+#-A FORWARD -d $vpnip -p udp -m udp --dport 500 -j ACCEPT
+#-A FORWARD -d $vpnip -p udp -m udp --dport 4500 -j ACCEPT
+COMMIT
+EOF
+
+}
+
+#
+# Main
+#
+dbl=""
+debug=1
+#debug=0               # 0=debug 1=production
+thishostx=$(hostname)
+thishost="$thishostx"
+echo ""
+echo "Build a site-to-site tunnel configuration"
+echo ""
+echo "After the configuration information has been gathered, it will be displayed"
+echo "for review/confirmation before any changes are made to the system"
+
+echo ""
+echo "Details required for each end of the Tunnel:"
+echo " * Hostname, LAN IP address, LAN IP range (CIDR), WAN IP address or DNS name"
+echo "   * The LAN IP range (CIDR) is explained below"
+echo "   * The WAN IP address is required for a host to act as a VPN Server"
+echo "     (that is, able to receive VPN tunnel connection requests)"
+echo ""
+echo "The tunnel can be site-to-site (routing onto remote LAN) or host-to-host"
+echo ""
+echo -n "Tunnel type [S]ite or Host: " ; read tmp
+case "${tmp,,}" in
+    h|host) echo "Host-to-host tunnel selected"
+	    fsite=1
+	    ttype="Host-to-Host"
+	    ;;
+    s|site|*) echo "Site-to-site tunnel selected"
+	      ttype="Site-to-Site"
+	      fsite=0
+	      ;;
+esac
+echo ""
+echo "** The tunnel name is used for configuration naming"
+echo "   Each tunnel must have a unique name"
+echo ""
+askdefault "Tunnel name" tunnelname "newtunnel"
+# Error if Tunnel config file exists
+fs=$(ls /etc/swanctl/conf.d/Tunnel-${tunnelname}*.conf  2> /dev/null)
+[ "$fs" != "" ] && echo "? A tunnel named '$tunnelname' already exists" && exit
+askdefault "Name for this end of the tunnel" thishost "$thishostx"
+[ "$thishost" != "$thishostx" ] && fpack=0 || fpack=1
+echo "** Use the host name (for example) for the remote end of the tunnel"
+askdefault "Remote VPN Server name" rmhost "remote"
+echo ""
+echo "** The IP ranges for each end of the tunnel must be carefully and accurately specified"
+echo ""
+echo "   This script will build a $ttype VPN with this configuration:"
+echo ""
+[ $fsite == 0 ] && echo "   LocalNet1 <---> VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost) <---> LocalNet2"
+[ $fsite == 1 ] && echo "   VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost)"
+echo "   Where:"
+echo "        LocalNet1         Local LAN IP Range for ${thishost}'s network"
+echo "        VPN Server 1      Server at one end of the tunnel ($thishost)"
+echo "        Tunnel            VPN tunnel transporting traffic between the two networks"
+echo "        VPN Server 2      Server at other end of the tunnel ($rmhost)"
+echo "        LocalNet2         Local LAN IP Range for ${rmhost}'s network"
+echo ""
+echo "   Site-to-site VPN: Hosts on each LAN can access the remote LAN with appropriate routing settings"
+echo "   Host-to-host VPN: VPN Servers can access each other but not hosts on the remote LAN"
+echo ""
+echo "   NOTE: LocalNet1 and LocalNet2 cannot be the same subnet (e.g., 192.168.1.0/24 on both networks)"
+echo "   If both networks are the same, one network must be completely IP-reassigned before configuring this VPN"
+echo "   This script does NO IP range syntax checking. If it's wrong the VPN will fail or will not pass traffic"
+echo ""
+echo "** IP ranges are entered as a.b.c.d/nn (e.g., 192.168.1.0/24)"
+echo "   See CIDR: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing"
+echo ""
+mustanswer "IP range for the '$thishost' LAN" myrange ""
+mustanswer "LAN IP address for '$thishost' in subnet $myrange" mylanip ""
+mustanswer "IP range for the '$rmhost' LAN" rmrange ""
+mustanswer "LAN IP address for '$rmhost' in subnet $rmrange" rmlanip ""
+
+dynurl="http://ipinfo.io.ip"
+myip=""
+if pingcheck $dynurl
+then
+    echo "Trying to obtain your external IP address..."
+    myip="$(curl -s $dynurl)"
+fi
+
+echo ""
+echo "** The VPN configuration requires one or both of the VPN Servers be the VPN Server"
+echo "   A VPN Server has ports 500 and 4500 forwarded to it, if required,"
+echo "   and it's external IP address is accessible from the remote system"
+echo ""
+echo "   Let's get the external DNS name or IP address for the two hosts"
+echo "   If a host does not have a DNS name or IP address assigned to it, it cannot"
+echo "   be a VPN Server for this tunnel and is only capable of initiating the VPN"
+echo ""
+echo "** Enter the public DNS name/IP address for '$thishost'"
+[ "$myip" == "" ] && dfl="Client Only" || dfl=$myip
+askdefault "DNS name or IP address for '$thishost'" myip "$dfl" "%any"
+echo ""
+echo "** Enter the public DNS name/IP address for '$rmhost'"
+askdefault "DNS name or IP address for '$rmhost'" rmip "Client Only" "%any"
+
+if [ "$myip" == "%any" -a "$rmip" == "%any" ]
+then
+    echo ""
+    echo "% Neither host can be a Server for this VPN"
+    if ! askyn "Do you want to continue"
+    then
+	exit
+    fi
+fi    
+
+echo ""
+echo "** The VPN ID is used as part of the authentication process"
+echo "   The defaults are fine, but change them as desired"
+echo ""
+askdefault "VPN ID for the '$thishost' VPN Server" mytid "$thishost.$tunnelname.com"
+askdefault "VPN ID for the '$rmhost' VPN Server" rtid "$rmhost.$tunnelname.com"
+
+caname="${tunnelname}-${thishost}"
+cacertfn="${caname}CACert.pem"
+myvpnf="${thishost}-${caname}"
+myvpncertfn="${myvpnf}VPNCert.pem"
+rmvpnf="${rmhost}-${caname}"
+rmvpncertfn="${rmvpnf}VPNCert.pem"
+tunnelmyhost="${tunnelname}-${thishost}"
+tunnelrmhost="${tunnelname}-${rmhost}"
+ikesfx="-Tunnel"
+thisike="${thishost}${ikesfx}"
+rmike="${rmhost}${ikesfx}"
+echo ""
+echo "** Ready to create the tunnel '$tunnelname'"
+echo ""
+echo "      CA  Cert  $cacertfn"
+echo "      VPN Cert  $myvpncertfn with id '$mytid'"
+echo "      VPN Cert  $rmvpncertfn with id '$rtid'"
+echo ""
+echo "             Tunnel assets on $thishost"
+echo "      Tunnel Config File    /etc/swanctl/conf.d/Tunnel-${tunnelrmhost}.conf"
+[ $fpack -eq 0 ] && echo "      VPN Config Pack       /etc/swanctl/pistrong/server-assets/${tunnelmyhost}.zip"
+[ $fpack -eq 0 ] && echo "        for '$thishost'"
+echo "      VPN Config Pack       /etc/swanctl/pistrong/server-assets/${tunnelrmhost}.zip"
+echo "        for '$rmhost'"
+echo ""
+echo "** VPN Network configuration"
+echo ""
+if [ $fsite -eq 0 ]
+then
+    printf "%16s %16s %16s  %-16s\n" "Host name" "LAN IP" "LAN range" "External Address"
+    printf "%16s %16s %16s  %-16s\n" "$thishost" $mylanip $myrange $myip
+    printf "%16s %16s %16s  %-16s\n" "$rmhost" $rmlanip $rmrange $rmip
+else
+    printf "%16s %16s %16s\n" "Host name" "LAN IP" "External Address"
+    printf "%16s %16s %16s\n" "$thishost" $mylanip $myip
+    printf "%16s %16s %16s\n" "$rmhost" $rmlanip $rmip
+fi
+[ "$myip" == "%any" -o "$rmip" == "%any" ] && echo "* Hosts with an External Address of %any are VPN clients only"
+
+echo ""
+echo "** Answer N and restart the script if you'd like to change anything"
+
+if ! askyn "Do you want to continue"
+then
+    exit
+fi
+
+echo "Create certs..."
+if [ $debug -eq 1 ]
+then
+    pistrong createca $caname --nocamsg --novpncert
+    pistrong makevpncert $thishost --vpnsankey $mytid --cacert $caname
+    pistrong makevpncert $rmhost --vpnsankey $rtid --cacert $caname
+fi
+echo ""
+echo "Build VPN Config Pack for '$rmhost'..."
+tmpdir=$(mktemp -d -p /tmp mktunXXXX)
+pushd $tmpdir > /dev/null
+cnfile="Tunnel-${tunnelmyhost}.conf"
+makeconnconf "./$cnfile" $thisike $myip $rmvpncertfn $rtid $myvpncertfn $mytid $rmrange $myrange
+ipfile="Tunnel-${tunnelmyhost}-VPNRouting.iptables"
+makevpniptables "./$ipfile" "$myrange"
+fwfile="Tunnel-${tunnelmyhost}-firewall.iptables"
+makefwiptables "./$fwfile" "$rmlanip"
+
+if [ $debug -eq 1 ]
+then
+    cp /etc/swanctl/x509ca/$cacertfn .
+    cp /etc/swanctl/x509/$myvpncertfn .
+    cp /etc/swanctl/x509/$rmvpncertfn .
+    cp /etc/swanctl/private/${myvpnf}VPNKey.pem .
+    cp /etc/swanctl/private/${rmvpnf}VPNKey.pem .
+else
+    touch $cacertfn
+    touch $myvpncertfn
+    touch $rmvpncertfn
+    touch ${myvpnf}VPNKey.pem
+    touch ${rmvpnf}VPNKey.pem
+fi
+makeInstallScript $rmhost $myip $thishost $cnfile $ipfile $fwfile $rmike
+zip -j /etc/swanctl/pistrong/server-assets/Tunnel-${tunnelrmhost}.zip *
+#
+# Make a VPN Config pack for $thishost
+# if $thishost == $thishostx put files into running system
+#
+echo "Build VPN Config Pack for '$thishost'..."
+rm -f pistrong-vpn-installer Tunnel-${tunnelmyhost}.conf
+rm -f "Tunnel-${tunnelmyhost}-VPNRouting.iptables"
+rm -f "Tunnel-${tunnelmyhost}-firewall.iptables"
+cnfile="Tunnel-${tunnelrmhost}.conf"
+makeconnconf "./$cnfile" $rmike $rmip $myvpncertfn $mytid $rmvpncertfn $rtid $myrange $rmrange
+ipfile="Tunnel-${tunnelrmhost}-VPNRouting.iptables"
+makevpniptables "./$ipfile" "$rmrange"
+fwfile="Tunnel-${tunnelrmhost}-firewall.iptables"
+makefwiptables "./$fwfile" "$mylanip"
+makeInstallScript $thishost $rmip $rmhost $cnfile $ipfile $fwfile $thisike
+zip -j /etc/swanctl/pistrong/server-assets/Tunnel-${tunnelmyhost}.zip *
+if [ $fpack -eq 1 ]
+then
+    echo "Loading $thishost VPN Config Pack into system..."
+    # put files into running system
+    cp $cnfile /etc/swanctl/conf.d
+    cp $fwfile /etc/swanctl/pistrong
+    cp $ipfile /etc/swanctl/pistrong
+    if [ "$rmip" != "%any" ]
+    then
+	cat >> /etc/swanctl/pistrong/VPNClients/$rmhost-Tunnel <<EOF
+# Tunnel Client VPN $thost-Tunnel connection assets
+conn=$rmhost-Tunnel
+file=x509ca/$cacertfn
+file=x509/$myvpncertfn
+file=x509/$rmvpncertfn
+file=private/${myvpnf}VPNKey.pem
+file=private/${rmvpnf}VPNKey.pem
+file=conf.d/$cnfile
+file=pistrong/client-assets/Tunnel-${tunnelmyhost}.zip
+EOF
+	cp /etc/swanctl/pistrong/server-assets/Tunnel-${tunnelmyhost}.zip /etc/swanctl/pistrong/client-assets
+    fi
+fi
+popd > /dev/null
+rm -rf $tmpdir
+
+echo ""
+echo "Next Steps"
+echo "  * On '$rmhost':"
+echo "  *  Copy the VPN Config Pack (/etc/swanctl/pistrong/server-assets/${tunnelrmhost}.zip) to '$rmhost'"
+echo "  *  'sudo pistrong client install ${tunnelrmhost}.zip' to install the tunnel configuration"
+echo "  *  Configure iptables using /etc/swanctl/pistrong/Tunnel-${tunnelmyhost}-VPNRouting.iptables"
+echo "       and https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
+echo "  *  Restart strongSwan: sudo systemctl restart strongswan"
+echo ""
+[ $fpack -ne 3 ] && echo "  * On '$thishost':"  # Always printed
+[ $fpack -eq 0 ] && echo "  *  Copy the VPN Config Pack (/etc/swanctl/pistrong/server-assets/${tunnelmyhost}.zip) to '$thishost'"
+[ $fpack -eq 0 ] && echo "  *  'sudo pistrong client install ${tunnelrmhost}.zip' to install the tunnel configuration"
+[ $fpack -eq 1 ] && echo "  *  The tunnel configuration has been installed on $thishost"
+[ $fpack -eq 1 ] && echo "  *  Configure iptables using /etc/swanctl/pistrong/Tunnel-${tunnelrmhost}-VPNRouting.iptables"
+[ $fpack -eq 1 ] && echo "       and https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
+[ $fpack -eq 1 ] && echo "  *  Restart strongSwan: sudo systemctl restart strongswan"
+echo ""
+echo "  * Start the VPN tunnel:"
+echo ""
+[ "$myip" != "%any" ] &&  echo "     On $rmhost: pistrong client start $thishost-Tunnel"
+[ "$rmip" != "%any" ] &&  echo "     On $thishost: pistrong client start $rmhost-Tunnel"
+[ "$myip" == "%any" ] && echo "     [This VPN tunnel cannot be initiated from '$rmhost'; the address of '$thishost' is not known]"
+[ "$rmip" == "%any" ] && echo "     [This VPN tunnel cannot be initiated from '$thishost'; the address of '$rmhost' is not known]"
+echo ""
+echo "Once everything is working to your satisfaction, consider 'sudo systemctl enable strongswan'"
+echo "  to start the strongSwan service (but NOT the VPN tunnel) automatically"
+echo "Start the VPN tunnel automatically by...coming soon TBD"
+exit
