@@ -17,6 +17,8 @@ pistrong components include:
 
 * `makeMyCA` - Use makeMyCA to create your secure custom CA supporting iOS, Windows, and Linux Clients after completing the installation. Or you can roll your own of course, using this as a model.
 
+* `makeTunnel` - Use makeTunnel to create a Site-to-Site (remote LANs are accessible) or Host-to-Host VPN (remote LANs are not accessible) with strongSwan on both ends of the VPN.
+
 ## Up and Running Nearly Instantly!
 
 Before diving in, decide if you're going to use a DNS name (highly recommended!) for external VPN access.Your public DNS IP address can be static or dynamic, depending on your Internet connection or ISP provider. If you don't use a DNS name, then you'll need to use your external IP address to access the VPN.
@@ -44,8 +46,10 @@ Now that you've attended to the external network considerations, it's time to in
     `sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong`
     
     `sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA -o /usr/local/bin/makeMyCA`
+
+    `sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/makeTunnel -o /usr/local/bin/makeTunnel`
     
-    `sudo chmod 755 /usr/local/bin/{pistrong,InstallPiStrong,makeMyCA}`
+    `sudo chmod 755 /usr/local/bin/{pistrong,InstallPiStrong,makeMyCA,makeTunnel}`
     
     `sudo /usr/local/bin/InstallPiStrong all`
 
