@@ -37,7 +37,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "3.1"
+version = "3.2"
 dbversion = "3"
 
 helpmsg = "pistrong {} commands:\n\
@@ -756,7 +756,7 @@ def cmd_add(pd, args):
         perrorexit("? Key '{}' already in use".format(newkey))
     ipwd = "" if args.password is None else args.password
     if not args.nopass:
-        if pd.dx['random']:
+        if pd.dx['random'] and ipwd == "":
             ipwd = genrandpwd()
         if ipwd == "":
             ipwd = getpwd()
