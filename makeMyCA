@@ -68,7 +68,9 @@ webdir="/var/www/html/vpn"
 ios="ios"
 windows="windows"
 linux="linux"
+# Get what we believe is the host IP address
 myipaddr=$(hostname --ip-address)
+[[ "$myipaddr" =~ "127.0" ]] && IFS=" " read myipaddr s2 <<< $(hostname --all-ip-addresses)
 caconf="/etc/swanctl/conf.d/pistrong-CAServerConnection.conf"
 
 echo "Build a prescriptive strongSwan CA for iOS, Windows, and Linux devices"
