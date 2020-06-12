@@ -149,9 +149,9 @@ If you want to completely delete and reset the CA, and the whole strongSwan/pist
 * `sudo makeMyCA` - Create a new CA. Use this, or your own script, as desired.
 *  Add new users or devices to the CA
 
-## Linux Roadwarrior Support
+## Linux Clients Connecting to Your VPN
 
-pistrong supports Linux Roadwarrior users (Linux Client devices connecting to the VPN). The easiest approach is to use strongSwan on the Linux client, and installing it via:
+pistrong supports Linux Linux Client devices connecting to the VPN. The easiest approach is to use strongSwan on the Linux client, and installing it via:
 
 * Download pistrong and InstallPiStrong onto the Linux client system as described above
 * `sudo InstallPiStrong` - Download, build, and install strongSwan
