@@ -110,7 +110,7 @@ Certs for Linux systems are created using pistrong with `sudo pistrong add usern
 
 Copy the Cert Pack to your Linux client system in a convenient directory, then issue the command: `sudo pistrong client install username-devicename.zip`
 
-pistrong will display the unpack.sh file from the zip file. Once you approve, pistrong will add the certs and connection information to the strongSwan configuration. Restart the strongSwan server, and then connect using `sudo pistrong client connect server.fqdn.com`. 
+pistrong will display the pistrong-vpn-installer script from the zip file. Once you approve, pistrong will add the certs and connection information to the strongSwan configuration. Restart the strongSwan server, and then connect using `sudo pistrong client connect server.fqdn.com`. 
 
 Use `sudo pistrong client stop` to disconnect the VPN connection.
 
