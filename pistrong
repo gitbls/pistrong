@@ -885,6 +885,7 @@ def cmd_resend(pd, args):
     newkey = makekeyname(pd, args)
     makeclientfnames(pd, args, newkey)
     checkcaexist(pd)
+    if args.mail is None: perrorexit("? Resend command requires --mail to specify email address")
     if keyindb(pd, newkey):
         pd.dx['mailfrom'] = pd.db['config']['mailfrom']['value']
         pd.dx['webdir'] =   pd.db['config']['webdir']['value']
