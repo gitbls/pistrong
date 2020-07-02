@@ -19,6 +19,8 @@ pistrong components include:
 
 * `makeTunnel` - Use makeTunnel to create a Site-to-Site (remote LANs are accessible) or Host-to-Host VPN (remote LANs are not accessible) with strongSwan on both ends of the VPN.
 
+**NOTE:** It's 99%  likely that MacOS and Android clients will work as well, but they have not been tested. If you have either of these and want to help me document these, let me know via a GitHub issue.
+
 ## Up and Running Nearly Instantly!
 
 Before diving in, decide if you're going to use a DNS name (highly recommended!) for external VPN access.Your public DNS IP address can be static or dynamic, depending on your Internet connection or ISP provider. If you don't use a DNS name, then you'll need to use your external IP address to access the VPN. If you're planning to use an IP address, please read the section below: Using an IP Address for VPN Access.
@@ -145,8 +147,8 @@ If you want to completely delete and reset the CA, and the whole strongSwan/pist
 * `sudo systemctl stop strongswan` - Stop the strongswan service
 * `sudo pistrong deleteca` - Deletes Everything
 * If things are **really confused**, you can go even further and do:
-    * `sudo pistrong config --list > ~/old-pistrong-config.txt &mdash;Save the old settings for reference
-    * `sudo rm -f /etc/swanctl/pistrong/pistrongdb.json` &mdash;Deletes the pistrong database, which pistrong will recreate as needed.  
+    * `sudo pistrong config --list > ~/old-pistrong-config.txt` &mdash; Save the old settings for reference
+    * `sudo rm -f /etc/swanctl/pistrong/pistrongdb.json` &mdash; Deletes the pistrong database, which pistrong will recreate as needed.  
 * `sudo makeMyCA` - Create a new CA. Use this, or your own script, as desired.
 *  Add new users or devices to the CA
 
@@ -169,17 +171,19 @@ pistrong supports Linux Client devices connecting to the VPN. The easiest approa
 
 ## Firewall Considerations
 
-strongSwan requires changes to the Firewall on the VPN Server for proper operation. This is not required on the Linux VPN Client system, or any other client for that matter. In case you don't have a firewall installed, InstallPiStrong writes a new systemd service *pistrong-iptables-load*, which contains only the VPN-required Firewall rules. If you want to use this service, `sudo systemctl enable pistrong-iptables-load` before rebooting.
+strongSwan **requires** changes to the Firewall on the VPN Server for proper operation. This is not required on the Linux VPN Client system, or any other client for that matter. In case you don't have a firewall installed, InstallPiStrong writes a new systemd service *pistrong-iptables-load*, which contains only the VPN-required Firewall rules. If you want to use this service, `sudo systemctl enable pistrong-iptables-load` before rebooting.
+
+The minimal firewall rules are in /etc/swanctl/pistrong/CA-iptables. If your connection to the internet changes from what you specified in makeMyCA, you must sudo edit this file and change the network device (typically, eth0, but could be eth1) to the appropriate network adapter. There is no validity checking done on this by pistrong, and if it's incorrect, VPN traffic from remote clients will not be able to access the VPN Server's LAN.
 
 Many users either have or want more than this very minimal firewall. In that case, the iptables rules in /etc/swanctl/pistrong/CA-iptables must be added to the Firewall rules for your system.
 
 ## Hints
 
-* Use the `pistrong config` command to quickly and easily configure pistrong for your system. See [makeMyCA](https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA), which creates a fully-functional CA to serve iOS, Windows, and Linux clients   .
+* Use the `pistrong config` command to quickly and easily configure pistrong for your system. See [makeMyCA](https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA), which creates a fully-functional CA to serve iOS, Windows, and Linux clients.
 
 * Typically you'll want to include your host FQDN as one of the VPN SAN keys, unless you are using an IP address to access your VPN server. In that case, you'll need to include the IP address. For maximum flexibility, pistrong does not apply the host FQDN or IP address as SAN keys, although makeMyCA does. If you are not using makeMyCA you must put the VPN-specific SAN key first. For example, `--vpnsankey myipsec.home.vpn,myhost.mydomain.com`. pistrong will add all specified SAN keys to the VPN cert. The VPN SAN key should match the value for the --remoteid switch, as this is how strongSwan determines which VPN configuration is applied to an incoming connection. The --remoteid value is sent to the user in email.
 
-    makeMyCA adds the host FQDN to the SAN keys it creates.
+    Note that makeMyCA adds the host FQDN to the SAN keys it creates.
 
 * After adding/deleting/revoking users, use `pistrong service reload` to cause strongSwan to reload all credentials.
 
@@ -249,6 +253,8 @@ If your system does not have the capability to send email, you can easily instal
   * More usage. Besides me, that is. 
 
   * pistrong does not provide a way to delete a single CA or VPN Cert.
+
+  * pistrong does not encrypt Certs in a Linux Cert Pack
 
 ## If you're interested...
 
