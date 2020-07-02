@@ -23,7 +23,7 @@ function askdefault () {
     then
 	[ "$ddfl" != "" ] && tmp="$ddfl" || tmp="$dfl"
     fi
-    eval "${2}=\"$tmp\""     # Defines a variable with the return value
+    eval "${2}=\"${tmp}\""     # Defines a variable with the return value
 }
 
 function emitFirewall() {
@@ -31,11 +31,14 @@ function emitFirewall() {
     [ -f /etc/swanctl/pistrong/CA-iptables ] && return
     cat > /etc/swanctl/pistrong/CA-iptables <<EOF
 #  Add the necessary iptables routes to enable VPN routing to the internet
-
+#  NOTE: If your connection to the internet is other than '$vpndev',
+#        sudo edit this file and change '$vpndev' to the appropriate
+#        network adapter
+#
 *nat
 :POSTROUTING ACCEPT [0:0]
--A POSTROUTING -s $vpnsubnet -o eth0 -m policy --dir out --pol ipsec -j ACCEPT
--A POSTROUTING -s $vpnsubnet -o eth0 -j MASQUERADE
+-A POSTROUTING -s $vpnsubnet -o $vpndev -m policy --dir out --pol ipsec -j ACCEPT
+-A POSTROUTING -s $vpnsubnet -o $vpndev -j MASQUERADE
 COMMIT
 EOF
     [ -f /etc/systemd/system/pistrong-iptables-load.service ] && return
@@ -59,16 +62,12 @@ EOF
     chmod 644 /etc/systemd/system/pistrong-iptables-load.service
     echo "** I have created the service pistrong-iptables-load, but it is not enabled"
     echo "** If you have another way to load iptables, you must add the code from /etc/swanctl/pistrong/CA-iptables to it"
-    echo "** Otherwise you must sudo systemctl enable pistrong-iptables-load"
+    echo "** Otherwise you must 'sudo systemctl enable --now pistrong-iptables-load'"
 }
 
 function isipaddr() {
     local ip="$1"
-    if [[ $ip =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]
-    then
-	return 0
-    fi
-    return 1
+    [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] && return 0 || return 1
 }
 
 dbl=""
@@ -108,6 +107,15 @@ echo ""
 askdefault "vpnaddr for your VPN" vpnaddr "$thisfqdn"
 
 echo ""
+echo "** 'vpndev' is the network device that will be connected to the Internet"
+echo "   If your system has:"
+echo "    One network device:         Use that device"
+echo "    More than 1 network device: Use the device that is or will be connected to the Internet"
+echo "                                either directly or indirectly through a router"
+echo ""
+askdefault "Network device that will be connected to the Internet" vpndev "eth0"
+
+echo ""
 echo "** 'cnsuffix' is a naming string only used in user certs"
 echo "   (e.g., username-device-$thishost@cnsuffix)"
 echo "   It is used by iOS for additional Cert validation"
@@ -136,7 +144,7 @@ askdefault "VPN Cert name prefix for iOS VPN Cert" ios "$ios"
 askdefault "VPN SAN key for iOS users" ioskey "$ioskey"
 
 askdefault "VPN Cert name prefix for Windows VPN Cert" windows "$windows"
-# Get Windows VPN SAN Key even though Windows IPSec stack (Win10 1903) currently doesn't use it
+# Get Windows VPN SAN Key even though Windows IPSec stack at least as of Win10 1903 doesn't use it
 askdefault "VPN SAN key for Windows users" winkey "$winkey"
 
 askdefault "VPN Cert name prefix for Linux VPN Cert" linux "$linux"
@@ -197,8 +205,10 @@ echo "   The default VPN Server Address is '$vpnaddr'"
 echo "   This can be changed on a per-user basis on the 'sudo pistrong add' command for a single user"
 echo "    using the --vpnaddr new-vpn-address switch, or for all subsequently created users"
 echo "    via 'sudo pistrong config --vpnaddr new-vpn-address'"
+echo "    (You might want to do this, for example, if you're using an IP address to connect externally"
+echo "     but also want to test connecting to the VPN server from your internal network)"
 echo "   See https://github.com/gitbls/pistrong/blob/master/README.md"
-echo "    for additional VPN Server Address considerations"
+echo "    for additional VPN Server IP Address considerations"
 echo ""
 echo "See 'sudo pistrong config --list' for a list of all the pistrong configuration parameters"
 echo " and make any changes necessary for your configuration"
@@ -342,7 +352,10 @@ echo ""
 echo " ** Next steps:"
 echo "    * Ensure that you've correctly established the necessary firewall rules"
 echo "      Review /etc/swanctl/pistrong/CA-iptables"
-echo "       and https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
+echo "        If your connection to the internet is other than '$vpndev'"
+echo "        you must sudo edit this file and change '$vpndev' to the appropriate"
+echo "        network adapter"
+echo "    * Review https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
 echo "    * Establish port forwarding on your router to IP $myipaddr for UDP ports 500 and 4500"
 echo "    * Set up a mail server and web server if you want to email cert information to users"
 echo ""
