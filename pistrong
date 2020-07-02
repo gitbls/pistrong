@@ -32,12 +32,12 @@ class pdat:
         self.rootca = self.swancertpfx = self.swancertfn = self.swancert = self.swankey = ""
         self.vpncertpfx = self.vpnhostcert = self.vpnhostkey = self.clientcertfmt = self.clientkeyfmt = ""
         self.clientcert = self.clientkey = self.newp12fn = self.newp12 = self.cn = ""
-        self.linuxzip = self.tmpdir = ""
+        self.cpackzip = self.tmpdir = ""
         self.fnpdir = "{}/{}"
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "3.3"
+version = "X3.4"
 dbversion = "3"
 
 helpmsg = "pistrong {} commands:\n\
@@ -584,15 +584,67 @@ def findclientvpn(pd, args, vpnkey):
             found.append(filename)
     return found
             
+def winiosmsg(pd, args, newkey, tfmail):
+    msg = "Installing the VPN Certificates and Creating the VPN connection\n\n"
+    msg += "iOS devices:\n"
+    if pd.db['users'][newkey]['password'] != "":
+        if tfmail:
+            msg += "* Go to the mail message containing the VPN Cert password and select and copy the password\n"
+            msg += "* In this email message, click on the CA Cert link, which will open it in Safari\n"
+        else:
+            msg += "* Obtain the VPN Cert password from the VPN Server administrator\n"
+            msg += "* Copy the two Cert files to a storage location that can be accessed from a Web Browser\n"
+            msg += "  including, but not limited to storage services such as OneDrive, Dropbox, Google Cloud, etc\n"
+            msg += "* Use Safari and browse to the CA Cert that you uploaded to the storage location\n"
+    msg += "* Click 'Install' or 'Allow'\n"
+    msg += "* Go to Settings | General | Profiles \n"
+    msg += "* Click on the new cert to install it\n"
+    if tfmail:
+        msg += "* Go back to mail and click on the Device Cert link in this message, which will open in it Safari\n"
+    else:
+        msg +="* Use Safari and browse to the Device Cert that you uploaded to the storage location\n"
+    msg += "* Click 'Install' or 'Allow'\n"
+    msg += "* Go to Settings | General | Profiles\n"
+    msg += "* Click on the new Cert to install it\n"
+    if pd.db['users'][newkey]['password'] != "":
+        msg += "* Paste the copied VPN Device Cert password when prompted\n"
+    msg += "* Create a new IKEV2 VPN connection using this information:\n"
+    msg += "          Description: A description of the VPN connection (your choice)\n"
+    msg += "          Server:      {}\n          Remote ID:   {}\n          Local ID:    {}\n".format(pd.dx['vpnaddr'], pd.db['users'][newkey]['remoteid'], pd.cn)
+    msg += "  Set the User Authentication to be 'Certificate' and then select\n  the newly-installed device certificate '{}'\n\n".format(pd.cn)
+    msg += "\nOther devices: See the CertInstall.md guide at https://github.com/gitbls/pistrong\nfor details on importing the certificate onto your device and creating the VPN configuration\n"
+    if pd.db['users'][newkey]['password'] == "":
+        msg += "\nThis certificate does not have a password\n"
+    else:
+        if tfmail:
+            msg += "\nThe password for this VPN Device Cert is in a separate email message\n"
+        else:
+            msg += "\nAsk the VPN administrator for the VPN Device Cert password if you do not have it\n"
+    return msg
+
+def makeuserzip(pd, args, newkey):
+    pd.cpackzip = "{}/server-assets/{}.zip".format(pd.pswandir, newkey)
+    pd.tmpdir = mkdtemp(prefix="pistrong")
+    tmpf = "{}/{}".format(pd.tmpdir, "readme.txt")
+    with open(tmpf, 'w') as f:
+        f.write(winiosmsg(pd, args, newkey, False))
+    dosystem(pd, "zip -jq {} {} {} {}".format(pd.cpackzip, pd.swancert, pd.newp12, tmpf), True, True)
+    os.unlink(tmpf)
+    os.rmdir(pd.tmpdir)
+
 def buildlinuxpack(pd, args, newkey, newremoteid):
 
-    pd.linuxzip = "{}/server-assets/{}.zip".format(pd.pswandir, newkey)
+    pd.cpackzip = "{}/server-assets/{}.zip".format(pd.pswandir, newkey)
     pd.tmpdir = mkdtemp(prefix="pistrong")
+    # Make a copy of the CA cert and rename it to {hostname}-{name}CACert.pem
+    # so that the client can have CA Cert files from multiple hosts
     qcopyfile(pd.swancert, pd.tmpdir)
     tmpswancert = "{}/{}-{}".format(pd.tmpdir, pd.shorthost, pd.swancertfn)
     tmpswancertfn="{}-{}".format(pd.shorthost, pd.swancertfn)
     qrename(pd.fnpdir.format(pd.tmpdir,pd.swancertfn), tmpswancert)
-    dosystem(pd, "zip -j {} {} {} {}".format(pd.linuxzip, tmpswancert, pd.clientcert, pd.clientkey), True, True)
+    # Create the zip file and put the certs into it
+    dosystem(pd, "zip -jq {} {} {} {}".format(pd.cpackzip, tmpswancert, pd.clientcert, pd.clientkey), True, True)
+    # Build the installer script and add to the zip file
     tmpf = "{}/{}".format(pd.tmpdir, pd.db['config']['lxscript']['value'])
     with open(tmpf, 'w') as f:
         hypfqdn = pd.dx['cname']
@@ -657,7 +709,7 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
         f.write('echo ""\n')
         f.write('echo "For instance use sudo \'pistrong client start {}\' to start the VPN connection"\n'.format(pd.hostfqdn))
         f.write('echo ""\n')
-    dosystem(pd, "zip -j {} {}".format(pd.linuxzip, tmpf), True, True)
+    dosystem(pd, "zip -jq {} {}".format(pd.cpackzip, tmpf), True, True)
     os.unlink(tmpf)
     os.unlink(tmpswancert)
     os.rmdir(pd.tmpdir)
@@ -682,30 +734,11 @@ def mailcert(pd, args, newkey):
         os.chmod(webfn, 0o644)
         certurl = pd.fnpdir.format(pd.dx['weburl'], pd.newp12fn)
         cacerturl = pd.fnpdir.format(pd.dx['weburl'], pd.swancertfn)
-        msg = "\nRoot CA Cert:             {}\nYour Device Certificate:  {}\n\n".format(cacerturl, certurl)
-        msg += "iOS devices: See directions at end of this mail for installing certificates\n"
-        msg += "  Then create a new IKEV2 VPN connection using the iOS profile {}\n  and this information:\n".format(pd.cn)
-        msg += "          Server:    {}\n          Remote ID: {}\n          Local ID:  {}\n".format(pd.dx['vpnaddr'], pd.db['users'][newkey]['remoteid'], pd.cn)
-        msg += "  And select the newly-installed device certificate.\n"
-        msg += "\nOther devices: See the CertInstall.md guide at https://github.com/gitbls/pistrong\nfor details on importing the certificate onto your device and creating the VPN configuration\n"
-        if pd.db['users'][newkey]['password'] == "":
-            msg += "\nThis certificate does not have a password"
-        else:
-            msg+= "\nThe password for this certificate is in a separate email message"
+        msg = "VPN Certificates\n----------------\nRoot CA Cert:             {}\nYour Device Certificate:  {}\n\n".format(cacerturl, certurl)
+        msg += winiosmsg(pd, args, newkey, True)
+        if pd.db['users'][newkey]['password'] != "":
             pwmsg = "Use this password to import the certificate onto your device: {}\n".format(pd.db['users'][newkey]['password'])
             sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert password {}".format(pd.cn), pwmsg)
-        msg += "\n\nInstalling Certificates on iOS:\n"
-        if pd.db['users'][newkey]['password'] != "":
-            msg += "* Go to the mail message containing the VPN Cert password and select and copy the password\n"
-        msg += "* In this email message, click on the CA Cert link, which will open it in Safari\n"
-        msg += "* Click Install\n"
-        msg += "* Go to Settings | General | Profiles \n"
-        msg += "* Click on the new cert to install it\n"
-        msg += "* Go back to mail and click on the Device Cert link, which will open in it Safari\n"
-        msg += "* Go to Settings | General | Profiles\n"
-        msg += "* Click on the new Cert to install it\n"
-        if pd.db['users'][newkey]['password'] != "":
-            msg += "* Paste the copied VPN Cert password when prompted"
         sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert {}".format(pd.cn), msg)
     print("% Mail sent to '{}'".format(args.mail))
 
@@ -720,7 +753,7 @@ def makevpncert(pd, args):
     dosystem(pd, "pki --gen --type rsa --size {} --outform pem > {}".format(args.keybits, pd.vpnhostkey), True, True)
     os.chmod(pd.vpnhostkey, 0o600)
     print("Create VPN Host Cert ({})".format(pd.vpnhostcert))
-    print (" with VPN SAN key(s) {}\n".format(pd.dx['vpnsankey']))
+    print(" with VPN SAN key(s) {}\n".format(pd.dx['vpnsankey']))
     sankey = pd.dx['vpnsankey']
     sanstring = ""
     for iakey in sankey.split(","):
@@ -816,6 +849,8 @@ def cmd_add(pd, args):
     newremoteid = pd.db['config']['vpnsankey']['value'].split(',')[0] if args.remoteid is None else args.remoteid
     if not isidvalid(pd, newremoteid):
         perrorexit("? Remote ID '{}' is not configured on this VPN".format(newremoteid))
+    if ((args.ios and args.linux) or (args.ios and args.windows) or (args.linux and args.windows)):
+        perrorexit("? Only one of --ios, --windows, or --linux can be specified")
     pd.dx['vpnaddr'] = pd.db['config']['vpnaddr']['value'] if args.vpnaddr is None else args.vpnaddr
     pd.dx['cname'] = pd.hostfqdn.replace(".","-") if args.cname is None else args.cname.replace(".","-")
     cmd = "pki --gen --type rsa --size {} --outform pem > {}".format(args.keybits, pd.clientkey)
@@ -839,9 +874,12 @@ def cmd_add(pd, args):
         pd.dx['webdir'] = args.webdir if args.webdir != None else pd.db['config']['webdir']['value']
         pd.dx['weburl'] = args.weburl if args.weburl != None else pd.db['config']['weburl']['value']
         mailcert(pd, args, newkey)
-    print("% Added {} with Remote ID '{}' using CA Cert {}".format(newkey, newremoteid, pd.swancertpfx))
+    if args.zip:
+        makeuserzip(pd, args, newkey)
+        print("% Zip file '{}' created for '{}'".format(pd.cpackzip, newkey))
+    print("% Added '{}' with Remote ID '{}' using CA Cert '{}'".format(newkey, newremoteid, pd.swancertpfx))
     if args.linux and args.mail == None:
-        print("% Linux VPN Config Pack for {} is in {}".format(newkey, pd.linuxzip))
+        print("% Linux VPN Config Pack for '{}' is in '{}'".format(newkey, pd.cpackzip))
     return
 
 def cmd_delete(pd, args):
@@ -1218,6 +1256,7 @@ subparser_add.add_argument("username", help="Username to add")
 subparser_add.add_argument("--cacert", help="CA cert to use")
 subparser_add.add_argument("--cname", help="Connection name")
 subparser_add.add_argument("--device", help="Device name for identification")
+subparser_add.add_argument("--ios", help="Build an iOS Cert", action='store_true')
 subparser_add.add_argument("--keybits", default="2048", help="User cert key bits [2048]")
 subparser_add.add_argument("--linux", help="Build a Linux VPN Config Pack for this user", action='store_true')
 subparser_add.add_argument("--mail", help="User email address")
@@ -1229,6 +1268,8 @@ subparser_add.add_argument("--uclife", help="User Cert lifetime")
 subparser_add.add_argument("--vpnaddr", help="VPN Server DNS Name or IP address")
 subparser_add.add_argument("--webdir", help="Web server directory for users p12 and CA certs")
 subparser_add.add_argument("--weburl", help="URL prefix for Cert in email")
+subparser_add.add_argument("--windows", help="Build a Windows Cert", action='store_true')
+subparser_add.add_argument("--zip", help="Build a zip file with iOS or Windows Certs", action='store_true')
 subparser_add.set_defaults(func=cmd_add, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_delete = subparsers.add_parser("delete", help="Delete user cert/key", parents=[parent_parser])
@@ -1251,7 +1292,7 @@ subparser_resend = subparsers.add_parser("resend", help="Resend the cert email t
 subparser_resend.add_argument("username", help="Username for cert (already created)")
 subparser_resend.add_argument("--device", help="Device name for identification")
 subparser_resend.add_argument("--mail", help="User email address")
-subparser_resend.set_defaults(func=cmd_resend, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_resend.set_defaults(func=cmd_resend, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, zip=False, usedb=True)
 
 service_actions = ['reload', 'start', 'stop', 'restart', 'disable', 'enable', 'status']
 subparser_service = subparsers.add_parser("service", help="Control the strongSwan service", parents=[parent_parser])
