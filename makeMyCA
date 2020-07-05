@@ -70,6 +70,35 @@ function isipaddr() {
     [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] && return 0 || return 1
 }
 
+function writemakeCAlog() {
+    local dt=$(date +"%Y-%m-%d %H:%M:%S")
+    local calog="/etc/swanctl/pistrong/makeCA.log"
+    [ -f $calog.bak ] && rm -f $calog.bak
+    [ -f $calog ] && mv $calog $calog.bak
+    cat >> $calog <<EOF
+date:          $dt
+thisfqdn:      $thisfqdn
+vpnaddr:       $vpnaddr
+vpndev:        $vpndev
+landev:        $landev
+myipaddr:      $myipaddr
+mysubnetx:     $mysubnetx
+myfullsubnet:  $myfullsubnet
+vpnsubnet:     $vpnsubnet
+vpndns:        $vpndns
+cnsuffix:      $cnsuffix
+webdir:        $webdir
+weburl:        $weburl
+san2:          $san2
+ios:           $ios
+ioskey:        $ioskey
+windows:       $windows
+winkey:        $winkey
+linux:         $linux
+linuxkey:      $linuxkey
+EOF
+}
+
 dbl=""
 thishost=$(hostname)        #This gets the hostname from Linux
 webdir="/var/www/html/vpn"
@@ -77,8 +106,8 @@ ios="ios"
 windows="windows"
 linux="linux"
 # Get what we believe is the host IP address
-myipaddr=$(hostname --ip-address)
-[[ "$myipaddr" =~ "127.0" ]] && IFS=" " read myipaddr s2 <<< $(hostname --all-ip-addresses)
+#myipaddr=$(hostname --ip-address)
+#[[ "$myipaddr" =~ "127.0" ]] && IFS=" " read myipaddr s2 <<< $(hostname --all-ip-addresses)
 caconf="/etc/swanctl/conf.d/pistrong-CAServerConnection.conf"
 
 echo "Build a prescriptive strongSwan CA for iOS, Windows, and Linux devices"
@@ -109,11 +138,63 @@ askdefault "vpnaddr for your VPN" vpnaddr "$thisfqdn"
 echo ""
 echo "** 'vpndev' is the network device that will be connected to the Internet"
 echo "   If your system has:"
-echo "    One network device:         Use that device"
-echo "    More than 1 network device: Use the device that is or will be connected to the Internet"
-echo "                                either directly or indirectly through a router"
+echo "    One network device: Use that device"
+echo "    > 1 network device: Use the device that is or will be connected to the Internet"
+echo "                        either directly or indirectly through a router"
 echo ""
 askdefault "Network device that will be connected to the Internet" vpndev "eth0"
+echo ""
+echo "** 'landev' is the network device that is connected to the local LAN"
+echo "   If your system has:"
+echo "    One network device:  Use that device"
+echo "    > 1 network device: Use the device that is not '$vpndev'"
+echo ""
+askdefault "Network device that will be connected to the local LAN" landev "eth0"
+# Get LAN IP address and subnet information
+ipline="$(ip -o -f inet addr show | grep $landev)"
+[ "$ipline" == "" ] && echo "? No IP address is assigned to network device '$landev'" && exit
+myipaddr=$(awk '{print $4}' <<< $(echo "$ipline") | (IFS='/'; read a b; echo $a))
+subnetbrd=$(awk '{print $6}' <<< $(echo "$ipline"))
+mysubnetx=$(sed -e 's/.255//' <<< $(echo "$subnetbrd"))
+myfullsubnet=$(sed -e 's/255/0/' <<< $(echo "$subnetbrd"))/$(awk '{print $4}' <<< $(echo "$ipline") | (IFS='/'; read a b; echo $b))
+
+echo ""
+echo "** VPN Server IP configuration"
+echo "** 'myipaddr' Local LAN IP Address"
+echo "   If your system has:"
+echo "    One network device: Use the IP Address of that device"
+echo "    > 1 network device: Use the IP Address of '$landev'"
+echo ""
+
+askdefault "VPN Server Local LAN IP Address" myipaddr "$myipaddr"
+
+echo ""
+echo "** 'mysubnet' is the Local LAN Subnet"
+echo "   If you have multiple network adapters this is the subnet of the adapter"
+echo "    connected to the LAN network ($landev) rather than"
+echo "    the adapter connected to the Internet ($vpndev)"
+echo ""
+askdefault "VPN Server Local LAN Subnet" mysubnet "$myfullsubnet"
+
+echo ""
+echo "** The Subnet for VPN Clients is a virtual subnet used between"
+echo "   the VPN Server and Clients. It must not be used on your network"
+echo "   and requires iptables configuration, which will be created"
+echo "   by this script (although you'll need to enable it)"
+echo ""
+askdefault "Subnet for VPN Clients" vpnsubnet "10.1.10.0/24"
+
+# Default to subnet.1 for DNS, since that's where most people's routers are
+echo ""
+echo "** The DNS Server should be a DNS Server on your network"
+echo "   This can be your router (if so configured) or another DNS Server"
+echo ""
+askdefault "DNS Server for connected VPN Clients" vpndns "${mysubnetx}.1"
+
+# Original code. keep for a bit
+#mysubnetx=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/.255//')
+#mysub1=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/255/0/')
+#mysubnet="$mysub1/$(ip -o -f inet addr show | awk '/scope global/{print $4}' | head -n 1 | (IFS='/'; read a b; echo $b))"
 
 echo ""
 echo "** 'cnsuffix' is a naming string only used in user certs"
@@ -164,30 +245,6 @@ askdefault "Additional Secondary VPN SAN Key(s)" san2 ""
 [ "$san2" == "" ] && san2="$dsan" || san2="$dsan,$san2"
 
 echo ""
-echo "** VPN Server IP configuration"
-echo ""
-askdefault "VPN Server Local LAN IP Address" myipaddr "$myipaddr"
-
-mysubnetx=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/.255//')
-mysub1=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/255/0/')
-mysubnet="$mysub1/$(ip -o -f inet addr show | awk '/scope global/{print $4}' | head -n 1 | (IFS='/'; read a b; echo $b))"
-   
-askdefault "VPN Server Local LAN Subnet" mysubnet "$mysubnet"
-echo ""
-echo "** The Subnet for VPN Clients is a virtual subnet used between"
-echo "   the VPN Server and Clients. It must not be used on your network"
-echo "   and requires iptables configuration, which will be created"
-echo "   by this script (although you'll need to enable it)"
-echo ""
-askdefault "Subnet for VPN Clients" vpnsubnet "10.1.10.0/24"
-# Default to subnet.1 for DNS, since that's where most people's routers are
-echo ""
-echo "** The DNS Server should be a DNS Server on your network"
-echo "   This can be your router (if so configured) or another DNS Server"
-echo ""
-askdefault "DNS Server for connected VPN Clients" vpndns "${mysubnetx}.1"
-
-echo ""
 echo "** This script will now create:"
 echo "      Connection Config:    $caconf"
 echo "      CA Cert:              strongSwanCACert.pem"
@@ -195,11 +252,11 @@ echo "      VPN Cert for iOS:     $ios-strongSwanVPNCert.pem with VPN SAN key '$
 echo "      VPN Cert for Windows: $windows-strongSwanVPNCert.pem with VPN SAN key '$winkey'"
 echo "      VPN Cert for Linux:   $linux-strongSwanVPNCert.pem with VPN SAN key '$linuxkey'"
 echo ""
-echo "   For VPN Server IP $myipaddr subnet $mysubnet with VPN Client DNS servers $vpndns"
+echo "   For VPN Server LAN IP $myipaddr subnet $myfullsubnet with VPN Client DNS servers $vpndns"
 echo ""
 echo "   The VPN will use virtual subnet $vpnsubnet for VPN Clients"
 echo ""
-echo "   Each VPN cert will have '$san2' as a secondary VPN SAN key"
+echo "   Each VPN cert will have '$san2' as secondary VPN SAN key(s)"
 echo ""
 echo "   The default VPN Server Address is '$vpnaddr'"
 echo "   This can be changed on a per-user basis on the 'sudo pistrong add' command for a single user"
@@ -275,7 +332,7 @@ connections {
         children {
             net-linux {
                 remote_ts = $vpnsubnet
-                local_ts = $mysubnet
+                local_ts = $myfullsubnet
                 updown = /libexec/ipsec/_updown iptables
 		esp_proposals = aes128gcm128-x25519
             }
@@ -347,6 +404,8 @@ connections {
     }
 }
 EOF
+
+writemakeCAlog
 
 echo ""
 echo " ** Next steps:"
