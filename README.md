@@ -89,6 +89,8 @@ password for the certificate. See section below on Local Mail for a quick and ea
 
 * `pistrong createca --vpnsankey my.special.vpnsankey` - Create a new Certificate Authority using the vpnsankey as specified. The VPN SAN key is required and provides an extra level of security for iOS device authentication. See CertDetails.md for more information on VPN SAN keys.
 
+* `pistrong add fred --device iPhone --mail fred@domain.com --zip` - Add user *fred*, for the device named *iPhone*. Send *fred* email with a zip file containing the Certs. The device name is optional and may be helpful to track where a Cert is targeted. If --device is not specified, the string *`dev`* is used.
+
 * `pistrong add fred --device iPhone --mail fred@domain.com` - Add user *fred*, for the device named *iPhone*. Copy the necessary certs to `webdir` (see Configuration below). Send *fred* email with links to the Certs using `weburl`. The device name is optional and may be helpful to track where a Cert is targeted. If --device is not specified, the string *`dev`* is used.
 
 * `pistrong resend fred-iPhone --mail fred@otherdomain.com` - Resend the email with the links to the Certs to the specified email address. 
