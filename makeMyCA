@@ -27,20 +27,41 @@ function askdefault () {
 }
 
 function emitFirewall() {
-
-    [ -f /etc/swanctl/pistrong/CA-iptables ] && return
-    cat > /etc/swanctl/pistrong/CA-iptables <<EOF
-#  Add the necessary iptables routes to enable VPN routing to the internet
-#  NOTE: If your connection to the internet is other than '$vpndev',
-#        sudo edit this file and change '$vpndev' to the appropriate
-#        network adapter
+    if [ -f $catables ]
+    then
+	[ -f $catables.bak ] && rm -f $catables.bak
+	mv $catables $catables.bak
+	echo "% Saved existing $catables as $catables.bak"
+    fi
+    cat > $catables <<EOF
+#
+#  $catables $(date +"%Y-%m-%d %H:%M:%S")
+#
+#  These are the required iptables rules to enable proper VPN routing
+#  You must either 'sudo systemctl enable --now pistrong-iptables-load'
+#   or incorporate these rules into your existing iptables configuration file
+#
+#  These rules are configured for:
+#    Internet connection: $vpndev
+#    LAN connection:      $landev
 #
 *nat
 :POSTROUTING ACCEPT [0:0]
 -A POSTROUTING -s $vpnsubnet -o $vpndev -m policy --dir out --pol ipsec -j ACCEPT
 -A POSTROUTING -s $vpnsubnet -o $vpndev -j MASQUERADE
+EOF
+    [ "$vpndev" != "$landev" ] && echo "-A POSTROUTING -o $vpndev -j MASQUERADE" >> $catables
+    echo "COMMIT" >> $catables
+    if [ "$vpndev" != "$landev" ]
+    then
+	# Add iptables entries to route between VPNeth and LANeth
+	cat >> $catables <<EOF
+*filter
+-A FORWARD -i $vpndev -o $landev -m state --state RELATED,ESTABLISHED -j ACCEPT
+-A FORWARD -i $landev -o $vpndev -j ACCEPT
 COMMIT
 EOF
+    fi
     [ -f /etc/systemd/system/pistrong-iptables-load.service ] && return
     cat > /etc/systemd/system/pistrong-iptables-load.service <<EOF
 [Unit]
@@ -48,7 +69,7 @@ Description=Load iptables for strongSwan
 Requires=network-online.target
 
 [Service]
-ExecStart=/sbin/iptables-restore /etc/swanctl/pistrong/CA-iptables
+ExecStart=/sbin/iptables-restore $catables
 User=root
 StandardInput=null
 StandardOutput=null
@@ -61,7 +82,7 @@ WantedBy=multi-user.target
 EOF
     chmod 644 /etc/systemd/system/pistrong-iptables-load.service
     echo "** I have created the service pistrong-iptables-load, but it is not enabled"
-    echo "** If you have another way to load iptables, you must add the code from /etc/swanctl/pistrong/CA-iptables to it"
+    echo "** If you have another way to load iptables, you must add the code from $catables to it"
     echo "** Otherwise you must 'sudo systemctl enable --now pistrong-iptables-load'"
 }
 
@@ -109,6 +130,7 @@ linux="linux"
 #myipaddr=$(hostname --ip-address)
 #[[ "$myipaddr" =~ "127.0" ]] && IFS=" " read myipaddr s2 <<< $(hostname --all-ip-addresses)
 caconf="/etc/swanctl/conf.d/pistrong-CAServerConnection.conf"
+catables="/etc/swanctl/pistrong/CA-iptables"
 
 echo "Build a prescriptive strongSwan CA for iOS, Windows, and Linux devices"
 echo ""
@@ -176,6 +198,18 @@ echo "    the adapter connected to the Internet ($vpndev)"
 echo ""
 askdefault "VPN Server Local LAN Subnet" mysubnet "$myfullsubnet"
 
+if [ "$vpndev" != "$landev" ]
+then
+    ipline="$(ip -o -f inet addr show | grep $vpndev)"
+    [ "$ipline" == "" ] && echo "? No IP address is assigned to network device '$vpndev'" && exit
+    emyipaddr=$(awk '{print $4}' <<< $(echo "$ipline") | (IFS='/'; read a b; echo $a))
+    echo ""
+    echo "** VPN Server Internet-connected network device ($vpndev) IP address"
+    askdefault "VPN Server Internet-connected network device ($vpndev) IP address" emyipaddr "$emyipaddr"
+else
+    emyipaddr=$myipaddr
+fi
+
 echo ""
 echo "** The Subnet for VPN Clients is a virtual subnet used between"
 echo "   the VPN Server and Clients. It must not be used on your network"
@@ -190,11 +224,6 @@ echo "** The DNS Server should be a DNS Server on your network"
 echo "   This can be your router (if so configured) or another DNS Server"
 echo ""
 askdefault "DNS Server for connected VPN Clients" vpndns "${mysubnetx}.1"
-
-# Original code. keep for a bit
-#mysubnetx=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/.255//')
-#mysub1=$(ip -o -f inet addr show | awk '/scope global/{print $6}' | head -n 1 | sed -e 's/255/0/')
-#mysubnet="$mysub1/$(ip -o -f inet addr show | awk '/scope global/{print $4}' | head -n 1 | (IFS='/'; read a b; echo $b))"
 
 echo ""
 echo "** 'cnsuffix' is a naming string only used in user certs"
@@ -236,7 +265,7 @@ if isipaddr "$vpnaddr"
 then
     dsan="$vpnaddr,$thisfqdn"
 else
-    dsan=$thisfqdn
+    [ "$thisfqdn" == "$vpnaddr" ] && dsan=$thisfqdn || dsan="$thisfqdn,$vpnaddr"
 fi
 echo "** The default secondary VPN SAN Key is '$dsan'"
 echo "   You can add additional SAN Keys if desired"
@@ -260,8 +289,7 @@ echo "   Each VPN cert will have '$san2' as secondary VPN SAN key(s)"
 echo ""
 echo "   The default VPN Server Address is '$vpnaddr'"
 echo "   This can be changed on a per-user basis on the 'sudo pistrong add' command for a single user"
-echo "    using the --vpnaddr new-vpn-address switch, or for all subsequently created users"
-echo "    via 'sudo pistrong config --vpnaddr new-vpn-address'"
+echo "    using the --vpnaddr new-vpn-address switch"
 echo "    (You might want to do this, for example, if you're using an IP address to connect externally"
 echo "     but also want to test connecting to the VPN server from your internal network)"
 echo "   See https://github.com/gitbls/pistrong/blob/master/README.md"
@@ -309,8 +337,9 @@ echo "When adding Linux   users apply --remoteid $linuxkey --linux"
 echo ""
 echo "Your strongSwan CA is configured"
 echo ""
-echo "Creating /etc/swanctl/pistrong/CA-iptables with firewall rules"
+echo "Creating $catables with firewall rules"
 emitFirewall
+echo ""
 echo "Creating $caconf with the new VPN Server definitions"
 cat > $caconf <<EOF
 connections {
@@ -409,12 +438,8 @@ writemakeCAlog
 
 echo ""
 echo " ** Next steps:"
-echo "    * Ensure that you've correctly established the necessary firewall rules"
-echo "      Review /etc/swanctl/pistrong/CA-iptables"
-echo "        If your connection to the internet is other than '$vpndev'"
-echo "        you must sudo edit this file and change '$vpndev' to the appropriate"
-echo "        network adapter"
+echo "    * Ensure that the firewall rules in $catables are correct"
 echo "    * Review https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
-echo "    * Establish port forwarding on your router to IP $myipaddr for UDP ports 500 and 4500"
+echo "    * Establish port forwarding on your router to IP $emyipaddr for UDP ports 500 and 4500"
 echo "    * Set up a mail server and web server if you want to email cert information to users"
 echo ""
