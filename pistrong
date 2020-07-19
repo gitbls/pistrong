@@ -5,6 +5,10 @@ Manage strongswan Certificate Authority (CA) and user certs/keys via the command
 """
 import argparse
 import datetime
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import json
 import os
 import pexpect
@@ -37,7 +41,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "X3.4"
+version = "V3.4"
 dbversion = "3"
 
 helpmsg = "pistrong {} commands:\n\
@@ -135,11 +139,11 @@ def qrename(src, dst):
     except OSError:
         pass
 
-def qcopyfile(src, dst):
+def qcopyfile(src, dst, flog):
     """
     Copy src file to dst
     """
-    print("% Copying '{}' to '{}'".format(src, dst))
+    if flog: print("% Copying '{}' to '{}'".format(src, dst))
     shutil.copy(src, dst)
 
 def enofile(fns, emsg):
@@ -282,14 +286,22 @@ def makevpnfns(pd, args):
     pd.vpnhostkey = "{}/{}-{}VPNKey.pem".format(pd.dprivate, pd.vpncertpfx, pd.swancertpfx)
     pd.dx['vpnsankey'] = args.vpnsankey if args.vpnsankey else pd.db['config']['vpnsankey']['value']
 
-def sendmsg(pd, mfrom, mto, msubj, mtext):
+def sendmsg(pd, mfrom, mto, msubj, mtext, mattach):
     """
     Send an email message. May still need work on authentication
     """
-    mmsg = MIMEText(mtext)
+    mmsg = MIMEMultipart()
     mmsg['From'] = mfrom
     mmsg['To'] = mto
     mmsg['Subject'] = msubj
+    mmsg.attach(MIMEText(mtext, 'plain'))
+    if mattach != None:
+        with open(mattach, 'rb') as attach:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(attach.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", "attachment; filename={}".format(os.path.basename(mattach)))
+        mmsg.attach(part)
     msmtp = smtplib.SMTP(pd.db['config']['smtpserver']['value'], pd.db['config']['smtpport']['value'])
     if pd.db['config']['smtpusetls']['value']:
        msmtp.starttls()
@@ -584,35 +596,13 @@ def findclientvpn(pd, args, vpnkey):
             found.append(filename)
     return found
             
-def winiosmsg(pd, args, newkey, tfmail):
-    msg = "Installing the VPN Certificates and Creating the VPN connection\n\n"
-    msg += "iOS devices:\n"
-    if pd.db['users'][newkey]['password'] != "":
-        if tfmail:
-            msg += "* Go to the mail message containing the VPN Cert password and select and copy the password\n"
-            msg += "* In this email message, click on the CA Cert link, which will open it in Safari\n"
-        else:
-            msg += "* Obtain the VPN Cert password from the VPN Server administrator\n"
-            msg += "* Copy the two Cert files to a storage location that can be accessed from a Web Browser\n"
-            msg += "  including, but not limited to storage services such as OneDrive, Dropbox, Google Cloud, etc\n"
-            msg += "* Use Safari and browse to the CA Cert that you uploaded to the storage location\n"
-    msg += "* Click 'Install' or 'Allow'\n"
-    msg += "* Go to Settings | General | Profiles \n"
-    msg += "* Click on the new cert to install it\n"
-    if tfmail:
-        msg += "* Go back to mail and click on the Device Cert link in this message, which will open in it Safari\n"
-    else:
-        msg +="* Use Safari and browse to the Device Cert that you uploaded to the storage location\n"
-    msg += "* Click 'Install' or 'Allow'\n"
-    msg += "* Go to Settings | General | Profiles\n"
-    msg += "* Click on the new Cert to install it\n"
-    if pd.db['users'][newkey]['password'] != "":
-        msg += "* Paste the copied VPN Device Cert password when prompted\n"
-    msg += "* Create a new IKEV2 VPN connection using this information:\n"
-    msg += "          Description: A description of the VPN connection (your choice)\n"
-    msg += "          Server:      {}\n          Remote ID:   {}\n          Local ID:    {}\n".format(pd.dx['vpnaddr'], pd.db['users'][newkey]['remoteid'], pd.cn)
-    msg += "  Set the User Authentication to be 'Certificate' and then select\n  the newly-installed device certificate '{}'\n\n".format(pd.cn)
-    msg += "\nOther devices: See the CertInstall.md guide at https://github.com/gitbls/pistrong\nfor details on importing the certificate onto your device and creating the VPN configuration\n"
+def certdetailmsg(pd, args, newkey, tfmail):
+    # tfmail = true if sending in email, false if into a zip file
+    msg =  "See https://github.com/gitbls/pistrong/blob/master/CertInstall.md\n"
+    msg += "for detailed certificate installation instructions\n\n"
+    msg += "Conection Details:\n"
+    msg += "   Server:      {}\n   Remote ID:   {}\n   Local ID:    {}\n".format(pd.dx['vpnaddr'], pd.db['users'][newkey]['remoteid'], pd.cn)
+    msg += "   Cert Name:   {}\n\n".format(pd.cn)
     if pd.db['users'][newkey]['password'] == "":
         msg += "\nThis certificate does not have a password\n"
     else:
@@ -627,7 +617,7 @@ def makeuserzip(pd, args, newkey):
     pd.tmpdir = mkdtemp(prefix="pistrong")
     tmpf = "{}/{}".format(pd.tmpdir, "readme.txt")
     with open(tmpf, 'w') as f:
-        f.write(winiosmsg(pd, args, newkey, False))
+        f.write(certdetailmsg(pd, args, newkey, False))
     dosystem(pd, "zip -jq {} {} {} {}".format(pd.cpackzip, pd.swancert, pd.newp12, tmpf), True, True)
     os.unlink(tmpf)
     os.rmdir(pd.tmpdir)
@@ -638,7 +628,7 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
     pd.tmpdir = mkdtemp(prefix="pistrong")
     # Make a copy of the CA cert and rename it to {hostname}-{name}CACert.pem
     # so that the client can have CA Cert files from multiple hosts
-    qcopyfile(pd.swancert, pd.tmpdir)
+    qcopyfile(pd.swancert, pd.tmpdir, False)
     tmpswancert = "{}/{}-{}".format(pd.tmpdir, pd.shorthost, pd.swancertfn)
     tmpswancertfn="{}-{}".format(pd.shorthost, pd.swancertfn)
     qrename(pd.fnpdir.format(pd.tmpdir,pd.swancertfn), tmpswancert)
@@ -717,29 +707,34 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
 def mailcert(pd, args, newkey):
     if pd.db['users'][newkey]['linux']:
         zipfn = "{}.zip".format(newkey)
-        qcopyfile("{}/server-assets/{}".format(pd.pswandir, zipfn), pd.dx['webdir'])
+        qcopyfile("{}/server-assets/{}".format(pd.pswandir, zipfn), pd.dx['webdir'], True)
         webfn = pd.fnpdir.format(pd.dx['webdir'],"{}".format(zipfn))
         os.chmod(webfn, 0o644)
-        msg = "\nDownload this VPN Config Pack to your Linux VPN client system\n\nUse 'sudo pistrong client install <zipfile>' to install\n\n     "
-        msg += pd.fnpdir.format(pd.dx['weburl'], zipfn)
-        msg += "\n"
+        msg = "\nDownload this VPN Config Pack to your Linux VPN client system\n\nUse 'sudo pistrong client install <zipfile>' to install\n"
+        if not args.zip: msg += "\n  {}\n\n".format(pd.fnpdir.format(pd.dx['weburl'], zipfn))
         msg += "\nThis Linux VPN Config Pack does not have a password"
-        sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert {}".format(pd.cn), msg)
+        zfl = pd.cpackzip if args.zip else None
+        sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert {}".format(pd.cn), msg, zfl)
     else:
-        webfn = pd.fnpdir.format(pd.dx['webdir'], pd.newp12fn)
-        qcopyfile(pd.newp12, webfn)
-        os.chmod(webfn, 0o644)
-        webfn = pd.fnpdir.format(pd.dx['webdir'], pd.swancertfn)
-        qcopyfile(pd.swancert, webfn)
-        os.chmod(webfn, 0o644)
-        certurl = pd.fnpdir.format(pd.dx['weburl'], pd.newp12fn)
-        cacerturl = pd.fnpdir.format(pd.dx['weburl'], pd.swancertfn)
-        msg = "VPN Certificates\n----------------\nRoot CA Cert:             {}\nYour Device Certificate:  {}\n\n".format(cacerturl, certurl)
-        msg += winiosmsg(pd, args, newkey, True)
+        if args.zip:
+            msg = "Your VPN Certificates are in the attached zip file\n\n"
+            zipfile = pd.cpackzip
+        else:
+            zipfile = None
+            webfn = pd.fnpdir.format(pd.dx['webdir'], pd.newp12fn)
+            qcopyfile(pd.newp12, webfn, True)
+            os.chmod(webfn, 0o644)
+            webfn = pd.fnpdir.format(pd.dx['webdir'], pd.swancertfn)
+            qcopyfile(pd.swancert, webfn, True)
+            os.chmod(webfn, 0o644)
+            certurl = pd.fnpdir.format(pd.dx['weburl'], pd.newp12fn)
+            cacerturl = pd.fnpdir.format(pd.dx['weburl'], pd.swancertfn)
+            msg = "VPN Certificates\n----------------\nRoot CA Cert:             {}\nYour Device Certificate:  {}\n\n".format(cacerturl, certurl)
+        msg += certdetailmsg(pd, args, newkey, True)
         if pd.db['users'][newkey]['password'] != "":
-            pwmsg = "Use this password to import the certificate onto your device: {}\n".format(pd.db['users'][newkey]['password'])
-            sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert password {}".format(pd.cn), pwmsg)
-        sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert {}".format(pd.cn), msg)
+            pwmsg = "Use this password to import the certificate onto your device:\n\n{}\n".format(pd.db['users'][newkey]['password'])
+            sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert password {}".format(pd.cn), pwmsg, None)
+        sendmsg(pd, pd.dx['mailfrom'], args.mail, "VPN Cert {}".format(pd.cn), msg, zipfile)
     print("% Mail sent to '{}'".format(args.mail))
 
 def makevpncert(pd, args):
@@ -838,6 +833,8 @@ def cmd_add(pd, args):
     makeclientfnames(pd, args, newkey)
     pd.dx['random'] = trueorfalse(args.random) if args.random else pd.db['config']['random']['value']
     pd.dx['uclife'] = args.uclife if args.uclife else pd.db['config']['uclife']['value']
+    if args.mail != None and not os.path.exists("/var/www/html/vpn"):
+        perrorexit("? Directory /var/www/html/vpn doesn't exist\n  Use 'sudo mkdir -p /var/www/html/vpn' to correct")
     if keyindb(pd, newkey):
         perrorexit("? Key '{}' already in use".format(newkey))
     ipwd = "" if args.password is None else args.password
@@ -868,15 +865,16 @@ def cmd_add(pd, args):
     else:
         mkpkcs12zpw(pd, cmd)
     dbupdate(pd, newkey, "V", ipwd, pd.swancertpfx, newremoteid, args.linux)
-    if args.linux: buildlinuxpack(pd, args, newkey, newremoteid)
+    if args.linux:
+        buildlinuxpack(pd, args, newkey, newremoteid)
+    else:
+        makeuserzip(pd, args, newkey)
+        print("% Zip file '{}' created for '{}'".format(pd.cpackzip, newkey))
     if args.mail != None:
         pd.dx['mailfrom'] = pd.db['config']['mailfrom']['value']
         pd.dx['webdir'] = args.webdir if args.webdir != None else pd.db['config']['webdir']['value']
         pd.dx['weburl'] = args.weburl if args.weburl != None else pd.db['config']['weburl']['value']
         mailcert(pd, args, newkey)
-    if args.zip:
-        makeuserzip(pd, args, newkey)
-        print("% Zip file '{}' created for '{}'".format(pd.cpackzip, newkey))
     print("% Added '{}' with Remote ID '{}' using CA Cert '{}'".format(newkey, newremoteid, pd.swancertpfx))
     if args.linux and args.mail == None:
         print("% Linux VPN Config Pack for '{}' is in '{}'".format(newkey, pd.cpackzip))
@@ -1005,7 +1003,7 @@ def cmd_deleteca(pd, args):
         pd.db['certs'] = {}
         pd.db['config']['validids']['value'] = ""
         dbflush(pd)
-        print("% CA Deleted. pistrong configuration remains")
+        print("% CA Deleted. pistrong configuration (/etc/swanctl/pistrong/pistrongdb.json) retained")
     else:
         print("% CA NOT deleted")
     return
@@ -1269,7 +1267,7 @@ subparser_add.add_argument("--vpnaddr", help="VPN Server DNS Name or IP address"
 subparser_add.add_argument("--webdir", help="Web server directory for users p12 and CA certs")
 subparser_add.add_argument("--weburl", help="URL prefix for Cert in email")
 subparser_add.add_argument("--windows", help="Build a Windows Cert", action='store_true')
-subparser_add.add_argument("--zip", help="Build a zip file with iOS or Windows Certs", action='store_true')
+subparser_add.add_argument("--zip", help="Email zip file with Certs instead of links", action='store_true')
 subparser_add.set_defaults(func=cmd_add, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
 
 subparser_delete = subparsers.add_parser("delete", help="Delete user cert/key", parents=[parent_parser])
