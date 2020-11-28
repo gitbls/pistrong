@@ -53,7 +53,19 @@ function askinall() {
 }
 
 function gotoBuildDir() {
-    cd $PISTRONGROOT/piStrong/strongswan-$ssver
+    if [ "$ssver" == "" ]
+    then
+	# See if we can find the build dir
+	for d in $PSDIR/strongswan-*
+	do
+	    # Found it. Get ssver
+	    IFS="-" read fn ssver <<< $d
+	    break
+	done
+    fi
+    PSBDIR="$PISTRONGROOT/piStrong/strongswan-$ssver"
+    cd $PSBDIR
+    return 0
 }
 
 function DoPreReqs() {
@@ -89,7 +101,7 @@ function DoPreReqs() {
             then
 		[ "$cmd" == "all" ] && ally="-y" || ally=""
                 echo ""
-                for p in libgmp10 libgmp-dev libsystemd-dev libssl-dev python3-pexpect zip ; do
+                for p in libgmp10 libgmp-dev libsystemd-dev libssl-dev python3-pexpect zip curl pkg-config ; do
                     if ! dpkg-query -s $p > /dev/null 2>&1
                     then
                         echo "Installing package $p"
@@ -127,13 +139,33 @@ function DoDownload() {
     echo "** The strongSwan download/build process can take several minutes (fast RPi4)"
     echo "   or close to an hour (RPi0W)."
     echo ""
-    [ -f strongswan-$ssver.tar.bz2 ] && askinall "Press Enter to start Strongswan download: " && echo ""
     [ ! -d piStrong ] && mkdir piStrong
     cd ./piStrong
     [ -d strongswan-$ssver ] && rm -rf strongswan-$ssver
+    #
+    # Make sure no older versions are there with the same name pattern
+    #
+    oldssver=""
+    for d in $PSDIR/strongswan-*.*.*
+    do
+	if [ -d $d ]
+	then
+	    IFS="-" read fn oldssver <<< $d
+	    break
+	fi
+    done
+    if [ "$oldssver" != "" ]
+    then
+	echo ""
+	echo "% The directory '$PSDIR/strongswan-$oldssver' exists"
+	echo "% You must rename or delete all directories named '$PSDIR/strongswan-xx.xx.xx' before continuing"
+	exit
+    fi
     if [ ! -f strongswan-$ssver.tar.bz2 ]
     then
 	curl -L https://download.strongswan.org/strongswan-$ssver.tar.bz2 -o strongswan-$ssver.tar.bz2
+	ests=$?
+	[ $ests -ne 0 ] && echo "% Error downloading strongSwan tarball; Please try again" && exit
     else
 	echo ""
 	echo "Using found strongSwan tar archive $ssver.tar.bz2"
@@ -142,38 +174,43 @@ function DoDownload() {
     echo ""
     [ -f pistrong-untar.log ] && rm -f pistrong-untar.log
     echo "** $(date +'%Y-%m-%d %H:%M:%S') Unpacking source archive [Log: $PSDIR/pistrong-untar.log]"
-    tar -xjvf strongswan-$ssver.tar.bz2 > pistrong-untar.log
-#    curl -L https://download.strongswan.org/strongswan-$ssver.tar.bz2 | tar -xjvf -
+    tar -xjvf strongswan-$ssver.tar.bz2 > pistrong-untar.log 2>&1
+    ests=$?
+    [ $ests -eq 0 ] && sts="No errors" || sts="review $PSDIR/pistrong-untar.log"
+    echo "   tar exit status: $ests ($sts)"
 }
 
 function DoPreConf() {
     gotoBuildDir
     askinall "Press Enter to start pre-make configuration: "
     echo ""
-    echo "** $(date +'%Y-%m-%d %H:%M:%S') Performing pre-make configuration [Log: $PSDIR/pistrong-configure.log]"
+    echo "** $(date +'%Y-%m-%d %H:%M:%S') Performing pre-make configuration [Log: $PSBDIR/pistrong-configure.log]"
     ./configure --prefix= --enable-eap-mschapv2 --enable-eap-identity --enable-openssl --enable-eap-md5 --enable-eap-tls --enable-eap-dynamic --enable-systemd --enable-swanctl --disable-charon --disable-stroke --disable-scepclient --enable-counters > pistrong-configure.log
-    [ $? == 0 ] && sts="No errors" || sts="review pistrong-configure.log"
-    echo "   Config exit status: $? ($sts)"
+    ests=$?
+    [ $ests -eq 0 ] && sts="No errors" || sts="review $PSBDIR/pistrong-configure.log"
+    echo "   Config exit status: $ests ($sts)"
 }
 
 function DoMake() {
     gotoBuildDir
     askinall "Press Enter to start make: "
     echo ""
-    echo "** $(date +'%Y-%m-%d %H:%M:%S') Performing make [Log: $PSDIR/pistrong-make.log]"
+    echo "** $(date +'%Y-%m-%d %H:%M:%S') Performing make [Log: $PSBDIR/pistrong-make.log]"
     make > pistrong-make.log
-    [ $? == 0 ] && sts="No errors" || sts="review pistrong-make.log"
-    echo "   Make exit status: $? ($sts)"
+    ests=$?
+    [ $ests -eq 0 ] && sts="No errors" || sts="review $PSBDIR/pistrong-make.log"
+    echo "   Make exit status: $ests ($sts)"
 }
 
 function DoInstall() {
     gotoBuildDir
     askinall "Press Enter to start install: "
     echo ""
-    echo "** $(date +'%Y-%m-%d %H:%M:%S') Performing install [Log: $PSDIR/pistrong-install.log]"
+    echo "** $(date +'%Y-%m-%d %H:%M:%S') Performing install [Log: $PSBDIR/pistrong-install.log]"
     make install > pistrong-install.log 2>&1
-    [ $? == 0 ] && sts="No errors" || sts="review pistrong-install.log"
-    echo "   Install exit status: $? ($sts)"
+    ests=$?
+    [ $ests -eq 0 ] && sts="No errors" || sts="review $PSBDIR/pistrong-install.log"
+    echo "   Install exit status: $ests ($sts)"
 }
 
 function DoMakeDirs() {
@@ -259,8 +296,8 @@ function DoAll() {
 	echo ""
 	echo "     See pistrong help and pistrong --help for pistrong command details"
     else
-	echo "     Once you have received the VPN Config Pack from the manager of the VPN Server"
-	echo "      install them into strongSwan using the 'sudo pistrong client install' command"
+	echo "     Once you have received the VPN Cert Pack from the VPN Server manager"
+	echo "      install it into strongSwan using the 'sudo pistrong client install' command"
 	echo "     Then..."
     fi
     echo ""
