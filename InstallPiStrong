@@ -254,9 +254,11 @@ function DoPostConf() {
 	mv /etc/strongswan.d/charon-systemd.conf /etc/strongswan.d/orig-charon-systemd.conf
 	cat >> /etc/strongswan.d/charon-systemd.conf <<EOF
 charon-systemd {
-
+    #
     # Section to configure native systemd journal logger, very similar to the
     # syslog logger as described in LOGGER CONFIGURATION in strongswan.conf(5).
+    # See https://wiki.strongswan.org/projects/strongswan/wiki/Loggerconfiguration
+    #
     journal {
 
         # Loglevel for a specific subsystem.
@@ -265,8 +267,8 @@ charon-systemd {
         # Default loglevel.
         # default = 1
 
-        # ** pistrong set IKE=1 to turn off keep-alive message logging
-	ike = 1
+        # ** pistrong set IKE=0 to turn off keep-alive message logging
+	ike = 0
 
     }
 }
