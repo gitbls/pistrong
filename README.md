@@ -21,6 +21,8 @@ pistrong components include:
 
 **NOTE:** It's 99%  likely that MacOS and Android clients will work as well, but they have not been tested. If you have either of these and want to help me document these, let me know via a GitHub issue.
 
+If you find pistrong useful, please consider starring it to help me understand how many people are using it. Thanks!
+
 ## Up and Running Nearly Instantly!
 
 Before diving in, decide if you're going to use a DNS name (highly recommended!) for external VPN access.Your public DNS IP address can be static or dynamic, depending on your Internet connection or ISP provider. If you don't use a DNS name, then you'll need to use your external IP address to access the VPN. If you're planning to use an IP address, please read the section below: Using an IP Address for VPN Access.
@@ -233,6 +235,10 @@ While using a DNS name is the best way to access the VPN, that may not always be
             * `--dev somename` &mdash; A slightly different name for the same device. For instance, if you created the Internet connection using `--dev pi3`, you might decide to use `--dev pi3LAN`. The name can be whatever you want, but it must be different from the Internet connection.
             * `--cname some-name` &mdash; Specifies the name you'll use to reference the connection on a `pistrong client start` command
             * `--vpnaddr VPNSERVER-LANAddr` &mdash; Specifies the LAN IP address for the VPN Server. This only affects the address that is in the Client connection config file.
+
+## Tunnels
+
+A simple way to enable LAN clients to utilize the tunnel is to add a route to the remote server's IP address(es) to the router. It does cause outgoing traffic to hit the router twice, which may be a consideration on a heavily-utilized tunnel. It's easy to add routes to Linux clients, which can be used to ameliorate the router impact.
 
 ## Local Mail
 
