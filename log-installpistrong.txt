@@ -1,271 +1,141 @@
-#
-# Before starting I did: sudo apt-get update ; sudo apt-get upgrade
-#
-rpi42~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/pistrong -o /usr/local/bin/pistrong
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-rpi42~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-rpi42~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA -o /usr/local/bin/makeMyCA
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
+** Installer for strongSwan/pistrong Management Tool **
 
-rpi42~# sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/install-dovecot -o /usr/local/bin/install-dovecot
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
+This installer requires 'curl' and 'zip'
+Doing an 'apt update' and installing them if necessary...
 
-#
-# First we'll install postfix and dovecot (not mandatory, but needed if you want to use the --mail feature)
-#
-rpi42~# apt-get install postfix
-The following packages were automatically installed and are no longer required:
-  libgnutls-dane0 libunbound8 rpi.gpio-common
-Use 'apt autoremove' to remove them.
+Hit:1 http://raspbian.raspberrypi.org/raspbian buster InRelease
+Hit:2 http://archive.raspberrypi.org/debian buster InRelease
+Reading package lists...
+* curl and zip are both already installed
+
+> Identifying strongSwan version numbers on Web and in apt
+
+strongSwan can be installed one of two ways:
+
+  apt: Version 5.7.2-1
+       Uses the standard apt package mechanism
+       Slightly older version of strongSwan, quick install
+
+  web: Version 5.9.2
+       Download, build, and install from strongswan.org
+       Latest released version of strongSwan, longer install (10-15 mins on Pi4)
+
+See the github README for further information
+Select A:apt W:website: 
+> Downloading pistrong scripts from github
+* Downloading pistrong
+* Downloading makeMyCA
+* Downloading makeTunnel
+> Installing strongSwan from apt
+* Installing packages 'strongswan-swanctl strongswan-pki charon-systemd python3-pexpect'
+Reading package lists...
+Building dependency tree...
+Reading state information...
 The following additional packages will be installed:
-  ssl-cert
+  libstrongswan libstrongswan-standard-plugins python3-ptyprocess
+  strongswan-libcharon
 Suggested packages:
-  procmail postfix-mysql postfix-pgsql postfix-ldap postfix-pcre postfix-lmdb postfix-sqlite sasl2-bin | dovecot-common
-  libsasl2-modules | dovecot-common postfix-cdb ufw postfix-doc openssl-blacklist
-The following packages will be REMOVED:
-  exim4-base exim4-config exim4-daemon-light
+  libstrongswan-extra-plugins python-pexpect-doc libcharon-extra-plugins
 The following NEW packages will be installed:
-  postfix ssl-cert
-0 upgraded, 2 newly installed, 3 to remove and 0 not upgraded.
-Need to get 1,414 kB of archives.
-After this operation, 9,216 B disk space will be freed.
-Do you want to continue? [Y/n] y
-Get:1 http://mirror.web-ster.com/raspbian/raspbian buster/main armhf ssl-cert all 1.0.39 [20.8 kB]
-Get:2 http://mirror.web-ster.com/raspbian/raspbian buster/main armhf postfix armhf 3.4.5-1 [1,393 kB]
- Fetched 1,414 kB in 1s (1,325 kB/s)
-Preconfiguring packages ...
-Postfix Configuration
-Please select the mail server configuration type that best meets your needs.
-Removing exim4-daemon-light (4.92-8+deb10u1) ...
-Removing exim4-base (4.92-8+deb10u1) ...
-Removing exim4-config (4.92-8+deb10u1) ...
-Selecting previously unselected package ssl-cert.
-Preparing to unpack .../ssl-cert_1.0.39_all.deb ...
-Unpacking ssl-cert (1.0.39) ...
-Selecting previously unselected package postfix.
-Preparing to unpack .../postfix_3.4.5-1_armhf.deb ...
-Unpacking postfix (3.4.5-1) ...
-Setting up ssl-cert (1.0.39) ...
-Setting up postfix (3.4.5-1) ...
-Adding group `postfix' (GID 117) ...
-Done.
-Adding system user `postfix' (UID 111) ...
-Adding new user `postfix' (UID 111) with group `postfix' ...
-Not creating home directory `/var/spool/postfix'.
-Creating /etc/postfix/dynamicmaps.cf
-Adding group `postdrop' (GID 118) ...
-Done.
-setting myhostname: rpi42.starwhite.net
-setting alias maps
-setting alias database
-mailname is not a fully qualified domain name.  Not changing /etc/mailname.
-setting destinations: $myhostname, rpi42, localhost.localdomain, localhost
-setting relayhost: 
-setting mynetworks: 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
-setting mailbox_size_limit: 0
-setting recipient_delimiter: +
-setting inet_interfaces: loopback-only
-setting default_transport: error
-setting relay_transport: error
-setting inet_protocols: all
-WARNING: /etc/aliases exists, but does not have a root alias.
-
-Postfix (main.cf) is now set up with a default configuration.  If you need to 
-make changes, edit /etc/postfix/main.cf (and others) as needed.  To view 
-Postfix configuration values, see postconf(1).
-
-After modifying main.cf, be sure to run 'service postfix reload'.
-
-Running newaliases
-Created symlink /etc/systemd/system/multi-user.target.wants/postfix.service → /lib/systemd/system/postfix.service.
-Processing triggers for systemd (241-5+rpi1) ...
+  charon-systemd libstrongswan libstrongswan-standard-plugins python3-pexpect
+  python3-ptyprocess strongswan-libcharon strongswan-pki strongswan-swanctl
+0 upgraded, 8 newly installed, 0 to remove and 21 not upgraded.
+Need to get 1,225 kB of archives.
+After this operation, 3,394 kB of additional disk space will be used.
+Get:1 http://raspbian.raspberrypi.org/raspbian buster/main armhf libstrongswan armhf 5.7.2-1 [373 kB]
+Get:2 http://raspbian.raspberrypi.org/raspbian buster/main armhf strongswan-swanctl armhf 5.7.2-1 [172 kB]
+Get:3 http://raspbian.raspberrypi.org/raspbian buster/main armhf strongswan-libcharon armhf 5.7.2-1 [276 kB]
+Get:4 http://raspbian.raspberrypi.org/raspbian buster/main armhf charon-systemd armhf 5.7.2-1 [92.6 kB]
+Get:5 http://raspbian.raspberrypi.org/raspbian buster/main armhf libstrongswan-standard-plugins armhf 5.7.2-1 [120 kB]
+Get:6 http://raspbian.raspberrypi.org/raspbian buster/main armhf python3-ptyprocess all 0.6.0-1 [13.2 kB]
+Get:7 http://raspbian.raspberrypi.org/raspbian buster/main armhf python3-pexpect all 4.6.0-1 [52.4 kB]
+Get:8 http://raspbian.raspberrypi.org/raspbian buster/main armhf strongswan-pki armhf 5.7.2-1 [126 kB]
+Fetched 1,225 kB in 0s (23.2 MB/s)
+Selecting previously unselected package libstrongswan.
+Preparing to unpack .../0-libstrongswan_5.7.2-1_armhf.deb ...
+Unpacking libstrongswan (5.7.2-1) ...
+Selecting previously unselected package strongswan-swanctl.
+Preparing to unpack .../1-strongswan-swanctl_5.7.2-1_armhf.deb ...
+Unpacking strongswan-swanctl (5.7.2-1) ...
+Selecting previously unselected package strongswan-libcharon.
+Preparing to unpack .../2-strongswan-libcharon_5.7.2-1_armhf.deb ...
+Unpacking strongswan-libcharon (5.7.2-1) ...
+Selecting previously unselected package charon-systemd.
+Preparing to unpack .../3-charon-systemd_5.7.2-1_armhf.deb ...
+Unpacking charon-systemd (5.7.2-1) ...
+Selecting previously unselected package libstrongswan-standard-plugins.
+Preparing to unpack .../4-libstrongswan-standard-plugins_5.7.2-1_armhf.deb ...
+Unpacking libstrongswan-standard-plugins (5.7.2-1) ...
+Selecting previously unselected package python3-ptyprocess.
+Preparing to unpack .../5-python3-ptyprocess_0.6.0-1_all.deb ...
+Unpacking python3-ptyprocess (0.6.0-1) ...
+Selecting previously unselected package python3-pexpect.
+Preparing to unpack .../6-python3-pexpect_4.6.0-1_all.deb ...
+Unpacking python3-pexpect (4.6.0-1) ...
+Selecting previously unselected package strongswan-pki.
+Preparing to unpack .../7-strongswan-pki_5.7.2-1_armhf.deb ...
+Unpacking strongswan-pki (5.7.2-1) ...
+Setting up libstrongswan (5.7.2-1) ...
+Setting up strongswan-libcharon (5.7.2-1) ...
+Setting up strongswan-swanctl (5.7.2-1) ...
+Setting up python3-ptyprocess (0.6.0-1) ...
+Setting up strongswan-pki (5.7.2-1) ...
+Setting up libstrongswan-standard-plugins (5.7.2-1) ...
+Setting up charon-systemd (5.7.2-1) ...
+Created symlink /etc/systemd/system/multi-user.target.wants/strongswan-swanctl.service → /lib/systemd/system/strongswan-swanctl.service.
+Setting up python3-pexpect (4.6.0-1) ...
 Processing triggers for man-db (2.8.5-2) ...
-Processing triggers for rsyslog (8.1901.0-1) ...
 
-rpi42~# install-dovecot 
-Installing dovecot...
-The following packages were automatically installed and are no longer required:
-  libgnutls-dane0 libunbound8 rpi.gpio-common
-Use 'apt autoremove' to remove them.
-The following additional packages will be installed:
-  libexttextcat-2.0-0 libexttextcat-data liblua5.3-0 libsodium23 libstemmer0d
-Suggested packages:
-  dovecot-gssapi dovecot-ldap dovecot-lmtpd dovecot-lucene dovecot-managesieved dovecot-mysql dovecot-pgsql dovecot-pop3d
-  dovecot-sieve dovecot-solr dovecot-sqlite dovecot-submissiond ntp ufw
-The following NEW packages will be installed:
-  dovecot-core dovecot-imapd libexttextcat-2.0-0 libexttextcat-data liblua5.3-0 libsodium23 libstemmer0d
-0 upgraded, 7 newly installed, 0 to remove and 0 not upgraded.
-Need to get 4,642 kB/5,107 kB of archives.
-After this operation, 11.8 MB of additional disk space will be used.
-Do you want to continue? [Y/n] y
-Get:1 http://mirror.web-ster.com/raspbian/raspbian buster/main armhf dovecot-core armhf 1:2.3.4.1-5+deb10u1 [3,494 kB]
-Get:2 http://mirror.web-ster.com/raspbian/raspbian buster/main armhf dovecot-imapd armhf 1:2.3.4.1-5+deb10u1 [1,148 kB]
-Preparing to unpack .../0-libstemmer0d_0+svn585-1_armhf.deb ...
-Unpacking libstemmer0d:armhf (0+svn585-1) ...
-Selecting previously unselected package libexttextcat-data.
-Preparing to unpack .../1-libexttextcat-data_3.4.5-1_all.deb ...
-Unpacking libexttextcat-data (3.4.5-1) ...
-Selecting previously unselected package libexttextcat-2.0-0:armhf.
-Preparing to unpack .../2-libexttextcat-2.0-0_3.4.5-1_armhf.deb ...
-Unpacking libexttextcat-2.0-0:armhf (3.4.5-1) ...
-Selecting previously unselected package liblua5.3-0:armhf.
-Preparing to unpack .../3-liblua5.3-0_5.3.3-1.1_armhf.deb ...
-Unpacking liblua5.3-0:armhf (5.3.3-1.1) ...
-Selecting previously unselected package libsodium23:armhf.
-Preparing to unpack .../4-libsodium23_1.0.17-1_armhf.deb ...
-Unpacking libsodium23:armhf (1.0.17-1) ...
-Selecting previously unselected package dovecot-core.
-Preparing to unpack .../5-dovecot-core_1%3a2.3.4.1-5+deb10u1_armhf.deb ...
-Unpacking dovecot-core (1:2.3.4.1-5+deb10u1) ...
-Selecting previously unselected package dovecot-imapd.
-Preparing to unpack .../6-dovecot-imapd_1%3a2.3.4.1-5+deb10u1_armhf.deb ...
-Unpacking dovecot-imapd (1:2.3.4.1-5+deb10u1) ...
-Setting up libsodium23:armhf (1.0.17-1) ...
-Setting up libexttextcat-data (3.4.5-1) ...
-Setting up liblua5.3-0:armhf (5.3.3-1.1) ...
-Setting up libstemmer0d:armhf (0+svn585-1) ...
-Setting up libexttextcat-2.0-0:armhf (3.4.5-1) ...
-Setting up dovecot-core (1:2.3.4.1-5+deb10u1) ...
+> Creating /etc/swanctl/pistrong directories...
+* Editing /etc/swanctl/conf.d/*.conf to ensure /libexec/ipsec/_updown is changed to /usr/lib/ipsec/_updown
 
-Creating config file /etc/dovecot/dovecot.conf with new version
+ If this system will be a VPN Server AND you want remote VPN clients to access your LAN
+ then IPV4 forwarding should be enabled
 
-Creating config file /etc/dovecot/dovecot-dict-auth.conf.ext with new version
+Enable IPV4 forwarding [y/n]? * Creating /etc/sysctl.d/92-pistrong.conf to set net.ipv4.ip_forward=1
+Config Key      Value                          Description
+calife          3650                           CA Lifetime [3650 days]
+cmds            0                              Echo executed commands
+cnsuffix        ipsec.vpn                      Suffix for user cert names
+crllife         7                              Cert Revocation List lifetime [7 days]
+debug           0                              Debug mode
+lxscript        pistrong-vpn-installer         Linux VPN Config Pack script name
+mailfrom        PiStrongVPN<root@mydomain.com> 'From' string for cert email
+myfqdn                                         VPN host FQDN (Fully Qualified Domain Name)
+random          1                              Generate random cert passwords
+rootca          strongSwan                     String for root CA name [strongSwan]
+service         strongswan-swanctl.service     strongSwan service name
+smtppassword                                   SMTP mail server password if required
+smtpport        25                             SMTP mail server port
+smtpserver      127.0.0.1                      SMTP mail server IP address or name
+smtpuser                                       SMTP mail server username if required
+smtpusetls      0                              SMTP Mail use TLS auth [NYI]
+swancertpfx     strongSwan                     CA Cert name prefix [strongSwan]
+swandir         /etc/swanctl                   System directory for strongSwan [/etc/swanctl]
+uclife          730                            User Cert Lifetime [730 days]
+validids                                       Valid SAN Keys
+version         3                              Database version
+vpnaddr         p83                            VPN Server Address (IP or DNS)
+vpncertpfx      default                        VPN Cert name prefix [default]
+vpnsankey       ipsec.vpn.net                  Default VPN SAN key
+webdir          tmp                            Directory in file system corresponding to weburl
+weburl          http://127.0.0.1               Web URL on which to append cert name
 
-Creating config file /etc/dovecot/dovecot-dict-sql.conf.ext with new version
-
-Creating config file /etc/dovecot/dovecot-sql.conf.ext with new version
-
-Creating config file /etc/dovecot/conf.d/10-auth.conf with new version
-
-Creating config file /etc/dovecot/conf.d/10-director.conf with new version
-
-Creating config file /etc/dovecot/conf.d/10-logging.conf with new version
-
-Creating config file /etc/dovecot/conf.d/10-mail.conf with new version
-
-Creating config file /etc/dovecot/conf.d/10-master.conf with new version
-
-Creating config file /etc/dovecot/conf.d/10-ssl.conf with new version
-
-Creating config file /etc/dovecot/conf.d/10-tcpwrapper.conf with new version
-
-Creating config file /etc/dovecot/conf.d/15-lda.conf with new version
-
-Creating config file /etc/dovecot/conf.d/15-mailboxes.conf with new version
-
-Creating config file /etc/dovecot/conf.d/90-acl.conf with new version
-
-Creating config file /etc/dovecot/conf.d/90-plugin.conf with new version
-
-Creating config file /etc/dovecot/conf.d/90-quota.conf with new version
-
-Creating config file /etc/dovecot/conf.d/auth-checkpassword.conf.ext with new version
-
-Creating config file /etc/dovecot/conf.d/auth-deny.conf.ext with new version
-
-Creating config file /etc/dovecot/conf.d/auth-dict.conf.ext with new version
-
-Creating config file /etc/dovecot/conf.d/auth-master.conf.ext with new version
-
-Creating config file /etc/dovecot/conf.d/auth-passwdfile.conf.ext with new version
-
-Creating config file /etc/dovecot/conf.d/auth-sql.conf.ext with new version
-
-Creating config file /etc/dovecot/conf.d/auth-static.conf.ext with new version
-
-Creating config file /etc/dovecot/conf.d/auth-system.conf.ext with new version
-
-Creating config file /etc/dovecot/conf.d/auth-vpopmail.conf.ext with new version
-Created symlink /etc/systemd/system/multi-user.target.wants/dovecot.service → /lib/systemd/system/dovecot.service.
-Setting up dovecot-imapd (1:2.3.4.1-5+deb10u1) ...
-
-Creating config file /etc/dovecot/conf.d/20-imap.conf with new version
-Processing triggers for systemd (241-7~deb10u1+rpi1) ...
-Processing triggers for man-db (2.8.5-2) ...
-Processing triggers for libc-bin (2.28-10+rpi1) ...
-Processing triggers for dovecot-core (1:2.3.4.1-5+deb10u1) ...
-
-% Ignore error from openssl if directory listing following is OK
-Generating a RSA private key
-.................+++++
-......+++++
-writing new private key to 'private/dovecot.key'
------
-Cannot write random bytes:
-1991618576:error:2407007A:random number generator:RAND_write_file:Not a regular file:../crypto/rand/randfile.c:183:Filename=/dev/urandom
--rw-r--r-- 1 root root 1253 Sep 14 07:45 /etc/dovecot/private/dovecot.pem
--rw------- 1 root root 1704 Sep 14 07:45 /etc/dovecot/private/dovecot.key
-
-Updating /etc/postfix/main.cf...
-#
-# Install and configure strongSwan
-#
-rpi42~# InstallPiStrong
-** Ensure your Pi is up to date
- Your Pi must be up to date with the Raspbian repositories by using these commands
-
-    sudo apt-get update
-    sudo apt-get upgrade
-
-  If you have not done this yet, respond n to exit and update your Pi
-  Then reboot your Pi and restart this procedure
-
-Press y to Continue, n to exit and update your Pi [y/n]? y
-Package libgmp10 already installed
-Package libgmp-dev already installed
-Package libsystemd-dev already installed
-Package libssl-dev already installed
-Package python3-pexpect already installed
-Package zip already installed
-
-Using Strongswan version 5.8.1
-
-** The strongSwan download/build process can take several minutes (fast RPi4)
-   or close to an hour (RPi0W).
-
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-100 4412k  100 4412k    0     0  2126k      0  0:00:02  0:00:02 --:--:-- 2126k
-
-** 2019-11-12 11:10:08 Unpacking source archive [Log: /root/piStrong/pistrong-untar.log]
-
-** 2019-11-12 11:10:15 Performing pre-make configuration [Log: /root/piStrong/pistrong-configure.log]
-   Config exit status: 0 (No errors)
-
-** 2019-11-12 11:11:34 Performing make [Log: /root/piStrong/pistrong-make.log]
-   Make exit status: 0 (No errors)
-
-** 2019-11-12 11:20:47 Performing install [Log: /root/piStrong/pistrong-install.log]
-   Install exit status: 0 (No errors)
-
- VPN Server configuration includes:
-   Enable IPV4 forwarding
-
-Configure this system to be a VPN Server [y/n]? y
-** Creating /etc/swanctl/pistrong directories...
-** Creating /etc/sysctl.d/92-pistrong.conf to set net.ipv4.ip_forward=1
-
-** pistrong/strongSwan Installation complete
+> pistrong/strongSwan Installation complete
 
 ** Required Post-installation Steps:
-     Add router port forwards for UDP ports 500 and 4500 to this system
 
-     See https://github.com/gitbls/pistrong/blob/master/makeMyCA to fully configure a CA
-     that supports iOS, Windows, and Linux VPN Clients
+* If this system will be a VPN Server:
+  * Add port forwards to this system on your router for UDP ports 500 and 4500
+    See /usr/local/bin/makeMyCA to fully configure a CA that supports iOS, Windows, and Linux VPN Clients
+  * Set up iptables. See https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
+    See pistrong help and pistrong --help for pistrong command details
 
-     Set up iptables. See https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
+* If this system will be a VPN Client:
+  * Once you receive the VPN Cert Pack from the VPN Server manager,
+    install it into strongSwan using the 'sudo pistrong client install' command
+  * Then:
+      'sudo pistrong service start' or 'sudo systemctl start strongswan' to start the strongSwan VPN
+      'sudo pistrong service enable' or 'sudo systemctl enable strongswan' to enable strongSwan to restart after each reboot
 
-     See pistrong help and pistrong --help for pistrong command details
-
-        'sudo pistrong service start' or 'sudo systemctl start strongswan' to start the strongSwan VPN
-        'sudo pistrong service enable' or 'sudo systemctl enable strongswan' to enable strongSwan to restart after reboot
-
-   Reboot and make sure everything works
-
-rpi42~#
-
+* Reboot the system and make sure everything works

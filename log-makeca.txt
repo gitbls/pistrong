@@ -1,4 +1,3 @@
-rpi42~# makeMyCA
 Build a prescriptive strongSwan CA for iOS, Windows, and Linux devices
 
 ** You will be asked a series of configuration questions
@@ -7,356 +6,183 @@ Build a prescriptive strongSwan CA for iOS, Windows, and Linux devices
 ** The CA requires a domain name
    If you have a registered domain name to use for the VPN, use that
    If not, you can use a name of your choice
+   NOTE: This must be a DNS name, not an IP address
 
-Domain Name to use [noname.com]: mydom.com
+Domain Name to use [noname.com]: 
+** Configuring strongSwan for host FQDN p83.noname.com
 
-** Configuring strongSwan for host FQDN rpi42.mydom.com
+** 'vpnaddr' is the DNS name or IP address that VPN clients use when connecting to the VPN Server
+   Use your externally available DNS name if you have one, otherwise use your Internet IP address
 
+vpnaddr for your VPN [p83.noname.com]: 
+** 'vpndev' is the network device that will be connected to the Internet
+   If your system has:
+    One network device: Use that device
+    > 1 network device: Use the device that is or will be connected to the Internet
+                        either directly or indirectly through a router
+
+Network device that will be connected to the Internet [eth0]: 
+** 'landev' is the network device that is connected to the local LAN
+   If your system has:
+    One network device:  Use that device
+    > 1 network device:  Use the device that is not 'eth0'
+
+Network device that will be connected to the local LAN [eth0]: 
+** VPN Server IP configuration
+** 'myipaddr' Local LAN IP Address
+   If your system has:
+    One network device: Use the IP Address of that device
+    > 1 network device: Use the IP Address of 'eth0'
+
+VPN Server Local LAN IP Address [192.168.92.224]: 
+** 'mysubnet' is the Local LAN Subnet
+   If you have multiple network adapters this is the subnet of the adapter
+    connected to the LAN network (eth0) rather than
+    the adapter connected to the Internet (eth0)
+
+VPN Server Local LAN Subnet [192.168.92.0/24]: 
+** The Subnet for VPN Clients is a virtual subnet used between
+   the VPN Server and Clients. It must not be used on your network
+   and requires iptables configuration, which will be created
+   by this script (although you'll need to enable it)
+
+Subnet for VPN Clients [10.1.10.0/24]: 
+** The DNS Server should be a DNS Server on your network
+   This can be your router (if so configured) or another DNS Server
+
+DNS Server for connected VPN Clients [192.168.92.1]: 
 ** 'cnsuffix' is a naming string only used in user certs
-   (e.g., username-device-rpi42@cnsuffix)
+   (e.g., username-device-p83@cnsuffix)
    It is used by iOS for additional Cert validation
    and will be visible for strongSwan connections in the system log
 
-cnsuffix for your CA [myvpn.net]:
-
+cnsuffix for your CA [myvpn.net]: 
 ** 'webdir' is the directory in the file system where certs will be shared via your web server
 
-webdir for your system [/var/www/html/vpn]:
+webdir for your system [/var/www/html/vpn]: % Directory /var/www/html/vpn does not exist. Be sure to create it before using pistrong --mail
 
 ** 'weburl' is the URL that will be used in emails to users with their certs
 
-weburl for your system [http://rpi42.mydom.com/vpn]:
-
+weburl for your system [http://p83.noname.com/vpn]: 
 ** Configure the SAN Key (remoteid) and VPN Cert name for iOS, Windows, and Linux users
    The VPN Cert name prefix is important because it helps you retain your sanity
    The remoteid identifies the connection to strongSwan, and is assigned to users when they are added
    The defaults are acceptable, but you may change them if you wish
 
-VPN Cert name prefix for iOS VPN Cert [ios]:
-VPN SAN key for iOS users [ios.mydom.com]:
-VPN Cert name prefix for Windows VPN Cert [windows]:
-VPN SAN key for Windows users [windows.mydom.com]:
-VPN Cert name prefix for Linux VPN Cert [linux]:
-VPN SAN key for Linux users [linux.mydom.com]:
+VPN Cert name prefix for iOS VPN Cert [ios]: VPN SAN key for iOS users [ios.noname.com]: VPN Cert name prefix for Windows VPN Cert [windows]: VPN SAN key for Windows users [windows.noname.com]: VPN Cert name prefix for Linux VPN Cert [linux]: VPN SAN key for Linux users [linux.noname.com]: 
+** The default secondary VPN SAN Key is 'p83.noname.com'
+   You can add additional SAN Keys if desired
 
-** The default second VPN SAN Key is 'rpi42.mydom.com'
-   If you are using a different FQDN or an IP address to access your VPN
-   you must change the second VPN SAN key
-
-Second VPN SAN Key [rpi42.mydom.com]:
-
-** VPN Server IP configuration
-
-VPN Server Local LAN IP Address [192.168.16.4]:
-VPN Server Local LAN Subnet [192.168.16.0/24]: 
-
-** The Subnet for VPN Clients is a virtual subnet used between
-   the VPN Server and Clients. It must not be used on your network
-   and requires iptables configuration, which will be done
-   by this script (although you'll need to enable it)
-
-Subnet for VPN Clients [10.1.10.0/24]:
-
-** The DNS Server should be a DNS Server on your network
-   This can be your router (if so configured) or another DNS Server
-
-DNS Server for connected VPN Clients [192.168.92.1]: 192.168.16.1
-
+Additional Secondary VPN SAN Key(s) []: 
 ** This script will now create:
       Connection Config:    /etc/swanctl/conf.d/pistrong-CAServerConnection.conf
       CA Cert:              strongSwanCACert.pem
-      VPN Cert for iOS:     ios-strongSwanVPNCert.pem with VPN SAN key 'ios.mydom.com'
-      VPN Cert for Windows: windows-strongSwanVPNCert.pem with VPN SAN key 'windows.mydom.com'
-      VPN Cert for Linux:   linux-strongSwanVPNCert.pem with VPN SAN key 'linux.mydom.com'
+      VPN Cert for iOS:     ios-strongSwanVPNCert.pem with VPN SAN key 'ios.noname.com'
+      VPN Cert for Windows: windows-strongSwanVPNCert.pem with VPN SAN key 'windows.noname.com'
+      VPN Cert for Linux:   linux-strongSwanVPNCert.pem with VPN SAN key 'linux.noname.com'
 
-   For VPN Server IP 192.168.16.4 subnet 192.168.16.0 with VPN Client DNS servers 192.168.16.1
-
-   Each VPN cert will have 'rpi42.mydom.com' as a second VPN SAN key
+   For VPN Server LAN IP 192.168.92.224 subnet 192.168.92.0/24 with VPN Client DNS servers 192.168.92.1
 
    The VPN will use virtual subnet 10.1.10.0/24 for VPN Clients
 
+   Each VPN cert will have 'p83.noname.com' as secondary VPN SAN key(s)
+
+   The default VPN Server Address is 'p83.noname.com'
+   This can be changed on a per-user basis on the 'sudo pistrong add' command for a single user
+    using the --vpnaddr new-vpn-address switch
+    (You might want to do this, for example, if you're using an IP address to connect externally
+     but also want to test connecting to the VPN server from your internal network)
+   See https://github.com/gitbls/pistrong/blob/master/README.md
+    for additional VPN Server IP Address considerations
+
+See 'sudo pistrong config --list' for a list of all the pistrong configuration parameters
+ and make any changes necessary for your configuration
+
 ** If you'd like to change anything, answer N to the next question and restart the script
 
-Do you want to continue [y/N]? y
-Creating strongSwan CA for host rpi42.mydom.com in /etc/swanctl
+Do you want to continue [y/N]? Creating strongSwan CA for host p83.noname.com in /etc/swanctl
 Creating CA Key (/etc/swanctl/private/strongSwanCAKey.pem)
 Create self-signed CA Cert (/etc/swanctl/x509ca/strongSwanCACert.pem)
 
-  subject:  "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  issuer:   "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  validity:  not before Nov 12 11:27:58 2019, ok
-             not after  Nov 09 11:27:58 2029, ok (expires in 3650 days)
-  serial:    4b:26:3f:b0:bc:eb:0a:86
-  flags:     CA CRLSign self-signed
-  subjkeyId: 91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
+  subject:  "C=US, O=p83-strongSwan, CN=strongSwan p83 Root CA"
+  issuer:   "C=US, O=p83-strongSwan, CN=strongSwan p83 Root CA"
+  validity:  not before Jun 24 11:10:07 2021, ok
+             not after  Jun 22 11:10:07 2031, ok (expires in 3650 days)
+  serial:    46:23:4e:e5:50:77:7f:9f
+  flags:     CA CRLSign self-signed 
+  subjkeyId: 3f:f7:c1:bf:b2:17:de:b9:27:48:d9:6b:0f:c2:0f:7e:4e:9e:b4:8f
   pubkey:    RSA 4096 bits
-  keyid:     4f:5f:4d:d0:79:6e:c8:51:61:4a:9a:9b:56:f1:5a:ea:92:45:22:90
-  subjkey:   91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
+  keyid:     32:f1:ab:7d:d8:f0:f7:d1:4d:61:9e:36:01:20:fc:f9:54:d0:3d:80
+  subjkey:   3f:f7:c1:bf:b2:17:de:b9:27:48:d9:6b:0f:c2:0f:7e:4e:9e:b4:8f
 
 Create VPN Host Key  (/etc/swanctl/private/ios-strongSwanVPNKey.pem)
 Create VPN Host Cert (/etc/swanctl/x509/ios-strongSwanVPNCert.pem)
- with VPN SAN key(s) ios.mydom.com,rpi42.mydom.com
+ with VPN SAN key(s) ios.noname.com,p83.noname.com
 
-  subject:  "C=US, O=rpi42-strongSwan, CN=rpi42.mydom.com"
-  issuer:   "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  validity:  not before Nov 12 11:28:35 2019, ok
-             not after  Nov 09 11:28:35 2029, ok (expires in 3649 days)
-  serial:    58:4a:40:41:fd:46:d2:28
-  altNames:  ios.mydom.com, rpi42.mydom.com
-  flags:     serverAuth ikeIntermediate
-  authkeyId: 91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
-  subjkeyId: 68:42:60:31:ff:5c:48:1d:28:39:1f:e7:57:d9:79:b5:d8:84:24:40
+  subject:  "C=US, O=p83-strongSwan, CN=p83.noname.com"
+  issuer:   "C=US, O=p83-strongSwan, CN=strongSwan p83 Root CA"
+  validity:  not before Jun 24 11:10:16 2021, ok
+             not after  Jun 22 11:10:16 2031, ok (expires in 3650 days)
+  serial:    37:e5:17:6a:ac:c2:7f:50
+  altNames:  ios.noname.com, p83.noname.com
+  flags:     serverAuth ikeIntermediate 
+  authkeyId: 3f:f7:c1:bf:b2:17:de:b9:27:48:d9:6b:0f:c2:0f:7e:4e:9e:b4:8f
+  subjkeyId: ab:5f:20:c6:97:34:bf:36:e3:b1:9e:c6:4e:dc:9e:7d:f7:c6:cd:fa
   pubkey:    RSA 4096 bits
-  keyid:     5f:b4:c3:00:ea:d4:76:cb:7d:ae:f5:57:23:da:3a:b1:0c:2a:c7:29
-  subjkey:   68:42:60:31:ff:5c:48:1d:28:39:1f:e7:57:d9:79:b5:d8:84:24:40
+  keyid:     67:c4:72:0c:0b:b6:3b:a4:9a:a2:8e:15:fe:d1:38:09:d7:3c:28:85
+  subjkey:   ab:5f:20:c6:97:34:bf:36:e3:b1:9e:c6:4e:dc:9e:7d:f7:c6:cd:fa
 
 Create VPN Host Key  (/etc/swanctl/private/windows-strongSwanVPNKey.pem)
 Create VPN Host Cert (/etc/swanctl/x509/windows-strongSwanVPNCert.pem)
- with VPN SAN key(s) windows.mydom.com,rpi42.mydom.com
+ with VPN SAN key(s) windows.noname.com,p83.noname.com
 
-  subject:  "C=US, O=rpi42-strongSwan, CN=rpi42.mydom.com"
-  issuer:   "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  validity:  not before Nov 12 11:29:10 2019, ok
-             not after  Nov 09 11:29:10 2029, ok (expires in 3649 days)
-  serial:    58:f6:be:16:31:38:6b:b4
-  altNames:  windows.mydom.com, rpi42.mydom.com
-  flags:     serverAuth ikeIntermediate
-  authkeyId: 91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
-  subjkeyId: e3:29:c6:f7:26:6d:97:21:c0:10:0e:28:1c:05:44:d1:a7:1c:e2:63
+  subject:  "C=US, O=p83-strongSwan, CN=p83.noname.com"
+  issuer:   "C=US, O=p83-strongSwan, CN=strongSwan p83 Root CA"
+  validity:  not before Jun 24 11:10:24 2021, ok
+             not after  Jun 22 11:10:24 2031, ok (expires in 3650 days)
+  serial:    02:3f:68:e1:42:63:b9:6a
+  altNames:  windows.noname.com, p83.noname.com
+  flags:     serverAuth ikeIntermediate 
+  authkeyId: 3f:f7:c1:bf:b2:17:de:b9:27:48:d9:6b:0f:c2:0f:7e:4e:9e:b4:8f
+  subjkeyId: af:e7:79:1d:70:72:23:5f:e9:6f:ba:59:cf:e6:91:2b:ca:b9:1d:bc
   pubkey:    RSA 4096 bits
-  keyid:     a1:fb:b3:ca:23:86:9c:2b:36:71:ba:5f:1c:2d:d5:7b:95:e3:5f:aa
-  subjkey:   e3:29:c6:f7:26:6d:97:21:c0:10:0e:28:1c:05:44:d1:a7:1c:e2:63
+  keyid:     06:78:6e:7e:16:fe:1c:61:a1:a9:57:f4:ae:68:39:d9:0b:f6:75:de
+  subjkey:   af:e7:79:1d:70:72:23:5f:e9:6f:ba:59:cf:e6:91:2b:ca:b9:1d:bc
 
 Create VPN Host Key  (/etc/swanctl/private/linux-strongSwanVPNKey.pem)
 Create VPN Host Cert (/etc/swanctl/x509/linux-strongSwanVPNCert.pem)
- with VPN SAN key(s) linux.mydom.com,rpi42.mydom.com
+ with VPN SAN key(s) linux.noname.com,p83.noname.com
 
-  subject:  "C=US, O=rpi42-strongSwan, CN=rpi42.mydom.com"
-  issuer:   "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  validity:  not before Nov 12 11:29:23 2019, ok
-             not after  Nov 09 11:29:23 2029, ok (expires in 3649 days)
-  serial:    4e:62:80:af:17:0f:87:23
-  altNames:  linux.mydom.com, rpi42.mydom.com
-  flags:     serverAuth ikeIntermediate
-  authkeyId: 91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
-  subjkeyId: 7e:03:38:b6:28:5d:dd:72:fe:31:65:af:ef:d2:1c:ed:3e:2b:15:21
+  subject:  "C=US, O=p83-strongSwan, CN=p83.noname.com"
+  issuer:   "C=US, O=p83-strongSwan, CN=strongSwan p83 Root CA"
+  validity:  not before Jun 24 11:10:27 2021, ok
+             not after  Jun 22 11:10:27 2031, ok (expires in 3649 days)
+  serial:    1f:60:97:ba:33:04:e7:95
+  altNames:  linux.noname.com, p83.noname.com
+  flags:     serverAuth ikeIntermediate 
+  authkeyId: 3f:f7:c1:bf:b2:17:de:b9:27:48:d9:6b:0f:c2:0f:7e:4e:9e:b4:8f
+  subjkeyId: ab:13:a3:24:a7:d6:85:34:9d:82:4c:fd:ef:78:a5:9d:45:98:c9:6c
   pubkey:    RSA 4096 bits
-  keyid:     72:47:a7:db:e2:3c:c6:19:3d:13:e6:88:4d:43:d4:ba:06:95:fe:5e
-  subjkey:   7e:03:38:b6:28:5d:dd:72:fe:31:65:af:ef:d2:1c:ed:3e:2b:15:21
+  keyid:     d9:ea:67:21:f3:cb:b7:a8:d5:1a:cc:dd:3a:57:45:fc:52:90:88:53
+  subjkey:   ab:13:a3:24:a7:d6:85:34:9d:82:4c:fd:ef:78:a5:9d:45:98:c9:6c
 
 
-When adding iOS     users apply --remoteid ios.mydom.com
-When adding Windows users apply --remoteid windows.mydom.com
-When adding Linux   users apply --remoteid linux.mydom.com --linux
+When adding iOS     users apply --remoteid ios.noname.com
+When adding Windows users apply --remoteid windows.noname.com
+When adding Linux   users apply --remoteid linux.noname.com --linux
 
 Your strongSwan CA is configured
 
 Creating /etc/swanctl/pistrong/CA-iptables with firewall rules
+** I have created the service pistrong-iptables-load, but it is not enabled
+** If you have another way to load iptables, you must add the code from /etc/swanctl/pistrong/CA-iptables to it
+** Otherwise you must 'sudo systemctl enable --now pistrong-iptables-load'
+
 Creating /etc/swanctl/conf.d/pistrong-CAServerConnection.conf with the new VPN Server definitions
 
  ** Next steps:
-    * Ensure that you've correctly established the necessary firewall rules
-      Review /etc/swanctl/pistrong/CA-iptables
-       and https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
-    * Establish port forwarding on your router to IP 192.168.16.4 for UDP ports 500 and 4500
+    * Ensure that the firewall rules in /etc/swanctl/pistrong/CA-iptables are correct
+    * Review https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
+    * Establish port forwarding on your router to IP 192.168.92.224 for UDP ports 500 and 4500
     * Set up a mail server and web server if you want to email cert information to users
-
-
-rpi42~# pistrong listca
-
-Cert Name       CA Cert Subject Key
- CA strongSwan  91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
-  VPN windows-strongSwan SAN: windows.mydom.com, rpi42.mydom.com
-  VPN linux-strongSwan   SAN: linux.mydom.com, rpi42.mydom.com
-  VPN ios-strongSwan     SAN: ios.mydom.com, rpi42.mydom.com
-rpi42~# pistrong showca
-[CA Certificate /etc/swanctl/x509ca/strongSwanCACert.pem]
-  subject:  "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  issuer:   "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  validity:  not before Nov 12 11:27:58 2019, ok
-             not after  Nov 09 11:27:58 2029, ok (expires in 3649 days)
-  serial:    4b:26:3f:b0:bc:eb:0a:86
-  flags:     CA CRLSign self-signed
-  subjkeyId: 91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
-  pubkey:    RSA 4096 bits
-  keyid:     4f:5f:4d:d0:79:6e:c8:51:61:4a:9a:9b:56:f1:5a:ea:92:45:22:90
-  subjkey:   91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
-
-
-[VPN Host Certificate /etc/swanctl/x509/windows-strongSwanVPNCert.pem]
-  subject:  "C=US, O=rpi42-strongSwan, CN=rpi42.mydom.com"
-  issuer:   "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  validity:  not before Nov 12 11:29:10 2019, ok
-             not after  Nov 09 11:29:10 2029, ok (expires in 3649 days)
-  serial:    58:f6:be:16:31:38:6b:b4
-  altNames:  windows.mydom.com, rpi42.mydom.com
-  flags:     serverAuth ikeIntermediate
-  authkeyId: 91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
-  subjkeyId: e3:29:c6:f7:26:6d:97:21:c0:10:0e:28:1c:05:44:d1:a7:1c:e2:63
-  pubkey:    RSA 4096 bits
-  keyid:     a1:fb:b3:ca:23:86:9c:2b:36:71:ba:5f:1c:2d:d5:7b:95:e3:5f:aa
-  subjkey:   e3:29:c6:f7:26:6d:97:21:c0:10:0e:28:1c:05:44:d1:a7:1c:e2:63
-
-
-[VPN Host Certificate /etc/swanctl/x509/linux-strongSwanVPNCert.pem]
-  subject:  "C=US, O=rpi42-strongSwan, CN=rpi42.mydom.com"
-  issuer:   "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  validity:  not before Nov 12 11:29:23 2019, ok
-             not after  Nov 09 11:29:23 2029, ok (expires in 3649 days)
-  serial:    4e:62:80:af:17:0f:87:23
-  altNames:  linux.mydom.com, rpi42.mydom.com
-  flags:     serverAuth ikeIntermediate
-  authkeyId: 91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
-  subjkeyId: 7e:03:38:b6:28:5d:dd:72:fe:31:65:af:ef:d2:1c:ed:3e:2b:15:21
-  pubkey:    RSA 4096 bits
-  keyid:     72:47:a7:db:e2:3c:c6:19:3d:13:e6:88:4d:43:d4:ba:06:95:fe:5e
-  subjkey:   7e:03:38:b6:28:5d:dd:72:fe:31:65:af:ef:d2:1c:ed:3e:2b:15:21
-
-
-[VPN Host Certificate /etc/swanctl/x509/ios-strongSwanVPNCert.pem]
-  subject:  "C=US, O=rpi42-strongSwan, CN=rpi42.mydom.com"
-  issuer:   "C=US, O=rpi42-strongSwan, CN=strongSwan rpi42 Root CA"
-  validity:  not before Nov 12 11:28:35 2019, ok
-             not after  Nov 09 11:28:35 2029, ok (expires in 3649 days)
-  serial:    58:4a:40:41:fd:46:d2:28
-  altNames:  ios.mydom.com, rpi42.mydom.com
-  flags:     serverAuth ikeIntermediate
-  authkeyId: 91:2c:3b:27:df:64:58:fe:9e:38:74:99:48:90:1b:ac:9b:b1:7e:50
-  subjkeyId: 68:42:60:31:ff:5c:48:1d:28:39:1f:e7:57:d9:79:b5:d8:84:24:40
-  pubkey:    RSA 4096 bits
-  keyid:     5f:b4:c3:00:ea:d4:76:cb:7d:ae:f5:57:23:da:3a:b1:0c:2a:c7:29
-  subjkey:   68:42:60:31:ff:5c:48:1d:28:39:1f:e7:57:d9:79:b5:d8:84:24:40
-
-
-rpi42~# pistrong list
-Status  Key name    Date                CA         Remote ID       Password
-V       bls-iphone  2019-11-12:11:52:12 strongSwan ios.mydom.com   wqAHLr7NEwPtw5wQwE7kgY77kb99eii
-V       travel-pi*  2019-11-12:11:51:47 strongSwan linux.mydom.com qPQ7o2ovZ4sEoxGH4V9udn1dhuDDpIt
-rpi42~# pistrong add bls --device iphone2 --remoteid ios.mydom.com --mail bls
-% Copying '/etc/swanctl/p12/bls-iphone2-rpi42.p12' to '/var/www/html/vpn/bls-iphone2-rpi42.p12'
-% Copying '/etc/swanctl/x509ca/strongSwanCACert.pem' to '/var/www/html/vpn/strongSwanCACert.pem'
-% Mail sent to bls
-% Added bls-iphone2 with Remote ID 'ios.mydom.com' using CA Cert strongSwan
-rpi42~# pistrong add bls --device laptop --remoteid windows.mydom.com
-% Added bls-laptop with Remote ID 'windows.mydom.com' using CA Cert strongSwan
-rpi42~# # Whoops forgot to send mail
-rpi42~# pistrong resend bls-laptop --mail bls
-% Copying '/etc/swanctl/p12/bls-laptop-rpi42.p12' to '/var/www/html/vpn/bls-laptop-rpi42.p12'
-% Copying '/etc/swanctl/x509ca/strongSwanCACert.pem' to '/var/www/html/vpn/strongSwanCACert.pem'
-% Mail sent to bls
-rpi42~# pistrong list
-Status  Key name     Date                CA         Remote ID         Password
-V       bls-iphone   2019-11-12:11:52:12 strongSwan ios.mydom.com     wqAHLr7NEwPtw5wQwE7kgY77kb99eii
-V       bls-iphone2  2019-11-12:12:30:44 strongSwan ios.mydom.com     PncSBGksymCH14HABceoGBeCXhlQNOc
-V       bls-laptop   2019-11-12:12:31:13 strongSwan windows.mydom.com dKqi4jxZY1CKD3WMEdLXDIbv6YWVtr7
-V       travel-pi*   2019-11-12:11:51:47 strongSwan linux.mydom.com   qPQ7o2ovZ4sEoxGH4V9udn1dhuDDpIt
-rpi42~# pistrong list bls
-? User 'bls-dev' not found
-rpi42~# pistrong list bls --all
-V       bls-iphone  2019-11-12:11:52:12 strongSwan ios.mydom.com     wqAHLr7NEwPtw5wQwE7kgY77kb99eii
-V       bls-iphone2  2019-11-12:12:30:44 strongSwan ios.mydom.com     PncSBGksymCH14HABceoGBeCXhlQNOc
-V       bls-laptop  2019-11-12:12:31:13 strongSwan windows.mydom.com dKqi4jxZY1CKD3WMEdLXDIbv6YWVtr7
-
-rpi42~# cat /var/mail/bls
-From root@rpi42.mydom.com  Tue Nov 12 12:30:44 2019
-Return-Path: <root@rpi42.mydom.com>
-X-Original-To: bls
-Delivered-To: bls@starwhite.net
-Received: from [127.0.1.1] (localhost [127.0.0.1])
-        by rpi42.starwhite.net (Postfix) with ESMTP id 214D327639
-        for <bls>; Tue, 12 Nov 2019 12:30:44 -0800 (PST)
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-From: PiStrongVPN<root@rpi42.mydom.com>
-To: bls@starwhite.net
-Subject: VPN Cert password bls-iphone2-rpi42@myvpn.net
-Message-Id: <20191112203044.214D327639@rpi42.starwhite.net>
-Date: Tue, 12 Nov 2019 12:30:44 -0800 (PST)
-
-Use this password to import the certificate onto your device: PncSBGksymCH14HABceoGBeCXhlQNOc
-
-From root@rpi42.mydom.com  Tue Nov 12 12:30:44 2019
-Return-Path: <root@rpi42.mydom.com>
-X-Original-To: bls
-Delivered-To: bls@starwhite.net
-Received: from [127.0.1.1] (localhost [127.0.0.1])
-        by rpi42.starwhite.net (Postfix) with ESMTP id 254992763A
-        for <bls>; Tue, 12 Nov 2019 12:30:44 -0800 (PST)
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-From: PiStrongVPN<root@rpi42.mydom.com>
-To: bls@starwhite.net
-Subject: VPN Cert bls-iphone2-rpi42@myvpn.net
-Message-Id: <20191112203044.254992763A@rpi42.starwhite.net>
-Date: Tue, 12 Nov 2019 12:30:44 -0800 (PST)
-
-
-Root CA cert:             http://rpi42.mydom.com/vpn/strongSwanCACert.pem
-Your device certificate:  http://rpi42.mydom.com/vpn/bls-iphone2-rpi42.p12
-
-iOS devices: Browse the links to install both certificates (Install CA Cert first).
-  Then create a new IKEV2 VPN connection using the iOS profile bls-iphone2-rpi42@myvpn.net
-  and this information:
-          Server:    rpi42.mydom.com
-          Remote ID: ios.mydom.com
-          Local ID:  bls-iphone2-rpi42@myvpn.net
-  And select the newly-installed device certificate.
-
-Other devices: See the CertInstall.md guide at https://github.com/gitbls/pistrong
-for details on importing the certificate onto your device and creating the VPN configuration
-
-The password for this certificate is in a separate email message
-
-From root@rpi42.mydom.com  Tue Nov 12 12:49:40 2019
-Return-Path: <root@rpi42.mydom.com>
-X-Original-To: bls
-Delivered-To: bls@starwhite.net
-Received: from [127.0.1.1] (localhost [127.0.0.1])
-	by rpi42.starwhite.net (Postfix) with ESMTP id 94AF12797C
-	for <bls>; Tue, 12 Nov 2019 12:49:40 -0800 (PST)
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-From: PiStrongVPN<root@rpi42.mydom.com>
-To: bls@starwhite.net
-Subject: VPN Cert password bls-laptop-rpi42@myvpn.net
-Message-Id: <20191112204940.94AF12797C@rpi42.starwhite.net>
-Date: Tue, 12 Nov 2019 12:49:40 -0800 (PST)
-
-Use this password to import the certificate onto your device: dKqi4jxZY1CKD3WMEdLXDIbv6YWVtr7
-
-From root@rpi42.mydom.com  Tue Nov 12 12:49:40 2019
-Return-Path: <root@rpi42.mydom.com>
-X-Original-To: bls
-Delivered-To: bls@starwhite.net
-Received: from [127.0.1.1] (localhost [127.0.0.1])
-	by rpi42.starwhite.net (Postfix) with ESMTP id 98D3F2797D
-	for <bls>; Tue, 12 Nov 2019 12:49:40 -0800 (PST)
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-From: PiStrongVPN<root@rpi42.mydom.com>
-To: bls@starwhite.net
-Subject: VPN Cert bls-laptop-rpi42@myvpn.net
-Message-Id: <20191112204940.98D3F2797D@rpi42.starwhite.net>
-Date: Tue, 12 Nov 2019 12:49:40 -0800 (PST)
-
-
-Root CA cert:             http://rpi42.mydom.com/vpn/strongSwanCACert.pem
-Your device certificate:  http://rpi42.mydom.com/vpn/bls-laptop-rpi42.p12
-
-iOS devices: Browse the links to install both certificates (Install CA Cert first).
-  Then create a new IKEV2 VPN connection using the iOS profile bls-laptop-rpi42@myvpn.net
-  and this information:
-          Server:    rpi42.mydom.com
-          Remote ID: windows.mydom.com
-          Local ID:  bls-laptop-rpi42@myvpn.net
-  And select the newly-installed device certificate.
-
-Other devices: See the CertInstall.md guide at https://github.com/gitbls/pistrong
-for details on importing the certificate onto your device and creating the VPN configuration
-
-The password for this certificate is in a separate email message
 
