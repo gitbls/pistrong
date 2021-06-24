@@ -376,8 +376,11 @@ function do_post_config() {
     esac
     for f in /etc/swanctl/conf.d/*.conf
     do
-	echo "* Editing $f to ensure $oldupdown is changed to $newupdown"
-	sed -i "s#$oldupdown#$newupdown#" $f
+	if [ "$f" != "/etc/swanctl/conf.d/*.conf" ]
+	then
+	    echo "* Editing $f to ensure $oldupdown is changed to $newupdown"
+	    sed -i "s#$oldupdown#$newupdown#" $f
+	fi
     done
     echo ""
     echo " If this system will be a VPN Server AND you want remote VPN clients to access your LAN"
