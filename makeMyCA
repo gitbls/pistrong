@@ -131,6 +131,7 @@ linux="linux"
 #[[ "$myipaddr" =~ "127.0" ]] && IFS=" " read myipaddr s2 <<< $(hostname --all-ip-addresses)
 caconf="/etc/swanctl/conf.d/pistrong-CAServerConnection.conf"
 catables="/etc/swanctl/pistrong/CA-iptables"
+[ -f $caconf ] && echo "? There is already a CA on this system" && echo "  Use 'sudo pistrong deleteca' to delete it if you really want to recreate it" && exit
 
 echo "Build a prescriptive strongSwan CA for iOS, Windows, and Linux devices"
 echo ""
@@ -169,7 +170,7 @@ echo ""
 echo "** 'landev' is the network device that is connected to the local LAN"
 echo "   If your system has:"
 echo "    One network device:  Use that device"
-echo "    > 1 network device: Use the device that is not '$vpndev'"
+echo "    > 1 network device:  Use the device that is not '$vpndev'"
 echo ""
 askdefault "Network device that will be connected to the local LAN" landev "eth0"
 # Get LAN IP address and subnet information
@@ -341,6 +342,9 @@ echo "Creating $catables with firewall rules"
 emitFirewall
 echo ""
 echo "Creating $caconf with the new VPN Server definitions"
+updowns="/usr/lib/ipsec/_updown"
+# If $updowns not found we were built from tarball, so use alternate location
+[ ! -f $updowns ] && updowns="/libexec/ipsec/_updown"
 cat > $caconf <<EOF
 connections {
     linux-pubkey-ikev2 {
@@ -362,7 +366,7 @@ connections {
             net-linux {
                 remote_ts = $vpnsubnet
                 local_ts = $myfullsubnet
-                updown = /libexec/ipsec/_updown iptables
+                updown = $updowns iptables
 		esp_proposals = aes128gcm128-x25519
             }
         }

@@ -1,26 +1,33 @@
 #!/bin/bash
 #
-# Installation script for piStrongVPN
+# Installation tool for pistrong
 # Performs the following tasks
 #   Ensures required packages are installed
 #       On Raspbian these are: Apt-get install libgmp10 libgmp-dev libsystemd-dev libssl-dev
+# Checks for availability of apt version of strongSwan
+# If it exists, gives user an option which strongSwan to install (latest or distro-provided)
+# If latest:
 #   Creates a work directory: $PISTRONGOOT/piStrong (defaults to /root/piStrong)
 #   Downloads and bunzip2 the current released strongswan bits 
 #   Builds strongswan
 #   Installs into the system
-# Use pistrong to manage users and certificates
+# If apt distro-provided:
+#   Installs the correct packages
+#
+# Use pistrong to manage users and certificates for your strongSwan VPN
 # Start and stop the VPN via: 'sudo pistrong service start' and 'sudo pistrong service stop' ...
 #   ...or 'sudo systemctl start strongswan' and 'sudo systemctl stop strongswan'
 #
 
-function getssver() {
+function get_wssver() {
     vs1=$(curl -s -L https://www.strongswan.org/download.html | grep 'Current Release' | head -1)
     s1=${vs1##<h4>Current Release*normal\">}
-    ssver=${s1%%<*}
+    wssver=${s1%%<*}
+    echo $wssver
     return 1
 }
 
-function getosdistro() {
+function get_osdistro() {
     [ "$osdistro" != "" ] && return
     if [ -f "/etc/os-release" ]
     then
@@ -30,6 +37,13 @@ function getosdistro() {
     fi
     osdistro=${osdistro%\"}
     osdistro=${osdistro#\"}
+    declare -x osdistro
+}
+
+function get_aptssver() {
+    read cand aptssver <<< $(apt policy strongswan-swanctl 2> /dev/null | grep Candidate)
+    echo "$aptssver"
+    return
 }
 
 function askyn() {
@@ -52,96 +66,187 @@ function askinall() {
     [ "$cmd" == "allx" ] && askin "$1"
 }
 
-function gotoBuildDir() {
-    if [ "$ssver" == "" ]
+function ispkginstalled() {
+    #
+    # $1 has package name
+    #
+    iver=$(apt-cache policy $1 | grep Installed:)
+    if [ "$iver" == "" ]
     then
-	# See if we can find the build dir
-	for d in $PSDIR/strongswan-*
-	do
-	    # Found it. Get ssver
-	    IFS="-" read fn ssver <<< $d
-	    break
-	done
+	return 1
+    else
+	[[ "$iver" =~ "(none)" ]] && return 1 || return 0
     fi
-    PSBDIR="$PISTRONGROOT/piStrong/strongswan-$ssver"
+    return
+}
+
+function do_cleanupwebinstall() {
+    [ "$PISTRONGROOT" == "" ] && PISTRONGROOT="/root"
+    [ ! -d "$PISTRONGROOT" ] && return
+    PSDIR="$PISTRONGROOT/piStrong"
+    [ ! -d "$PSDIR" ] && return
+    gotoBuildDir
+    [ ! -d "$PSBDIR" ] && return
+    echo "** We must remove the existing strongSwan Web install"
+    echo "   Any existing CA and user/device certs and keys will be preserved"
+    if askyn "Continue"
+    then
+	[ -f $PISTRONGROOT/pistrong-uninstall.log ] && rm -f $PISTRONGROOT/pistrong-uninstall.log
+	echo "> Removing existing strongSwan Web install"
+	echo "* Uninstall log will be in $PISTRONGROOT/pistrong-uninstall.log"
+	make uninstall > $PISTRONGROOT/pistrong-uninstall.log 2>&1
+	cd $PISTRONGROOT
+	rm -rf piStrong
+    else
+	echo "** Cannot continue apt install until web install is removed"
+	exit
+    fi
+}
+
+function do_cleanupaptinstall() {
+    if ! ispkginstalled strongswan-swanctl
+    then
+	return
+    fi
+    echo "** We must remove your existing apt install of strongSwan"
+    echo "   Any existing CA and user/device certs and keys will be preserved"
+    if ! askyn "Continue"
+    then
+	echo "** Cannot do the web install until the apt install is removed"
+	exit
+    fi
+    apt-get --yes remove strongswan-swanctl strongswan-pki charon-systemd libstrongswan libstrongswan-standard-plugins strongswan-libcharon
+}
+
+function do_wrapup() {
+    echo $"
+> pistrong/strongSwan Installation complete
+
+** Required Post-installation Steps:
+
+* If this system will be a VPN Server:
+  * Add port forwards to this system on your router for UDP ports 500 and 4500
+    See /usr/local/bin/makeMyCA to fully configure a CA that supports iOS, Windows, and Linux VPN Clients
+  * Set up iptables. See https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
+    See pistrong help and pistrong --help for pistrong command details
+
+* If this system will be a VPN Client:
+  * Once you receive the VPN Cert Pack from the VPN Server manager,
+    install it into strongSwan using the 'sudo pistrong client install' command
+  * Then:
+      'sudo pistrong service start' or 'sudo systemctl start strongswan' to start the strongSwan VPN
+      'sudo pistrong service enable' or 'sudo systemctl enable strongswan' to enable strongSwan to restart after each reboot
+
+* Reboot the system and make sure everything works
+"
+}
+
+function do_pistrong_download() {
+    #
+    # Download the pistrong bits from GitHub
+    #
+    echo "> Downloading pistrong scripts from github"
+    for f in pistrong InstallPiStrong makeMyCA makeTunnel
+    do
+	if [ ! -x /usr/local/bin/$f ]
+	then
+	    echo "* Downloading $f"
+#	    cp /l/work/pistrong/$f /usr/local/bin
+	    curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/$f -o /usr/local/bin/$f
+	    chmod 755 /usr/local/bin/$f
+	fi
+    done
+}
+
+function get_servicename() {
+    for sn in strongswan strongswan-swanctl
+    do
+	if [ "$(systemctl list-unit-files --no-pager --no-legend $sn.service)" != "" ]
+	then
+	    echo "$sn"
+	    return
+	fi
+    done
+    echo "unknown"
+    return
+}
+
+function do_install_prereqs() {
+    case "$osdistro" in
+	ubuntu|debian|raspbian|raspios)
+	    local pkgs=""
+	    [ "$(which curl)" == "" ] && pkgs="curl"
+	    [ "$(which zip)" == "" ] && pkgs="$pkgs zip"
+	    [ "$pkgs" != "" ] && apt-get install --yes $pkgs || echo "* curl and zip are both already installed"
+	    ;;
+	*)
+	    echo "? Cannot install prereqs; Unknown distro '$os'"
+	    ;;
+    esac
+    
+}
+
+function gotoBuildDir() {
+    for d in $PSDIR/strongswan-*
+    do
+	# Found it. Get ssver
+	IFS="-" read fn webssver <<< $d
+	break
+    done
+    PSBDIR="$PISTRONGROOT/piStrong/strongswan-$webssver"
     cd $PSBDIR
     return 0
 }
 
-function DoPreReqs() {
-    getosdistro
+function check_hostname() {
+    if [ "$(hostname)" == "raspberrypi" ]
+    then
+        echo ""
+        echo "%%% Your hostname is still 'raspberrypi'"
+        echo "  We STRONGLY encourage you to change it via sudo raspi-config Network Options before continuing"
+        if askyn "Press y to exit and correct hostname, n to continue"
+        then
+            exit 1
+        fi
+    fi
+}
+
+function web_do_prereqs() {
+    get_osdistro
     case "$osdistro" in
-        ubuntu)
-            echo "I'll try to install the required packages"
-            apt-get install make gcc pkg-config libgmp10 libgmp-dev libsystemd-dev libssl-dev python3-pexpect
-            echo "Check above to ensure everything got installed"
-            ;;
-        opensuse*)
-            echo "I'll try to install the required packages"
-            zypper in make gcc gmp-devel systemd-devel libopenssl-1_1-devel python3-pexpect
-            echo "Check above to ensure everything got installed"
-            ;;
-        centos|rhel|fedora)
-            echo "I'll try to install the required packages, but this is incomplete"
-            yum install gcc gmp-devel.x86_64 systemd-devel.x86_x64 openssl-devel.x86_64
-            echo "Check above to ensure everything got installed"
-            echo "** You'll need to install python3 and pexpect if they are not already installed"
-            ;;
-        debian|raspbian)
-            echo "** Ensure your Pi is up to date"
-            echo " Your Pi must be up to date with the Raspbian repositories by using these commands"
-	    echo ""
-            echo "    sudo apt-get update"
-            echo "    sudo apt-get upgrade"
+#        opensuse*)
+#            echo "I'll try to install the required packages"
+#            zypper in make gcc gmp-devel systemd-devel libopenssl-1_1-devel python3-pexpect zip
+#            echo "Check above to ensure everything got installed"
+#            ;;
+#        centos|rhel|fedora)
+#            echo "I'll try to install the required packages, but this is incomplete"
+#            yum install gcc gmp-devel.x86_64 systemd-devel.x86_x64 openssl-devel.x86_64 zip
+#            echo "Check above to ensure everything got installed"
+#            echo "** You'll need to install python3 and pexpect if they are not already installed"
+#            ;;
+        ubuntu|debian|raspbian|raspios)
             echo ""
-            echo "  If you have not done this yet, respond n to exit and update your Pi"
-            echo "  Then reboot your Pi and restart this procedure"
-            echo ""
-            if askyn "Press y to Continue, n to exit and update your Pi" "-n 1"
-            then
-		[ "$cmd" == "all" ] && ally="-y" || ally=""
-                echo ""
-                for p in libgmp10 libgmp-dev libsystemd-dev libssl-dev python3-pexpect zip curl pkg-config ; do
-                    if ! dpkg-query -s $p > /dev/null 2>&1
-                    then
-                        echo "Installing package $p"
-                        apt-get $ally install $p
-                    else
-                        echo "Package $p already installed"
-                    fi
-                done
-            else
-                echo ""
-                exit 1
-            fi
-            if [ "$(hostname)" == "raspberrypi" ]
-            then
-                echo ""
-                echo "% Your hostname is still 'raspberrypi'"
-                echo "  We STRONGLY encourage you to change it via sudo raspi-config Network Options before continuing"
-                if askyn "Press y to exit and correct hostname, n to continue"
-                then
-                    exit 1
-                fi
-            fi
-    ;;
+            echo "Ensuring that required packages 'make gcc libgmp10 libgmp-dev libsystemd-dev libssl-devpkg-config' are installed"
+            apt-get install --yes make gcc pkg-config libgmp10 libgmp-dev libsystemd-dev libssl-dev python3-pexpect
+	    ;;
         *) echo "% Pre-reqs unknown for distro $osdistro"
     esac
 }
 
-function DoDownload() {
+function web_dodownload() {
     cd $PISTRONGROOT
-    getssver
-#    ssver="5.6.3"  # If you want a specific version (and it's still available, of course)
+    webssver=$(get_wssver)
+#   webssver="5.6.3"  # If you want a specific version (and it's still available, of course)
     echo ""
-    echo "Using Strongswan version $ssver"
+    echo "Using Strongswan version $webssver"
     echo ""
-    echo "** The strongSwan download/build process can take several minutes (fast RPi4)"
+    echo "** The strongSwan download and build process can take about 10 minutes on an RPi4 on SSD"
     echo "   or close to an hour (RPi0W)."
     echo ""
     [ ! -d piStrong ] && mkdir piStrong
     cd ./piStrong
-    [ -d strongswan-$ssver ] && rm -rf strongswan-$ssver
+    [ -d strongswan-$webssver ] && rm -rf strongswan-$webssver
     #
     # Make sure no older versions are there with the same name pattern
     #
@@ -161,48 +266,48 @@ function DoDownload() {
 	echo "% You must rename or delete all directories named '$PSDIR/strongswan-xx.xx.xx' before continuing"
 	exit
     fi
-    if [ ! -f strongswan-$ssver.tar.bz2 ]
+    if [ ! -f strongswan-$webssver.tar.bz2 ]
     then
-	curl -L https://download.strongswan.org/strongswan-$ssver.tar.bz2 -o strongswan-$ssver.tar.bz2
+	curl -L https://download.strongswan.org/strongswan-$webssver.tar.bz2 -o strongswan-$webssver.tar.bz2
 	ests=$?
 	[ $ests -ne 0 ] && echo "% Error downloading strongSwan tarball; Please try again" && exit
     else
 	echo ""
-	echo "Using found strongSwan tar archive $ssver.tar.bz2"
+	echo "Using found strongSwan tar archive strongswan-$webssver.tar.bz2"
     fi
 #    askinall "Press Enter to unpack the sources: "
     echo ""
     [ -f pistrong-untar.log ] && rm -f pistrong-untar.log
     echo "** $(date +'%Y-%m-%d %H:%M:%S') Unpacking source archive [Log: $PSDIR/pistrong-untar.log]"
-    tar -xjvf strongswan-$ssver.tar.bz2 > pistrong-untar.log 2>&1
+    tar -xjvf strongswan-$webssver.tar.bz2 > pistrong-untar.log 2>&1
     ests=$?
     [ $ests -eq 0 ] && sts="No errors" || sts="review $PSDIR/pistrong-untar.log"
     echo "   tar exit status: $ests ($sts)"
 }
 
-function DoPreConf() {
+function web_dopreconf() {
     gotoBuildDir
     askinall "Press Enter to start pre-make configuration: "
     echo ""
     echo "** $(date +'%Y-%m-%d %H:%M:%S') Performing pre-make configuration [Log: $PSBDIR/pistrong-configure.log]"
-    ./configure --prefix= --enable-eap-mschapv2 --enable-eap-identity --enable-openssl --enable-eap-md5 --enable-eap-tls --enable-eap-dynamic --enable-systemd --enable-swanctl --disable-charon --disable-stroke --disable-scepclient --enable-counters > pistrong-configure.log
+    ./configure --prefix= --enable-eap-mschapv2 --enable-eap-identity --enable-openssl --enable-eap-md5 --enable-eap-tls --enable-eap-dynamic --enable-systemd --enable-swanctl --disable-charon --disable-stroke --disable-scepclient --enable-counters > pistrong-configure.log 2>&1
     ests=$?
     [ $ests -eq 0 ] && sts="No errors" || sts="review $PSBDIR/pistrong-configure.log"
     echo "   Config exit status: $ests ($sts)"
 }
 
-function DoMake() {
+function web_domake() {
     gotoBuildDir
     askinall "Press Enter to start make: "
     echo ""
     echo "** $(date +'%Y-%m-%d %H:%M:%S') Performing make [Log: $PSBDIR/pistrong-make.log]"
-    make > pistrong-make.log
+    make > pistrong-make.log 2>&1
     ests=$?
     [ $ests -eq 0 ] && sts="No errors" || sts="review $PSBDIR/pistrong-make.log"
     echo "   Make exit status: $ests ($sts)"
 }
 
-function DoInstall() {
+function web_doinstall() {
     gotoBuildDir
     askinall "Press Enter to start install: "
     echo ""
@@ -213,35 +318,83 @@ function DoInstall() {
     echo "   Install exit status: $ests ($sts)"
 }
 
-function DoMakeDirs() {
-    echo "** Creating /etc/swanctl/pistrong directories..."
-    cd /etc/swanctl
-    [ ! -d conf.d ]   && mkdir conf.d
-    [ ! -d pistrong ] && mkdir pistrong && mkdir pistrong/{client-assets,server-assets,VPNClients,backup}
-    chmod 700 pistrong/client-assets pistrong/server-assets
-    [ ! -d "p12" ] && mkdir p12 && chmod 750 p12
+function web_doall() {
+    do_pistrong_download
+    web_do_prereqs
+    web_dodownload
+    web_dopreconf
+    web_domake
+    web_doinstall
+    do_post_config web
+    do_wrapup
+
+}
+function do_web_install() {
+    [ "$PISTRONGROOT" == "" ] && PISTRONGROOT="/root"
+    [ ! -d "$PISTRONGROOT" ] && echo "? PISTRONGROOT directory '$PISTRONGROOT' does not exist" && exit
+    PSDIR="$PISTRONGROOT/piStrong"
+
+    case "$1" in
+	"prereq")   web_doprereqs ;;
+	"download") web_dodownload ;;
+	"preconf")  web_dopreconf ;;
+	"make")     web_domake ;;
+	"install")  web_doinstall ;;
+	"postconf"|"post-configure") do_post_config web ;;
+	"all"|"allx") web_doall ;;
+	*) echo "? Invalid command" ;
+	   echo "? Commands: prereq|download|preconf|make|install|postconf|all" ;
+	   exit 1
+       ;;
+esac
 }
 
-function DoPostConf() {
-    [ "$cmd" == "allx" ] && echo "" && echo "** $(date +'%Y-%m-%d %H:%M:%S') Starting postconf"
-    [ "$cmd" != "postconf" -a "$cmd" != "post-configure" ] && askinall "Press Enter to start postconf: "
+function do_apt_install() {
+    echo "> Installing strongSwan from apt"
+    echo "* Installing packages 'strongswan-swanctl strongswan-pki charon-systemd python3-pexpect'"
+    apt-get --yes install strongswan-swanctl strongswan-pki charon-systemd python3-pexpect
+}
+
+function do_post_config() {
     echo ""
-    echo " VPN Server configuration includes:"
-    echo "   Enable IPV4 forwarding"
+    echo "> Creating /etc/swanctl/pistrong directories..."
+    [ ! -d /etc/swanctl/conf.d ]   && mkdir /etc/swanctl/conf.d
+    [ ! -d /etc/swanctl/pistrong ] && mkdir -p /etc/swanctl/pistrong/{client-assets,server-assets,VPNClients,backup}
+    chmod 700 /etc/swanctl/pistrong/{client-assets,server-assets}
+    [ ! -d "/etc/swanctl/p12" ] && mkdir /etc/swanctl/p12 && chmod 750 /etc/swanctl/p12
+    #
+    # If /etc/swanctl/conf.d/*.conf files exist, sed them to make sure _updown is invoked from the correct location
+    case "$1" in
+	apt)
+	    oldupdown="/libexec/ipsec/_updown"
+	    newupdown="/usr/lib/ipsec/_updown"
+	;;
+	web)
+	    oldupdown="/usr/lib/ipsec/_updown"
+	    newupdown="/libexec/ipsec/_updown"
+	;;
+    esac
+    for f in /etc/swanctl/conf.d/*.conf
+    do
+	echo "* Editing $f to ensure $oldupdown is changed to $newupdown"
+	sed -i "s#$oldupdown#$newupdown#" $f
+    done
+    echo ""
+    echo " If this system will be a VPN Server AND you want remote VPN clients to access your LAN"
+    echo " then IPV4 forwarding should be enabled"
     echo ""
     fserver=1
-    if askyn "Configure this system to be a VPN Server"
+    if askyn "Enable IPV4 forwarding"
     then
 	fserver=0
     fi
-    DoMakeDirs
     sysctl92="/etc/sysctl.d/92-pistrong.conf"
     sysctl92d="/etc/sysctl.d/.92-pistrong.conf"
     if [ $fserver -eq 0 ]
     then
 	if [ ! -f $sysctl92 ]
 	then
-	    echo "** Creating $sysctl92 to set net.ipv4.ip_forward=1"
+	    echo "* Creating $sysctl92 to set net.ipv4.ip_forward=1"
 	    echo "net.ipv4.ip_forward=1" > $sysctl92 && sysctl -p $sysctl92 > /dev/null
 	fi
     else
@@ -249,9 +402,9 @@ function DoPostConf() {
 	[ ! -f $sysctl92d ] && echo "net.ipv4.ip_forward=1" > $sysctl92d
     fi
     # Change IKE logging to eliminate keep-alive message logging
-    if [ ! -f /etc/strongswan.d/orig-charon-systemd.conf ]
+    if [ ! -f /etc/strongswan.d/charon-systemd.conf-pistrong-orig ]
     then
-	mv /etc/strongswan.d/charon-systemd.conf /etc/strongswan.d/orig-charon-systemd.conf
+	mv /etc/strongswan.d/charon-systemd.conf /etc/strongswan.d/charon-systemd.conf-pistrong-orig
 	cat >> /etc/strongswan.d/charon-systemd.conf <<EOF
 charon-systemd {
     #
@@ -268,73 +421,127 @@ charon-systemd {
         # default = 1
 
         # ** pistrong set IKE=0 to turn off keep-alive message logging
+        # ** comment out next line to re-enable keep-alive message logging
 	ike = 0
 
     }
 }
 EOF
     fi
-}
-function DoAll() {
-    DoPreReqs
-    DoDownload
-    DoPreConf
-    DoMake
-    DoInstall
-    fServer=0
-    DoPostConf
-    echo ""
-    echo "** pistrong/strongSwan Installation complete"
-    echo ""
-    echo "** Required Post-installation Steps:"
-    if [ $fserver -eq 0 ]
+    sn=$(get_servicename)
+    if [ "$sn" == "unknown" ]
     then
-	echo "     Add router port forwards for UDP ports 500 and 4500 to this system"
-	echo ""
-	echo "     See https://github.com/gitbls/pistrong/blob/master/makeMyCA to fully configure a CA"
-	echo "     that supports iOS, Windows, and Linux VPN Clients"
-	echo ""
-	echo "     Set up iptables. See https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
-	echo ""
-	echo "     See pistrong help and pistrong --help for pistrong command details"
-    else
-	echo "     Once you have received the VPN Cert Pack from the VPN Server manager"
-	echo "      install it into strongSwan using the 'sudo pistrong client install' command"
-	echo "     Then..."
+	echo "% Could not find the strongSwan systemd service"
+	echo "  Set it with 'sudo pistrong config --service servicename.service'"
     fi
-    echo ""
-    echo "        'sudo pistrong service start' or 'sudo systemctl start strongswan' to start the strongSwan VPN"
-    echo "        'sudo pistrong service enable' or 'sudo systemctl enable strongswan' to enable strongSwan to restart after reboot"
-    echo ""
-    echo "   Reboot and make sure everything works"
-    echo ""
-
+    pistrong config --service $sn.service
+    systemctl stop $sn > /dev/null 2>&1
 }
+
 #
 # Main
 #
+
 if [[ ! $EUID -eq 0 ]];then
     echo "? Please run as root: sudo $0 $1 $2"
     exit 1
 fi
 
-cmd="$1"
+cmd="${1,,}"
 [ "$cmd" == "" ] && cmd="all"
-[ "$PISTRONGROOT" == "" ] && PISTRONGROOT="/root"
-[ ! -d "$PISTRONGROOT" ] && echo "? PISTRONGROOT directory '$PISTRONGROOT' does not exist" && exit
-PSDIR="$PISTRONGROOT/piStrong"
+get_osdistro
+check_hostname
+echo "** Installer for strongSwan/pistrong Management Tool **"
+echo ""
+echo "This installer requires 'curl' and 'zip'"
+echo "Doing an 'apt update' and installing them if necessary..."
+echo ""
+# ** Needs to be fixed when non-apt systems supported
+apt-get update
+do_install_prereqs
+echo ""
+webssver=$(get_wssver)
 
-case "$cmd" in
-    "prereq")   DoPreReqs ;;
-    "download") DoDownload ;;
-    "preconf") DoPreConf ;;
-    "make") DoMake ;;
-    "install") DoInstall ;;
-    "postconf"|"post-configure") DoPostConf ;;
-    "makedirs"|"mkdir") DoMakeDirs ;;
-    "all"|"allx") DoAll ;;
-    *) echo "? Invalid command" ;
-       echo "? Commands: prereq|download|preconf|make|install|postconf|all" ;
-       exit 1
-       ;;
-esac
+if [ "$cmd" != "all" ]
+then
+    do_cleanupaptinstall
+    do_web_install "$cmd"
+    exit
+fi
+
+if [ "$(which apt)" != "" ]
+then
+    echo "> Identifying strongSwan version numbers on Web and in apt"
+    
+    aptver=$(get_aptssver)
+    IFS="." read vmaj vmin vmisc <<< $aptver
+    vok=1
+    # Minimum required version of strongSwan is 5.8.0
+    # I had issues with 5.7.2 and iOS so disallowing older versions to avoid confusion
+    # Debian Bullseye will solve this issue with a much newer strongSwan apt package
+    if [ $vmaj -eq 5 ]
+    then
+	if [ $vmin -gt 8 ]
+	then
+	    vok=0
+	fi
+    else
+	[ $vmaj -gt 5 ] && vok=0
+    fi
+    if [ $vok -eq 0 -o "$PSAPTOK" != "" ]
+    then
+	echo $"
+strongSwan can be installed one of two ways:
+
+  apt: Version $aptver
+       Uses the standard apt package mechanism
+       Slightly older version of strongSwan, quick install
+
+  web: Version $webssver
+       Download, build, and install from strongswan.org
+       Latest released version of strongSwan, longer install (10-15 mins on Pi4)
+
+See the github README for further information"
+	echo -n "Select A:apt W:website: " ; read ans
+	case "${ans,,}" in
+	    a*|A*) echo ""
+		   [ "$(which make)" == "" ] && echo "Installing make..." && apt-get install make
+		   do_cleanupwebinstall
+		   do_pistrong_download
+		   do_apt_install
+		   do_post_config apt
+		   do_wrapup
+		   exit
+		   ;;
+	    w*|W*) echo ""
+		   do_cleanupaptinstall
+		   do_web_install "$cmd"
+		   exit
+		   ;;
+	    *)   echo ""
+		 exit
+		 ;;
+	esac
+    else
+	echo $"
+% The version of strongSwan in apt is less than the minimum required version (5.8.0)
+  You can still install the web version ($webssver)
+"
+	if askyn "Do you want to continue and install the web version"
+	then
+	    do_cleanupaptinstall
+	    do_web_install "$cmd"
+	    exit
+	else
+	    echo ""
+	    exit
+	fi
+    fi
+fi
+echo "% strongSwan not found in apt"
+if askyn "Do you want to install the latest version from the web"
+then
+    do_cleanupaptinstall
+    do_web_install "$cmd"
+fi
+exit

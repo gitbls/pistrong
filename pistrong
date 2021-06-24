@@ -41,73 +41,8 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "V3.4"
+version = "V3.5"
 dbversion = "3"
-
-helpmsg = "pistrong {} commands:\n\
-\n\
-        * Manage user certs *\n\
- add    name    Create a new user/device cert\n\
- resend name    Resend cert info to user\n\
- list   [name]  List users (see examples)\n\
- revoke name    Revoke user's cert\n\
- delete name    Delete user's cert\n\
-\n\
-        * Manage CA/VPN certs *\n\
- createca       Build the CA certs\n\
- deleteca       Delete ALL CA and user/device certs/keys (irreversible!)\n\
- makevpncert    Create an additional VPN cert/key\n\
- makecacert     Create an additional CA cert/key\n\
- listca         List all CA and VPN cert names\n\
- showca         Show CA and associated VPN certs\n\
- showcert       List cert contents\n\
-\n\
-        * pistrong configuration and Strongswan service management *\n\
- config         Modify or print config settings\n\
- service        Manage the strongSwan service\n\
-\n\
-        * Miscellaneous *\n\
- install        Starts strongSwan installation with 'InstallPiStrong all'\n\
- version        Print the pistrong version\n\
- help           Print this message\n\
-\n\
-Command-line switches override config file settings.\n\
-\n\
-Examples:\n\
-\n\
-pistrong --help\n          Get help about switches\n\
-pistrong createca\n          Create a new CA in the root directory (/etc/swanctl)\n\
-pistrong createca --vpnsankey keyname\n          Create a new CA with a different vpnsankey (d:ipsec.vpn.net)\n\
-pistrong deleteca\n          Delete the CA, all certs, etc. Be really sure on this one!\n\
-pistrong makevpncert --vpnsankey key1,key2 --vpncert mycert\n\
-          Make an additional VPN cert/key named mycert. key1 and key2 will be\n\
-          the SAN names in the cert\n\
-pistrong add name\n          Add user 'name' and create a cert for it\n\
-          The full username will be name-dev\n\
-pistrong add name --password abc\n          Provide the cert password on the command line\n\
-pistrong add name --device DEVICE\n          Name the cert name-DEVICE-servername@cnsuffix\n          (d: name-dev-servername...)\n\
-pistrong add name --nopass\n          Password for cert import is null\n\
-pistrong add name --random\n          Generate a random cert install password\n          Cert install passwords are saved in /etc/swanctl/pistrong/pistrongdb.json\n\
-pistrong add name --mail users-email@somewhere.com\n          Send mail to the user with a link to the certs\n          Cert passwords are sent separately\n\
-          --webdir dir --weburl url from the configuration or on command line\n\
-pistrong list\n          List all user certs\n\
-pistrong list name --all\n          List all certs for 'name'\n\
-pistrong list user --full\n          Show specific user plus cert details\n\
-pistrong resend name --mail users-email@somewhere.com\n          Resend the cert link and password to the user\n\
-\n\
-A full user name is name-dev. 'bill-iphone', for instance. If you don't specify\n\
---device, names will be 'name-dev' (e.g., 'bill-dev').\n\
-The list command requires a full name-dev, except when used with --all,\n\
-which will list all certs for the specified name.\n\
-\n\
-For example, 'pistrong list bill --all' will list the certs for bill-iphone\n\
-and bill-laptop.\n\
-\n\
-The revoke and resend commands always require a full name-dev.\n\
-\n\
-You MUST specify --vpnsankey when you first create a CA.\n\
-\n\
-See the full documentation at https://github.com/gitbls/pistrong\n".format(version)
 
 def qdelfile(qfn):
     """
@@ -156,7 +91,7 @@ def askyn(question):
     Returns True if yes, False if anything else
     """
     yni = input(question).lower()
-    if "yes".startswith(yni): return True
+    if yni != "" and "yes".startswith(yni): return True
     return False
 
 def asktwice(question):
@@ -188,21 +123,30 @@ def which(fname):
             return fullpath
     return None
 
-def dosystem(pd, docmd, doecho, pout):
+def decodeutf(utfstring):
+    return utfstring.decode('utf-8')
+
+def printutf(utfstring):
+    if utfstring != b'': print(utfstring.decode('utf-8'))
+    
+def dosystem(pd, docmd, doecho=True, pout=True):
     """
     Execute the string as a separate process, pout=display output, doecho=display cmd if --cmd
     Returns the result from subprocess.run, which contains stdout, returncode, etc.
     """
     if pd.dx['cmds'] and doecho: print("[{}]".format(docmd))
-    r = subprocess.run(docmd, stdout=subprocess.PIPE, stderr=None, shell=True)
-    if pout and r.stdout != b'': print(r.stdout.decode('utf-8'))
+    r = subprocess.run(docmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    if pout:
+        printutf(r.stdout)
+        if r.returncode != 0 and r.stderr != b'':
+            printutf(r.stderr)
     return r
 
 def isrunning(pd):
     """
     Returns 0 if strongswan service is running
     """
-    r = dosystem(pd, "systemctl --quiet is-active {}".format(pd.db['config']['service']['value']), False, False)
+    r = dosystem(pd, "systemctl --quiet is-active {}".format(pd.db['config']['service']['value']), doecho=False, pout=False)
     return r.returncode
 
 def stopifrunning(pd):
@@ -213,7 +157,7 @@ def stopifrunning(pd):
     if strunning == 0:
         if not pd.dx['debug']:
             print("% Stopping {}".format(pd.db['config']['service']['value']))
-            dosystem(pd, "systemctl stop {}".format(pd.db['config']['service']['value']), False, True)
+            dosystem(pd, "systemctl stop {}".format(pd.db['config']['service']['value']), doecho=False)
         else:
             strunning = 1
     return strunning
@@ -225,22 +169,22 @@ if strongswan was running before, as indicated by argument, restart it
     if running == 0:
         if not pd.dx['debug']:
             print("% Starting {}".format(pd.db['config']['service']['value']))
-            dosystem(pd, "systemctl start {}".format(pd.db['config']['service']['value']), False, True)
+            dosystem(pd, "systemctl start {}".format(pd.db['config']['service']['value']), doecho=False)
 
 def isikeup(pd, ikename):
     ikes = "--ike {}".format(ikename) if ikename != "" else ""
-    r = dosystem(pd, "swanctl --list-sas {}".format(ikes), False, False)
-    if "ESTABLISHED" in r.stdout.decode('utf-8'): return True
+    r = dosystem(pd, "swanctl --list-sas {}".format(ikes), doecho=False, pout=False)
+    if "ESTABLISHED" in decodeutf(r.stdout): return True
     return False
 
 def istunnelup(pd, ikename):
     ikes = "--ike {}".format(ikename) if ikename != "" else ""
-    r = dosystem(pd, "swanctl --list-sas {}".format(ikes), False, False)
-    if "INSTALLED" in r.stdout.decode('utf-8'): return True
+    r = dosystem(pd, "swanctl --list-sas {}".format(ikes), doecho=False, pout=False)
+    if "INSTALLED" in decodeutf(r.stdout): return True
     return False
 
 def killike(pd, ikename, silently):
-    r = dosystem(pd, "swanctl --terminate --ike {}".format(ikename), True, not silently)
+    r = dosystem(pd, "swanctl --terminate --ike {}".format(ikename), pout=not silently)
     return r.returncode
 
 def perrorexit(emsg):
@@ -303,10 +247,14 @@ def sendmsg(pd, mfrom, mto, msubj, mtext, mattach):
         part.add_header("Content-Disposition", "attachment; filename={}".format(os.path.basename(mattach)))
         mmsg.attach(part)
     msmtp = smtplib.SMTP(pd.db['config']['smtpserver']['value'], pd.db['config']['smtpport']['value'])
+    msmtp.ehlo()
     if pd.db['config']['smtpusetls']['value']:
        msmtp.starttls()
     try:
         msmtp.login(pd.db['config']['smtpuser']['value'], pd.db['config']['smtppassword']['value'])
+    except smtplib.SMTPAuthenticationError as err:
+        print("? Authentication error logging in to '{}'".format(pd.db['config']['smtpserver']['value']))
+        perrorexit(err)
     except smtplib.SMTPException:  # no login needed if "smart host"
         pass
     msmtp.sendmail(mfrom, mto, mmsg.as_string())
@@ -364,7 +312,7 @@ def reloadcreds(pd):
     """
     if isrunning(pd) == 0:
         print("% Reloading strongSwan VPN credentials...")
-        dosystem(pd, "swanctl --load-creds", True, True)  # reload credentials
+        dosystem(pd, "swanctl --load-creds")  # reload credentials
 
 def gethostfqdn(pd, args):
     if pd.db['config']['myfqdn']['value'] != "":
@@ -428,6 +376,7 @@ def dbload(pd):
                            "smtpusetls":{"value":False,"help":"SMTP Mail use TLS auth [NYI]"},\
                            "webdir":{"value":"tmp","help":"Directory in file system corresponding to weburl"},\
                            "weburl":{"value":"http://127.0.0.1","help":"Web URL on which to append cert name"}}
+        pd.dbmodified = True
     if not ('version' in pd.db['config']) or (pd.db['config']['version']['value'] < "3"):
             perrorexit("? {} is from a prior version. See documentation".format(pd.certdb))
     #
@@ -522,7 +471,7 @@ def getcertkey(certfile, keyname):
     Returns the specified "keyname:" from a cert in readable format
     """
     acert = subprocess.check_output(("pki --print --type x509 --in {}".format(certfile)), shell=True)
-    for line in acert.decode('utf-8').split("\n"):
+    for line in decodeutf(acert).split("\n"):
         if keyname in line:
             return line.replace(keyname,"").strip()
     return ""
@@ -568,7 +517,7 @@ def listentry(pd, listkey, maxkey, maxcertlen, maxrid):
     if args.full:
         if os.path.isfile(listcert):
             acert = subprocess.check_output(("pki --print --type x509 --in {}".format(listcert)), shell=True)
-            for line in acert.decode('utf-8').split("\n"):
+            for line in decodeutf(acert).split("\n"):
                 if line != "":
                     print(line)
         else:
@@ -618,12 +567,11 @@ def makeuserzip(pd, args, newkey):
     tmpf = "{}/{}".format(pd.tmpdir, "readme.txt")
     with open(tmpf, 'w') as f:
         f.write(certdetailmsg(pd, args, newkey, False))
-    dosystem(pd, "zip -jq {} {} {} {}".format(pd.cpackzip, pd.swancert, pd.newp12, tmpf), True, True)
+    dosystem(pd, "zip -jq {} {} {} {}".format(pd.cpackzip, pd.swancert, pd.newp12, tmpf))
     os.unlink(tmpf)
     os.rmdir(pd.tmpdir)
 
 def buildlinuxpack(pd, args, newkey, newremoteid):
-
     pd.cpackzip = "{}/server-assets/{}.zip".format(pd.pswandir, newkey)
     pd.tmpdir = mkdtemp(prefix="pistrong")
     # Make a copy of the CA cert and rename it to {hostname}-{name}CACert.pem
@@ -633,7 +581,7 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
     tmpswancertfn="{}-{}".format(pd.shorthost, pd.swancertfn)
     qrename(pd.fnpdir.format(pd.tmpdir,pd.swancertfn), tmpswancert)
     # Create the zip file and put the certs into it
-    dosystem(pd, "zip -jq {} {} {} {}".format(pd.cpackzip, tmpswancert, pd.clientcert, pd.clientkey), True, True)
+    dosystem(pd, "zip -jq {} {} {} {}".format(pd.cpackzip, tmpswancert, pd.clientcert, pd.clientkey))
     # Build the installer script and add to the zip file
     tmpf = "{}/{}".format(pd.tmpdir, pd.db['config']['lxscript']['value'])
     with open(tmpf, 'w') as f:
@@ -651,6 +599,9 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
         f.write("chmod 755 $swandir/x509ca/{}\n".format(tmpswancertfn))
         f.write("chmod 755 $swandir/x509/{}\n".format(pd.clientcertfn))
         f.write("chmod 600 $swandir/private/{}\n".format(pd.clientkeyfn))
+        f.write("updowns='/usr/lib/ipsec/_updown'\n")
+        # If $updowns not found we were built from tarball, so use alternate location
+        f.write('[ ! -f $updowns ] && updowns="/libexec/ipsec/_updown"\n')
         f.write("cat > $swandir/conf.d/{}-ClientConnection.conf <<EOF\n".format(pd.hostfqdn))
         f.write("connections {\n")
         f.write("    {} {{\n".format(hypfqdn))
@@ -672,7 +623,7 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
         f.write("            {} {{\n".format(hypfqdn))
         f.write("                local_ts = 0.0.0.0/0\n")
         f.write("                remote_ts = 0.0.0.0/0\n")
-        f.write("                updown = /libexec/ipsec/_updown iptables\n")
+        f.write("                updown = $updowns iptables\n")
         f.write("                esp_proposals = aes128gcm128-x25519\n")
         f.write("            }\n")
         f.write("        }\n")
@@ -691,25 +642,27 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
         f.write("EOF\n")
         f.write("cp $zf $swandir/pistrong/client-assets\n")
         f.write('echo ""\n')
+        f.write('echo "The name of this connection is \'{}\'"\n'.format(pd.hostfqdn))
+        f.write('echo ""\n')
         f.write('echo "Please sudo systemctl restart strongswan to enable new VPN connection"\n')
         f.write('echo ""\n')
-        f.write('echo "The name of this connection is \'{}\'"\n'.format(pd.hostfqdn))
-        f.write('echo "Use the \'sudo pistrong client\' command to manage the client VPN:"\n')
+        f.write('echo "\nUse the \'sudo pistrong client\' command to manage the client VPN:"\n')
         f.write("pistrong client --help\n")
         f.write('echo ""\n')
         f.write('echo "For instance use sudo \'pistrong client start {}\' to start the VPN connection"\n'.format(pd.hostfqdn))
         f.write('echo ""\n')
-    dosystem(pd, "zip -jq {} {}".format(pd.cpackzip, tmpf), True, True)
+    dosystem(pd, "zip -jq {} {}".format(pd.cpackzip, tmpf))
     os.unlink(tmpf)
     os.unlink(tmpswancert)
     os.rmdir(pd.tmpdir)
 
 def mailcert(pd, args, newkey):
     if pd.db['users'][newkey]['linux']:
-        zipfn = "{}.zip".format(newkey)
-        qcopyfile("{}/server-assets/{}".format(pd.pswandir, zipfn), pd.dx['webdir'], True)
-        webfn = pd.fnpdir.format(pd.dx['webdir'],"{}".format(zipfn))
-        os.chmod(webfn, 0o644)
+        if not args.zip:
+            zipfn = "{}.zip".format(newkey)
+            qcopyfile("{}/server-assets/{}".format(pd.pswandir, zipfn), pd.dx['webdir'], True)
+            webfn = pd.fnpdir.format(pd.dx['webdir'],"{}".format(zipfn))
+            os.chmod(webfn, 0o644)
         msg = "\nDownload this VPN Config Pack to your Linux VPN client system\n\nUse 'sudo pistrong client install <zipfile>' to install\n"
         if not args.zip: msg += "\n  {}\n\n".format(pd.fnpdir.format(pd.dx['weburl'], zipfn))
         msg += "\nThis Linux VPN Config Pack does not have a password"
@@ -745,7 +698,7 @@ def makevpncert(pd, args):
     if isidvalid(pd, newskey):
         perrorexit("? SAN Key '{}' is already configured in this CA; See sudo pistrong listca".format(newskey))
     print("Create VPN Host Key  ({})".format(pd.vpnhostkey))
-    dosystem(pd, "pki --gen --type rsa --size {} --outform pem > {}".format(args.keybits, pd.vpnhostkey), True, True)
+    dosystem(pd, "pki --gen --type rsa --size {} --outform pem > {}".format(args.keybits, pd.vpnhostkey))
     os.chmod(pd.vpnhostkey, 0o600)
     print("Create VPN Host Cert ({})".format(pd.vpnhostcert))
     print(" with VPN SAN key(s) {}\n".format(pd.dx['vpnsankey']))
@@ -754,20 +707,20 @@ def makevpncert(pd, args):
     for iakey in sankey.split(","):
             sanstring += " --san {}".format(iakey.strip())
     cacmd = "pki --issue --in {} --type rsa --lifetime {} --cacert {} --cakey {} --dn \"C=US, O={}, CN={}\"{} --flag serverAuth --flag ikeIntermediate --outform pem > {}".format(pd.vpnhostkey, pd.db['config']['calife']['value'], pd.swancert, pd.swankey, pd.dnou, pd.hostfqdn, sanstring, pd.vpnhostcert)
-    dosystem(pd, cacmd, True, True)
-    dosystem(pd, "pki --print --in {}".format(pd.vpnhostcert), True, True)
+    dosystem(pd, cacmd)
+    dosystem(pd, "pki --print --in {}".format(pd.vpnhostcert))
     addidtodb(pd, newskey)
 
 def makecacert(pd, args):
     """
     """
     print("Creating CA Key ({})".format(pd.swankey))
-    dosystem(pd, "pki --gen --type rsa --size {} --outform pem > {}".format(args.keybits, pd.swankey), True, True)
+    dosystem(pd, "pki --gen --type rsa --size {} --outform pem > {}".format(args.keybits, pd.swankey))
     os.chmod(pd.swankey, 0o600)
     print("Create self-signed CA Cert ({})\n".format(pd.swancert))
     dosystem(pd, "pki --self --ca --lifetime {} --in {} --type rsa\
-    --dn \"C=US, O={}, CN={}\" --outform pem > {}".format(pd.db['config']['calife']['value'], pd.swankey, pd.dnou, pd.rootca, pd.swancert), True, True)
-    dosystem(pd, "pki --print --in {}".format(pd.swancert), True, True)
+    --dn \"C=US, O={}, CN={}\" --outform pem > {}".format(pd.db['config']['calife']['value'], pd.swankey, pd.dnou, pd.rootca, pd.swancert))
+    dosystem(pd, "pki --print --in {}".format(pd.swancert))
     pd.db['certs'][pd.swancertpfx.replace(".pem","")] = getcertkey(pd.swancert, "subjkey:")
     pd.dbmodified = True
 
@@ -794,34 +747,40 @@ def listconfig(pd, args):
     for i in sorted(pd.db['config']):
         print("{key:<15} {val:<{vwid}} {help}".format(key=i, val=pd.db['config'][i]['value'], help=pd.db['config'][i]['help'], vwid=maxval))
     
+def doconfigitem(pd, dest, argval, tfitem=False):
+    # If arg was specified on command line, set it into the configuration and set dbmodified
+    # if tfitem=True set the value to trueorfalse(argval)
+    if argval != None:
+        pd.db['config'][dest]['value'] = argval if not tfitem else trueorfalse(argval)
+        pd.dbmodified = True
+
 def cmd_config(pd, args):
-    if args.debug:        pd.db['config']['debug']['value'] = trueorfalse(args.debug)
-    if args.cmds:         pd.db['config']['cmds']['value'] = trueorfalse(args.cmds)
-    if args.cacert:       pd.db['config']['cacert']['value'] = args.cacert
-    if args.calife:       pd.db['config']['calife']['value'] = args.calife
-    if args.cnsuffix:     pd.db['config']['cnsuffix']['value'] = args.cnsuffix
-    if args.crllife:      pd.db['config']['crllife']['value'] = args.crllife
-    if args.mailfrom:     pd.db['config']['mailfrom']['value'] = args.mailfrom
-    if args.myfqdn:       pd.db['config']['myfqdn']['value'] = args.myfqdn
-    if args.random:       pd.db['config']['random']['value'] = trueorfalse(args.random)
-    if args.rootca:       pd.db['config']['rootca']['value'] = args.rootca
-    if args.service:      pd.db['config']['service']['value'] = args.service
-    if args.smtppassword != None:  pd.db['config']['smtppassword']['value'] = args.smtppassword
-    if args.smtpport:     pd.db['config']['smtpport']['value'] = args.smtpport
-    if args.smtpserver:   pd.db['config']['smtpserver']['value'] = args.smtpserver
-    if args.smtpusetls:   pd.db['config']['smtpusetls']['value'] = args.smtpusetls
-    if args.swancertpfx:  pd.db['config']['swancertpfx']['value'] = args.swancertpfx
-    if args.uclife:       pd.db['config']['uclife']['value'] = args.uclife
-    if args.vpnaddr:      pd.db['config']['vpnaddr']['value'] = args.vpnaddr
-    if args.vpncertpfx:   pd.db['config']['vpncertpfx']['value'] = args.vpncertpfx
-    if args.vpnsankey:    pd.db['config']['vpnsankey']['value'] = args.vpnsankey
-    if args.webdir:       pd.db['config']['webdir']['value'] = args.webdir
-    if args.weburl:       pd.db['config']['weburl']['value'] = args.weburl
-    if args.debug or args.cmds or args.cacert or args.calife or args.cnsuffix or\
-       args.crllife or args.mailfrom or args.myfqdn or args.random or args.service or (args.smtppassword != None) or\
-       args.smtpport or args.smtpserver or args.smtpusetls or args.uclife or args.vpnsankey or\
-       args.vpnaddr or args.webdir or args.weburl: pd.dbmodified = True
-    if args.list or not pd.dbmodified: listconfig(pd, args)
+    doconfigitem(pd, 'cacert', args.cacert)
+    doconfigitem(pd, 'calife', args.calife)
+    doconfigitem(pd, 'cmds', args.cmds, tfitem=True)
+    doconfigitem(pd, 'cnsuffix', args.cnsuffix)
+    doconfigitem(pd, 'crllife', args.crllife)
+    doconfigitem(pd, 'debug', args.debug, tfitem=True)
+    doconfigitem(pd, 'mailfrom', args.mailfrom)
+    doconfigitem(pd, 'myfqdn', args.myfqdn)
+    doconfigitem(pd, 'random', args.random, tfitem=True)
+    doconfigitem(pd, 'rootca', args.rootca)
+    doconfigitem(pd, 'service', args.service)
+#    if args.smtppassword != None: doconfigitem(pd, 'smtppassword', args.smtppassword)
+    doconfigitem(pd, 'smtppassword', args.smtppassword)
+    doconfigitem(pd, 'smtpport', args.smtpport)
+    doconfigitem(pd, 'smtpserver', args.smtpserver)
+    doconfigitem(pd, 'smtpuser', args.smtpuser)
+    doconfigitem(pd, 'smtpusetls', args.smtpusetls, tfitem=True)
+    doconfigitem(pd, 'swancertpfx', args.swancertpfx)
+    doconfigitem(pd, 'uclife', args.uclife)
+    doconfigitem(pd, 'vpnaddr', args.vpnaddr)
+    doconfigitem(pd, 'vpncertpfx', args.vpncertpfx)
+    doconfigitem(pd, 'vpnsankey', args.vpnsankey)
+    doconfigitem(pd, 'webdir', args.webdir)
+    doconfigitem(pd, 'weburl', args.weburl)
+    # Show config if --list or no config file exists yet (we'll write at end of this command)
+    if args.list or not pd.dbmodified or (pd.dbmodified and not os.path.isfile(pd.certdb)): listconfig(pd, args)
     return
 
 def cmd_add(pd, args):
@@ -833,8 +792,13 @@ def cmd_add(pd, args):
     makeclientfnames(pd, args, newkey)
     pd.dx['random'] = trueorfalse(args.random) if args.random else pd.db['config']['random']['value']
     pd.dx['uclife'] = args.uclife if args.uclife else pd.db['config']['uclife']['value']
-    if args.mail != None and not os.path.exists("/var/www/html/vpn"):
-        perrorexit("? Directory /var/www/html/vpn doesn't exist\n  Use 'sudo mkdir -p /var/www/html/vpn' to correct")
+    if args.mail != None and not args.zip:
+        webvpndir = args.webdir if args.webdir != None else pd.db['config']['webdir']['value']
+        if not os.path.exists(webvpndir):
+            perrorexit("? Directory '{}' does not exist\n  Please correct or use --zip to mail the zip file\n  or change using 'sudo pistrong config --webdir'".format(webvpndir))
+#? Checking wrong directory (need to check args.webdir and pd.db[webdir]
+#?    if args.mail != None and not os.path.exists("/var/www/html/vpn"):
+#?        perrorexit("? Directory /var/www/html/vpn does not exist\n  Use 'sudo mkdir -p /var/www/html/vpn' to correct")
     if keyindb(pd, newkey):
         perrorexit("? Key '{}' already in use".format(newkey))
     ipwd = "" if args.password is None else args.password
@@ -851,22 +815,24 @@ def cmd_add(pd, args):
     pd.dx['vpnaddr'] = pd.db['config']['vpnaddr']['value'] if args.vpnaddr is None else args.vpnaddr
     pd.dx['cname'] = pd.hostfqdn.replace(".","-") if args.cname is None else args.cname.replace(".","-")
     cmd = "pki --gen --type rsa --size {} --outform pem > {}".format(args.keybits, pd.clientkey)
-    dosystem(pd, cmd, True, True)
+    dosystem(pd, cmd)
     os.chmod(pd.clientkey, 0o600)
     cmd = "pki --issue --in {} --type rsa --lifetime {} --cacert {} --cakey {}".format(pd.clientkey, pd.dx['uclife'], pd.swancert, pd.swankey)
     cmd += " --dn \"C=US, O={}, CN={}\" --san {} --outform pem > {}".format(pd.dnou, pd.cn, pd.cn, pd.clientcert)
-    dosystem(pd, cmd, True, True)
+    dosystem(pd, cmd)
     cmd = "openssl pkcs12 -export -inkey {}".format(pd.clientkey)
     cmd += " -in {} -name \"{}-{} VPN Certificate\"".format(pd.clientcert, newkey, pd.shorthost)
     cmd += " -certfile {} -caname \"{}\"  -out {}".format(pd.swancert, pd.rootca, pd.newp12)
     if ipwd != "":
         cmd += " -passout pass:{}".format(ipwd)
-        dosystem(pd, cmd, True, True)
+        dosystem(pd, cmd)
     else:
         mkpkcs12zpw(pd, cmd)
     dbupdate(pd, newkey, "V", ipwd, pd.swancertpfx, newremoteid, args.linux)
     if args.linux:
         buildlinuxpack(pd, args, newkey, newremoteid)
+#        print("% Linux VPN Config Pack for '{}' is in '{}'".format(newkey, pd.cpackzip))
+        print("% Linux VPN Config Pack '{}' created for '{}'".format(pd.cpackzip, newkey))
     else:
         makeuserzip(pd, args, newkey)
         print("% Zip file '{}' created for '{}'".format(pd.cpackzip, newkey))
@@ -876,8 +842,8 @@ def cmd_add(pd, args):
         pd.dx['weburl'] = args.weburl if args.weburl != None else pd.db['config']['weburl']['value']
         mailcert(pd, args, newkey)
     print("% Added '{}' with Remote ID '{}' using CA Cert '{}'".format(newkey, newremoteid, pd.swancertpfx))
-    if args.linux and args.mail == None:
-        print("% Linux VPN Config Pack for '{}' is in '{}'".format(newkey, pd.cpackzip))
+#    if args.linux and args.mail == None:
+#        print("% Linux VPN Config Pack for '{}' is in '{}'".format(newkey, pd.cpackzip))
     return
 
 def cmd_delete(pd, args):
@@ -908,7 +874,7 @@ def cmd_revoke(pd, args):
     lastcrl = "--lastcrl {}".format(pd.revokecrl) if os.path.isfile(pd.revokecrl) else ""
     cmd = "pki --signcrl --cacert {} --cakey {}".format(pd.swancert, pd.swankey)
     cmd += " --reason superseded --lifetime {} --cert {} {} > {}".format(pd.db['config']['crllife']['value'], pd.clientcert, pd.lastcrl, pd.revoketmp)
-    dosystem(pd, cmd, True, True)
+    dosystem(pd, cmd)
     qdelfile(pd.revokecrl)
     qrename(pd.revoketmp, pd.revokecrl)
     dbupdate(pd, newkey, "R", "", "", pd.db['users'][newkey]['linux'])
@@ -926,6 +892,7 @@ def cmd_resend(pd, args):
         pd.dx['mailfrom'] = pd.db['config']['mailfrom']['value']
         pd.dx['webdir'] =   pd.db['config']['webdir']['value']
         pd.dx['weburl'] =   pd.db['config']['weburl']['value']
+        pd.cpackzip = "{}/server-assets/{}.zip".format(pd.pswandir, newkey)
         mailcert(pd, args, newkey)
     else:
         perrorexit("? User '{}' not found".format(newkey))
@@ -951,6 +918,7 @@ def cmd_list(pd, args):
             for ukey in pd.db['users']:
                 if ukey.split("-")[0] == args.username:
                     maxnam = max(maxnam, len(ukey))
+                    maxnam += 1 # make room for Linux client flag (or space)
                 # List valid entries, then revoked entries
             listentries(pd, "V", args.username, maxnam, maxcert, maxrid)
             listentries(pd, "R", args.username, maxnam, maxcert, maxrid)
@@ -1034,7 +1002,7 @@ def cmd_showcert(pd, args):
     isrootordebug(pd, args)
     if os.path.isfile(args.certname):
         print("[Certificate {}]".format(args.certname))
-        dosystem(pd, "pki --print --in {}".format(args.certname), True, True)
+        dosystem(pd, "pki --print --in {}".format(args.certname))
     else:
         perrorexit("? Certificate {} not found".format(args.certname))
     return
@@ -1043,15 +1011,15 @@ def cmd_showca(pd, args):
     isrootordebug(pd, args)
     checkcaexist(pd)
     print("[CA Certificate {}]".format(pd.swancert))
-    dosystem(pd, "pki --print --in {}".format(pd.swancert), True, True)
+    dosystem(pd, "pki --print --in {}".format(pd.swancert))
     for fn in os.listdir(pd.dx509):
         filename = os.fsdecode(fn)
         if filename.endswith("{}VPNCert.pem".format(pd.swancertpfx)):
             print("\n[VPN Host Certificate {}]".format("{}/{}".format(pd.dx509, filename)))
-            dosystem(pd, "pki --print --in {}".format(format("{}/{}".format(pd.dx509, filename))), True, True)
+            dosystem(pd, "pki --print --in {}".format(format("{}/{}".format(pd.dx509, filename))))
     if os.path.isfile(pd.revokecrl):
         print("\n[Revoked CRL {}]".format(pd.revokecrl))
-        dosystem(pd, "pki --print --in {} --type crl".format(pd.revokecrl), True, True)
+        dosystem(pd, "pki --print --in {} --type crl".format(pd.revokecrl))
 
     return
 
@@ -1077,7 +1045,7 @@ def cmd_service(pd, args):
         if args.action == "reload":
             reloadcreds(pd)
         else:
-            dosystem(pd, "systemctl {} {}".format(args.action, pd.db['config']['service']['value']), False, True)
+            dosystem(pd, "systemctl {} {}".format(args.action, pd.db['config']['service']['value']), doecho=False)
     return
 
 def cmd_client_start(pd, args):
@@ -1087,31 +1055,24 @@ def cmd_client_start(pd, args):
     if len(vpnclients) == 0: perrorexit("? No matching Client VPN configuration found")
     if len(vpnclients) > 1: perrorexit("? More than one Client VPN configuration matches")
     dvpn = vpnclients[0].replace(".","-")   # Read from connection file someday?
-    if isrunning(pd) != 0: perrorexit("? strongSwan not running\n  Do: sudo systemctl start strongswan")
+    if isrunning(pd) != 0: perrorexit("? strongSwan not running\n  Use 'sudo systemctl start {} to start it".format(pd.db['cfg']['service']['value']))
     if isikeup(pd, ""): perrorexit("? VPN already started\n  Use 'sudo pistrong client stop' to stop VPN first")
     waitsec = args.wait
     try:
-        subp = subprocess.run(shlex.split("swanctl --initiate --ike {}".format(dvpn)), timeout=int(waitsec), stdout=subprocess.PIPE)
+        subp = subprocess.run(shlex.split("swanctl --initiate --ike {} --child {}".format(dvpn, dvpn)), timeout=int(waitsec), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.TimeoutExpired:
         killike(pd, dvpn, True)
         print("? VPN IKE connection timed out after {} seconds".format(waitsec))
         print("  Check internet connection and router port forwards for ports 500 and 4500")
+        printutf(subp.stderr)
         return
-    if isikeup(pd, dvpn):
-        for line in subp.stdout.decode('utf-8').split("\n"): print(line)          # Display the swanctl --initiate output
-        dosystem(pd, "swanctl --initiate --child {}".format(dvpn), True, True)
-        if not istunnelup(pd, dvpn):
-            print("? The VPN tunnel was not correctly established")
-            if askyn("* Close the IKE connection {}? ".format(dvpn)):
-                killike(pd, dvpn, False)
-            else:
-                print("% IKEV2 connection {} is still up".format(dvpn))
-            return
+    printutf(subp.stdout)
+    printutf(subp.stderr)
     return
 
 def cmd_client_stop(pd, args):
-    r = dosystem(pd, "swanctl --list-sas", True, False)
-    ikename = (r.stdout.decode('utf-8').split("\n")[0]).split(':')[0]
+    r = dosystem(pd, "swanctl --list-sas")
+    ikename = (decodeutf(r.stdout).split("\n")[0]).split(':')[0]
     if isikeup(pd, ikename): killike(pd, ikename, False)
     return
 
@@ -1122,17 +1083,17 @@ def cmd_client_install(pd, args):
     if args.vpnorzip == None: perrorexit("? Full path to VPN Config Pack zip file required")
     if not os.path.isfile(args.vpnorzip): perrorexit("? Cannot find VPN Config Pack '{}'".format(args.vpnorzip))
     pd.tmpdir = mkdtemp(prefix="pistrong")
-    dosystem(pd, "unzip -d {} {} {}".format(pd.tmpdir, args.vpnorzip, pd.db['config']['lxscript']['value']), True, True)
+    dosystem(pd, "unzip -d {} {} {}".format(pd.tmpdir, args.vpnorzip, pd.db['config']['lxscript']['value']))
     ufn = pd.fnpdir.format(pd.tmpdir,pd.db['config']['lxscript']['value'])
     os.chmod(ufn, 0o755)
     askyn("\nPress Return when you are ready to review the Client VPN install script: ")
-    dosystem(pd, "cat {}".format(ufn), False, True)
+    dosystem(pd, "cat {}".format(ufn), doecho=False)
     if askyn("Do you want to install this VPN Connection? "):
-        dosystem(pd, "/bin/bash {} {}".format(ufn, os.path.realpath(args.vpnorzip)), False, True)
+        dosystem(pd, "/bin/bash {} {}".format(ufn, os.path.realpath(args.vpnorzip)), doecho=False)
     return
 
 def cmd_client_status(pd, args):
-    r = dosystem(pd, "swanctl --list-sas", True, True)
+    r = dosystem(pd, "swanctl --list-sas")
     return r.returncode
 
 def cmd_client_list(pd, args):
@@ -1142,6 +1103,7 @@ def cmd_client_list(pd, args):
         
 def cmd_client_delete(pd, args):
     vpnkey = args.vpnorzip
+    if vpnkey == None: perrorexit("? No Client VPN specified")
     vpnclients = findclientvpn(pd, args, vpnkey)
     if len(vpnclients) == 0: perrorexit("? No matching Client VPN configuration found")
     if len(vpnclients) > 1: perrorexit("? More than one Client VPN configuration matches")
@@ -1165,6 +1127,70 @@ def cmd_client(pd, args):
     return
 
 def cmd_help(pd, args):
+    helpmsg = "pistrong {} commands:\n\
+\n\
+        * Manage user certs *\n\
+ add    name    Create a new user/device cert\n\
+ resend name    Resend cert info to user\n\
+ list   [name]  List users (see examples)\n\
+ revoke name    Revoke user's cert\n\
+ delete name    Delete user's cert\n\
+\n\
+        * Manage CA/VPN certs *\n\
+ createca       Build the CA certs\n\
+ deleteca       Delete ALL CA and user/device certs/keys (irreversible!)\n\
+ makevpncert    Create an additional VPN cert/key\n\
+ makecacert     Create an additional CA cert/key\n\
+ listca         List all CA and VPN cert names\n\
+ showca         Show CA and associated VPN certs\n\
+ showcert       List cert contents\n\
+\n\
+        * pistrong configuration and Strongswan service management *\n\
+ config         Modify or print config settings\n\
+ service        Manage the strongSwan service\n\
+\n\
+        * Miscellaneous *\n\
+ install        Starts strongSwan installation with 'InstallPiStrong all'\n\
+ version        Print the pistrong version\n\
+ help           Print this message\n\
+\n\
+Command-line switches override config file settings.\n\
+\n\
+Examples:\n\
+\n\
+pistrong --help\n          Get help about switches\n\
+pistrong createca\n          Create a new CA in the root directory (/etc/swanctl)\n\
+pistrong createca --vpnsankey keyname\n          Create a new CA with a different vpnsankey (d:ipsec.vpn.net)\n\
+pistrong deleteca\n          Delete the CA, all certs, etc. Be really sure on this one!\n\
+pistrong makevpncert --vpnsankey key1,key2 --vpncert mycert\n\
+          Make an additional VPN cert/key named mycert. key1 and key2 will be\n\
+          the SAN names in the cert\n\
+pistrong add name\n          Add user 'name' and create a cert for it\n\
+          The full username will be name-dev\n\
+pistrong add name --password abc\n          Provide the cert password on the command line\n\
+pistrong add name --device DEVICE\n          Name the cert name-DEVICE-servername@cnsuffix\n          (d: name-dev-servername...)\n\
+pistrong add name --nopass\n          Password for cert import is null\n\
+pistrong add name --random\n          Generate a random cert install password\n          Cert install passwords are saved in /etc/swanctl/pistrong/pistrongdb.json\n\
+pistrong add name --mail users-email@somewhere.com\n          Send mail to the user with a link to the certs\n          Cert passwords are sent separately\n\
+          --webdir dir --weburl url from the configuration or on command line\n\
+pistrong list\n          List all user certs\n\
+pistrong list name --all\n          List all certs for 'name'\n\
+pistrong list user --full\n          Show specific user plus cert details\n\
+pistrong resend name --mail users-email@somewhere.com\n          Resend the cert link and password to the user\n\
+\n\
+A full user name is name-dev. 'bill-iphone', for instance. If you don't specify\n\
+--device, names will be 'name-dev' (e.g., 'bill-dev').\n\
+The list command requires a full name-dev, except when used with --all,\n\
+which will list all certs for the specified name.\n\
+\n\
+For example, 'pistrong list bill --all' will list the certs for bill-iphone\n\
+and bill-laptop.\n\
+\n\
+The revoke and resend commands always require a full name-dev.\n\
+\n\
+You MUST specify --vpnsankey when you first create a CA.\n\
+\n\
+See the full documentation at https://github.com/gitbls/pistrong\n".format(version)
     print(helpmsg)
     return
 
@@ -1182,6 +1208,8 @@ parser = argparse.ArgumentParser(
     or delete a user's cert. A cert install password can be provided on the command line, \
     randomly generated, or no password. Certs can be sent via a link in email, or copied \
     to the client system via the network, USB stick, etc")
+
+parser.set_defaults(func=cmd_help, cacert=None, debug=False, myfqdn=None, swancertpfx=None, vpncertpfx=None, usedb=True)
 
 ynchoices = ['y', 'yes', 'no', 'n']
 parent_parser = argparse.ArgumentParser(add_help=False)
@@ -1201,10 +1229,11 @@ subparser_config.add_argument("--myfqdn", help="VPN host FQDN if pistrong needs 
 subparser_config.add_argument("--random", help="Create random cert install passwords", choices=ynchoices)
 subparser_config.add_argument("--rootca", help="Name for root CA [strongSwan]")
 subparser_config.add_argument("--service", help="strongSwan service name")
-subparser_config.add_argument("--smtppassword", help="Password for smtp mail server")
+subparser_config.add_argument("--smtppassword", help="Password for SMTP mail server authentication")
 subparser_config.add_argument("--smtpport", help="Port for smtp mail server")
 subparser_config.add_argument("--smtpserver", help="SMTP server IP address")
-subparser_config.add_argument("--smtpusetls", help="Use TLS for SMTP auth", action='store_true')
+subparser_config.add_argument("--smtpuser", help="User for SMTP mail server authentication")
+subparser_config.add_argument("--smtpusetls", help="Use TLS for SMTP auth", choices=ynchoices)
 subparser_config.add_argument("--swancertpfx", help="Default CA name [strongSwan]")
 subparser_config.add_argument("--uclife", help="User cert lifetime")
 subparser_config.add_argument("--vpnaddr", help="VPN Server DNS name or IP address")
@@ -1212,7 +1241,7 @@ subparser_config.add_argument("--vpncertpfx", help="Default VPN cert name [defau
 subparser_config.add_argument("--vpnsankey", help="Default VPN SAN key") # Sets the default if not specified on createca/makecacert/makevpncert
 subparser_config.add_argument("--webdir", help="Web server directory for users p12 and CA certs")
 subparser_config.add_argument("--weburl", help="URL prefix for Cert in email")
-subparser_config.set_defaults(func=cmd_config, swancertpfx=None, vpncertpfx=None, usedb=True)
+subparser_config.set_defaults(func=cmd_config)
 
 subparser_createca = subparsers.add_parser("createca", help="Create a Certificate Authority", parents=[parent_parser])
 subparser_createca.add_argument("cacert", nargs='?', help="CA cert/key name prefix ['strongSwan']")
@@ -1221,33 +1250,33 @@ subparser_createca.add_argument("--vpncertpfx", help="VPN cert/key name prefix [
 subparser_createca.add_argument("--vpnsankey", help="VPN SAN key(s) for VPN cert")
 subparser_createca.add_argument("--nocamsg", help="Don't print the 'CA created message'", action='store_true')
 subparser_createca.add_argument("--novpncert", help="Don't make a default VPN cert", action='store_true')
-subparser_createca.set_defaults(func=cmd_createca, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_createca.set_defaults(func=cmd_createca)
 
 subparser_deleteca = subparsers.add_parser("deleteca", help="Delete the ENTIRE CA and all certs/keys", parents=[parent_parser])
-subparser_deleteca.set_defaults(func=cmd_deleteca, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_deleteca.set_defaults(func=cmd_deleteca)
 
 subparser_showcert = subparsers.add_parser("showcert", help="Show cert contents", parents=[parent_parser])
 subparser_showcert.add_argument("certname", help="File spec for cert to show")
-subparser_showcert.set_defaults(func=cmd_showcert, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_showcert.set_defaults(func=cmd_showcert)
 
 subparser_makevpncert = subparsers.add_parser("makevpncert", help="Make a VPN cert", parents=[parent_parser])
 subparser_makevpncert.add_argument("vpncertpfx", help="VPN cert/key name prefix ['default']")
 subparser_makevpncert.add_argument("--cacert", help="CA cert to use")
 subparser_makevpncert.add_argument("--keybits", default="4096", help="VPN cert key bits [4096]")
 subparser_makevpncert.add_argument("--vpnsankey", help="VPN SAN key(s)")
-subparser_makevpncert.set_defaults(func=cmd_makevpncert, swancertpfx=None, myfqdn=None, usedb=True)
+subparser_makevpncert.set_defaults(func=cmd_makevpncert)
 
 subparser_makecacert = subparsers.add_parser("makecacert", help="Make an additional CA cert", parents=[parent_parser])
 subparser_makecacert.add_argument("cacert", help="Name for the cert")
 subparser_makecacert.add_argument("--keybits", default="4096", help="CA cert key bits [4096]")
-subparser_makecacert.set_defaults(func=cmd_makecacert, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_makecacert.set_defaults(func=cmd_makecacert)
 
 subparser_showca = subparsers.add_parser("showca", help="Show the CA", parents=[parent_parser])
 subparser_showca.add_argument("cacert", nargs='?', help="Name of CA to show [strongSwan]")
-subparser_showca.set_defaults(func=cmd_showca, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_showca.set_defaults(func=cmd_showca)
 
 subparser_listca = subparsers.add_parser("listca", help="List all CAs", parents=[parent_parser])
-subparser_listca.set_defaults(func=cmd_listca, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_listca.set_defaults(func=cmd_listca)
 
 subparser_add = subparsers.add_parser("add", help="Add new user", parents=[parent_parser])
 subparser_add.add_argument("username", help="Username to add")
@@ -1268,34 +1297,35 @@ subparser_add.add_argument("--webdir", help="Web server directory for users p12 
 subparser_add.add_argument("--weburl", help="URL prefix for Cert in email")
 subparser_add.add_argument("--windows", help="Build a Windows Cert", action='store_true')
 subparser_add.add_argument("--zip", help="Email zip file with Certs instead of links", action='store_true')
-subparser_add.set_defaults(func=cmd_add, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_add.set_defaults(func=cmd_add)
 
 subparser_delete = subparsers.add_parser("delete", help="Delete user cert/key", parents=[parent_parser])
 subparser_delete.add_argument("username", help="Username to delete")
 subparser_delete.add_argument("--device", help="Device name for identification")
-subparser_delete.set_defaults(func=cmd_delete, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_delete.set_defaults(func=cmd_delete)
 
 subparser_revoke = subparsers.add_parser("revoke", help="Revoke a user's cert", parents=[parent_parser])
 subparser_revoke.add_argument("username", help="Username to revoke")
 subparser_revoke.add_argument("--device", help="Device name for identification")
-subparser_revoke.set_defaults(func=cmd_revoke, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_revoke.set_defaults(func=cmd_revoke)
 
 subparser_list = subparsers.add_parser("list", help="List user certs", parents=[parent_parser])
 subparser_list.add_argument("username", nargs='?', help="List only specified username")
 subparser_list.add_argument("--all", help="List all certs for specified username", action='store_true')
 subparser_list.add_argument("--full", help="Show cert details as well", action='store_true')
-subparser_list.set_defaults(func=cmd_list, cacert=None, swancertpfx=None, vpncertpfx=None, device=None, myfqdn=None, usedb=True)
+subparser_list.set_defaults(func=cmd_list, device=None)
 
 subparser_resend = subparsers.add_parser("resend", help="Resend the cert email to a user", parents=[parent_parser])
 subparser_resend.add_argument("username", help="Username for cert (already created)")
 subparser_resend.add_argument("--device", help="Device name for identification")
 subparser_resend.add_argument("--mail", help="User email address")
-subparser_resend.set_defaults(func=cmd_resend, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, zip=False, usedb=True)
+subparser_resend.add_argument("--zip", help="Email zip file with Certs instead of links", action='store_true')
+subparser_resend.set_defaults(func=cmd_resend)
 
 service_actions = ['reload', 'start', 'stop', 'restart', 'disable', 'enable', 'status']
 subparser_service = subparsers.add_parser("service", help="Control the strongSwan service", parents=[parent_parser])
 subparser_service.add_argument("action", help="", choices=service_actions)
-subparser_service.set_defaults(func=cmd_service, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_service.set_defaults(func=cmd_service)
 
 
 client_cmd_actions = {'start':[cmd_client_start], 'connect':[cmd_client_start],\
@@ -1306,22 +1336,22 @@ subparser_client = subparsers.add_parser("client", help="Manage the VPN Client",
 subparser_client.add_argument("action", help="", choices=client_cmd_actions)
 subparser_client.add_argument("vpnorzip", nargs='?', help="VPN (Start, Delete) or zipfile (Install)")
 subparser_client.add_argument("--wait", default="5", help="Wait time for VPN to be established [5]")
-subparser_client.set_defaults(func=cmd_client, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=True)
+subparser_client.set_defaults(func=cmd_client)
 
 subparser_help = subparsers.add_parser("help", help="Print some help", parents=[parent_parser])
-subparser_help.set_defaults(func=cmd_help, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=False)
+subparser_help.set_defaults(func=cmd_help, usedb=False)
 
 subparser_version = subparsers.add_parser("version", help="Print the pistrong version", parents=[parent_parser])
-subparser_version.set_defaults(func=cmd_version, cacert=None, swancertpfx=None, vpncertpfx=None, myfqdn=None, usedb=False)
+subparser_version.set_defaults(func=cmd_version, usedb=False)
 #
 # Parse the command and dispatch
 #
 args = parser.parse_args()
 
-# Need to grab usedb and func this way bc argparse problem?
-usedb = args.usedb if hasattr(args,'usedb') else None
-
-if usedb:
+usedb = args.usedb
+thefunc = args.func
+# Need to test thefunc as well b/c pistrong cmd w/no args has usedb set to true (argparse defaulting convenience)
+if usedb and thefunc != cmd_help:
     pd.dx['debug'] = trueorfalse(args.debug) if args.debug else False # This isn't known yet :( pd.db['config']['debug']['value']
 
     pd.swandir = "." if pd.dx['debug'] else "/etc/swanctl"
@@ -1341,8 +1371,6 @@ if usedb:
     pd.dx['cmds'] = trueorfalse(args.cmds) if args.cmds else pd.db['config']['cmds']['value']
     if pd.db['config']['service']['value'] == "":
         perrorexit("? Can't determine strongSwan service name\n% Edit service name in {}".format(pd.certdb))
-
-thefunc = args.func if hasattr(args,'func') else cmd_help
 thefunc(pd, args)
 if pd.dbmodified: dbflush(pd)
 exit
