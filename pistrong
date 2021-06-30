@@ -41,7 +41,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "V3.5"
+version = "V3.6"
 dbversion = "3"
 
 def qdelfile(qfn):
@@ -1063,8 +1063,8 @@ def cmd_client_start(pd, args):
     except subprocess.TimeoutExpired:
         killike(pd, dvpn, True)
         print("? VPN IKE connection timed out after {} seconds".format(waitsec))
-        print("  Check internet connection and router port forwards for ports 500 and 4500")
-        printutf(subp.stderr)
+        print("  Check remote strongSwan Server, internet connection, and router port forwards for ports 500 and 4500")
+#        printutf(subp.stderr) # if swanctl fails, subp isn't set. :(
         return
     printutf(subp.stdout)
     printutf(subp.stderr)
