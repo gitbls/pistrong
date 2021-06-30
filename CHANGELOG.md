@@ -1,5 +1,9 @@
 # Changelog
 
+## V3.6
+
+* Prevent VPN connect timeout from killing pistrong
+
 ## V3.5
 
 * Sending email with smtp and TLS now works. Tested with both gmail and outlook.com. See the README for configuration information.
