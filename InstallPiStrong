@@ -104,7 +104,10 @@ function do_cleanupwebinstall() {
 }
 
 function do_cleanupaptinstall() {
-    if ! ispkginstalled strongswan-swanctl
+    local c1=1
+    ispkginstalled strongswan && c1=0
+    ispkginstalled strongswan-swanctl && c1=0
+    if [ $c1 -eq 1 ]
     then
 	return
     fi
@@ -115,7 +118,7 @@ function do_cleanupaptinstall() {
 	echo "** Cannot do the web install until the apt install is removed"
 	exit
     fi
-    apt-get --yes remove strongswan-swanctl strongswan-pki charon-systemd libstrongswan libstrongswan-standard-plugins strongswan-libcharon
+    apt-get --yes remove strongswan strongswan-swanctl strongswan-pki charon-systemd libstrongswan libstrongswan-standard-plugins strongswan-libcharon libcharon-extra-plugins strongswan-charon strongswan-starter
 }
 
 function do_wrapup() {
