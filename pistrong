@@ -41,7 +41,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "V3.6"
+version = "V3.7"
 dbversion = "3"
 
 def qdelfile(qfn):
@@ -373,7 +373,7 @@ def dbload(pd):
                            "smtpport":{"value":"25","help":"SMTP mail server port"},\
                            "smtpuser":{"value":"","help":"SMTP mail server username if required"},\
                            "smtppassword":{"value":"","help":"SMTP mail server password if required"},\
-                           "smtpusetls":{"value":False,"help":"SMTP Mail use TLS auth [NYI]"},\
+                           "smtpusetls":{"value":False,"help":"SMTP Mail use TLS auth"},\
                            "webdir":{"value":"tmp","help":"Directory in file system corresponding to weburl"},\
                            "weburl":{"value":"http://127.0.0.1","help":"Web URL on which to append cert name"}}
         pd.dbmodified = True
