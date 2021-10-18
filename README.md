@@ -42,7 +42,7 @@ The easiest way to install pistrong is to use the bash command:
 If you'd prefer to not feed an unknown script directly into bash, you can issue the following commands on your local system:
 
     sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong
-
+    sudo chmod 755 /usr/local/bin/InstallPiStrong
     sudo /usr/local/bin/InstallPiStrong
 
 * **Create your CA** You can do this manually, or use the makeMyCA script. makeMyCA uses pistrong to create a complete, secure, and ready-to-use CA for iOS, Windows, and Linux clients. See below for details.
@@ -174,7 +174,7 @@ pistrong supports Linux Client devices connecting to the VPN. The easiest approa
 
 strongSwan **requires** changes to the Firewall on the VPN Server for proper operation. This is not required on the Linux VPN Client system, or any other client for that matter. In case you don't have a firewall installed, InstallPiStrong writes a new systemd service *pistrong-iptables-load*, which contains only the VPN-required Firewall rules. If you want to use this service, `sudo systemctl enable pistrong-iptables-load` before rebooting.
 
-The minimal firewall rules are in /etc/swanctl/pistrong/CA-iptables. If your connection to the internet changes from what you specified in makeMyCA, you must sudo edit this file and change the network device (typically, eth0, but could be eth1) to the appropriate network adapter. There is no validity checking done on this by pistrong, and if it's incorrect, VPN traffic from remote clients will not be able to access the VPN Server's LAN.
+The minimal firewall rules are in /etc/swanctl/pistrong/CA-iptables. If your connection to the internet changes from what you specified in makeMyCA, you must sudoedit this file and change the network device (typically, eth0, but could be eth1) to the appropriate network adapter. There is no validity checking done on this by pistrong, and if it's incorrect, VPN traffic from remote clients will not be able to access the VPN Server's LAN.
 
 Many users either have or want more than this very minimal firewall. In that case, the iptables rules in /etc/swanctl/pistrong/CA-iptables must be added to the Firewall rules for your system.
 
