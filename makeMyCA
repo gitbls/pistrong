@@ -189,7 +189,15 @@ echo "    One network device: Use the IP Address of that device"
 echo "    > 1 network device: Use the IP Address of '$landev'"
 echo ""
 
-askdefault "VPN Server Local LAN IP Address" myipaddr "$myipaddr"
+askdefault "VPN Server Local LAN IP Address" tmyipaddr "$myipaddr"
+if [ "$tmyipaddr" != "$myipaddr" ]
+then
+    #  set mysubnetx, myfullsubnet 
+    mysubnetx=${tmyipaddr%.*}
+    myfullsubnet="${mysubnetx}.0/24"         #This is not perfectly correct
+    myipaddr=$tmyipaddr
+fi
+#
 
 echo ""
 echo "** 'mysubnet' is the Local LAN Subnet"
@@ -198,6 +206,7 @@ echo "    connected to the LAN network ($landev) rather than"
 echo "    the adapter connected to the Internet ($vpndev)"
 echo ""
 askdefault "VPN Server Local LAN Subnet" mysubnet "$myfullsubnet"
+myfullsubnet=$mysubnet
 
 if [ "$vpndev" != "$landev" ]
 then
