@@ -35,11 +35,7 @@ Now that you've attended to the external network considerations, it's time to in
 
 * **Download and run InstallPiStrong**. InstallPiStrong will download the remaining pistrong components from GitHub, and then install strongSwan. You will have the choice of installing either the strongSwan that is delivered with your apt-based distro, or building the latest version from sources from strongswan.org
 
-The easiest way to install pistrong is to use the bash command:
-
-    sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong | bash
-
-If you'd prefer to not feed an unknown script directly into bash, you can issue the following commands on your local system:
+Download and run the installer on your local system:
 
     sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/InstallPiStrong -o /usr/local/bin/InstallPiStrong
     sudo chmod 755 /usr/local/bin/InstallPiStrong
