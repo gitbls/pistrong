@@ -128,12 +128,12 @@ function do_wrapup() {
 ** Required Post-installation Steps:
 
 * If this system will be a VPN Server:
-  * Add port forwards to this system on your router for UDP ports 500 and 4500
-    See /usr/local/bin/makeMyCA to fully configure a CA that supports iOS, Windows, and Linux VPN Clients
+  * Configure your CA. Use /usr/local/bin/makeMyCA to fully configure a CA that supports iOS, Windows, and Linux VPN Clients
   * Configure iptables. See https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
   * Configure email settings via pistrong if you intend to email certs (See 'Sending email' in the README)
   * Configure strongSwan service to automatically start if desired
-  * See pistrong help and pistrong --help for pistrong command details
+  * Add user Certs (See pistrong help and pistrong add --help for command details)
+  * Add port forwards on your router to this system for UDP ports 500 and 4500
 
 * If this system will be a VPN Client:
   * Once you receive the VPN Cert Pack from the VPN Server manager,
@@ -450,55 +450,52 @@ EOF
 # Main
 #
 
-if [[ ! $EUID -eq 0 ]];then
-    echo "? Please run as root: sudo $0 $1 $2"
-    exit 1
-fi
+function main() {
 
-cmd="${1,,}"
-[ "$cmd" == "" ] && cmd="all"
-get_osdistro
-check_hostname
-echo "** Installer for strongSwan/pistrong Management Tool **"
-echo ""
-echo "This installer requires 'curl' and 'zip'"
-echo "Doing an 'apt update' and installing them if necessary..."
-echo ""
-# ** Needs to be fixed when non-apt systems supported
-apt-get update
-do_install_prereqs
-echo ""
-webssver=$(get_wssver)
+    cmd="${1,,}"
+    [ "$cmd" == "" ] && cmd="all"
+    get_osdistro
+    check_hostname
+    echo "** Installer for strongSwan/pistrong Management Tool **"
+    echo ""
+    echo "This installer requires 'curl' and 'zip'"
+    echo "Doing an 'apt update' and installing them if necessary..."
+    echo ""
+    # ** Needs to be fixed when non-apt systems supported
+    apt-get update
+    do_install_prereqs
+    echo ""
+    webssver=$(get_wssver)
 
-if [ "$cmd" != "all" ]
-then
-    do_cleanupaptinstall
-    do_web_install "$cmd"
-    exit
-fi
-
-if [ "$(which apt)" != "" ]
-then
-    echo "> Identifying strongSwan version numbers on Web and in apt"
-    
-    aptver=$(get_aptssver)
-    IFS="." read vmaj vmin vmisc <<< $aptver
-    vok=1
-    # Minimum required version of strongSwan is 5.8.0
-    # I had issues with 5.7.2 and iOS so disallowing older versions to avoid confusion
-    # Debian Bullseye will solve this issue with a much newer strongSwan apt package
-    if [ $vmaj -eq 5 ]
+    if [ "$cmd" != "all" ]
     then
-	if [ $vmin -gt 8 ]
-	then
-	    vok=0
-	fi
-    else
-	[ $vmaj -gt 5 ] && vok=0
+	do_cleanupaptinstall
+	do_web_install "$cmd"
+	exit
     fi
-    if [ $vok -eq 0 -o "$PSAPTOK" != "" ]
+
+    if [ "$(which apt)" != "" ]
     then
-	echo $"
+	echo "> Identifying strongSwan version numbers on Web and in apt"
+	
+	aptver=$(get_aptssver)
+	IFS="." read vmaj vmin vmisc <<< $aptver
+	vok=1
+	# Minimum required version of strongSwan is 5.8.0
+	# I had issues with 5.7.2 and iOS so disallowing older versions to avoid confusion
+	# Debian Bullseye will solve this issue with a much newer strongSwan apt package
+	if [ $vmaj -eq 5 ]
+	then
+	    if [ $vmin -gt 8 ]
+	    then
+		vok=0
+	    fi
+	else
+	    [ $vmaj -gt 5 ] && vok=0
+	fi
+	if [ $vok -eq 0 -o "$PSAPTOK" != "" ]
+	then
+	    echo $"
 strongSwan can be installed one of two ways:
 
   apt: Version $aptver
@@ -510,46 +507,61 @@ strongSwan can be installed one of two ways:
        Latest released version of strongSwan, longer install (10-15 mins on Pi4)
 
 See the github README for further information"
-	echo -n "Select A:apt W:website: " ; read ans
-	case "${ans,,}" in
-	    a*|A*) echo ""
-		   [ "$(which make)" == "" ] && echo "Installing make..." && apt-get install make
-		   do_cleanupwebinstall
-		   do_pistrong_download
-		   do_apt_install
-		   do_post_config apt
-		   do_wrapup
-		   exit
-		   ;;
-	    w*|W*) echo ""
-		   do_cleanupaptinstall
-		   do_web_install "$cmd"
-		   exit
-		   ;;
-	    *)   echo ""
-		 exit
-		 ;;
-	esac
-    else
-	echo $"
+	    echo -n "Select A:apt W:website: " ; read ans
+	    case "${ans,,}" in
+		a*|A*) echo ""
+		       [ "$(which make)" == "" ] && echo "Installing make..." && apt-get install make
+		       do_cleanupwebinstall
+		       do_pistrong_download
+		       do_apt_install
+		       do_post_config apt
+		       do_wrapup
+		       exit
+		       ;;
+		w*|W*) echo ""
+		       do_cleanupaptinstall
+		       do_web_install "$cmd"
+		       exit
+		       ;;
+		*)   echo ""
+		     exit
+		     ;;
+	    esac
+	else
+	    echo $"
 % The version of strongSwan in apt is less than the minimum required version (5.8.0)
   You can still install the web version ($webssver)
 "
-	if askyn "Do you want to continue and install the web version"
-	then
-	    do_cleanupaptinstall
-	    do_web_install "$cmd"
-	    exit
-	else
-	    echo ""
-	    exit
+	    if askyn "Do you want to continue and install the web version"
+	    then
+		do_cleanupaptinstall
+		do_web_install "$cmd"
+		exit
+	    else
+		echo ""
+		exit
+	    fi
 	fi
     fi
-fi
-echo "% strongSwan not found in apt"
-if askyn "Do you want to install the latest version from the web"
+    echo "% strongSwan not found in apt"
+    if askyn "Do you want to install the latest version from the web"
+    then
+	do_cleanupaptinstall
+	do_web_install "$cmd"
+    fi
+    exit
+}
+
+if [[ $EUID -ne 0 ]]
 then
-    do_cleanupaptinstall
-    do_web_install "$cmd"
+    if [[ $(dpkg-query -s sudo 2>/dev/null) ]]
+    then
+	sudo $0 $1 $2 $3 $4
+	exit
+    else
+	echo "? Please install sudo or run as root: $0 $1 $2"
+	exit 1
+    fi
 fi
-exit
+
+main "$@"
