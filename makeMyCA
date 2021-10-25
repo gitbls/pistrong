@@ -452,7 +452,7 @@ writemakeCAlog
 echo ""
 echo " ** Next steps:"
 echo "    * Ensure that the firewall rules in $catables are correct"
-echo "    * Review https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
+echo "    * Review and follow https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
 echo "    * Establish port forwarding on your router to IP $emyipaddr for UDP ports 500 and 4500"
 echo "    * Set up a mail server and web server if you want to email cert information to users"
 echo ""
