@@ -41,7 +41,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "V3.7"
+version = "V3.8"
 dbversion = "3"
 
 def qdelfile(qfn):
@@ -1055,7 +1055,7 @@ def cmd_client_start(pd, args):
     if len(vpnclients) == 0: perrorexit("? No matching Client VPN configuration found")
     if len(vpnclients) > 1: perrorexit("? More than one Client VPN configuration matches")
     dvpn = vpnclients[0].replace(".","-")   # Read from connection file someday?
-    if isrunning(pd) != 0: perrorexit("? strongSwan not running\n  Use 'sudo systemctl start {} to start it".format(pd.db['cfg']['service']['value']))
+    if isrunning(pd) != 0: perrorexit("? strongSwan not running\n  Use 'sudo systemctl start {} to start it".format(pd.db['config']['service']['value']))
     if isikeup(pd, ""): perrorexit("? VPN already started\n  Use 'sudo pistrong client stop' to stop VPN first")
     waitsec = args.wait
     try:
