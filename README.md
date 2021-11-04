@@ -269,6 +269,17 @@ If you'd prefer to use your own mail server, you can configure pistrong to use t
 
 * If you don't use the `--zip` switch, you'll also need to have a webserver installed, so that users can pick up the zip file from your web server. If you `sudo apt-get install apache2` before running makeMyCA everything will be set up correctly. You may need to restart the apache2 service after running makeMyCA. If you install apache2 after running makeMyCA, you may need to execute this command: `echo "ServerName vpnserver.fqdn" > /etc/apache2/conf-enabled/servername.conf`, of course, replacing vpnserver.fqdn with the fully-qualified domain name for your VPN Server.
 
+## Starting a Site-To-Site Tunnel Automatically
+
+It's easy to keep a site-to-site tunnel up and running using vpnmon (available on this github). Download vpnmon.service and vpnmon.sh to your system and then:
+
+* `sudo cp vpnmon.service /etc/systemd/system/vpnmon@.service`
+* `sudo cp vpnmon.sh /usr/local/bin/vpnmon`
+* `sudo pistrong client list` to get the name of the tunnel (e.g., otherhost-Tunnel)
+* sudo enable vpnmon@*otherhost*
+
+Generally, for any pair of tunnel endpoints, decide which will be the client (the one that initiates the VPN tunnel connection) and install vpnmon on that endpoint.
+
 ## Not Yet Completed
 
   * Android and MacOS testing - Certificate install testing and documentation for these devices.
