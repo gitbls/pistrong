@@ -1,5 +1,14 @@
 # Changelog
 
+## V3.8
+
+* Correct typo in client start error path
+* Resync version number
+
+## V3.7
+
+* Skipped
+	
 ## V3.6
 
 * Prevent VPN connect timeout from killing pistrong
