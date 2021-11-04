@@ -96,9 +96,12 @@ connections {
          $tike {
 EOF
     [ $fsite == 0 ] && echo "            local_ts  = $trange" >> $tcnfile
+    updowns="/usr/lib/ipsec/_updown"
+    # If $updowns not found we were built from tarball, so use alternate location
+    [ ! -f $updowns ] && updowns="/libexec/ipsec/_updown"
     cat >> $tcnfile <<EOF
             remote_ts = $rrange
-            updown = /libexec/ipsec/_updown iptables
+            updown = $updowns iptables
             rekey_time = $childrekeytime
             esp_proposals = aes128gcm128-x25519
          }
@@ -187,7 +190,7 @@ EOF
 	cat >> pistrong-vpn-installer <<EOF
 echo "To start the tunnel:"
 echo "  pistrong client start $tother-Tunnel"
-echo "To start the tunnel automatically at system boot...TBD"
+echo "See vpnmon on the pistrong GitHub for one method of starting the VPN tunnel automatically"
 echo ""
 EOF
     fi
@@ -492,6 +495,27 @@ then
     cp $cnfile /etc/swanctl/conf.d
     cp $fwfile /etc/swanctl/pistrong
     cp $ipfile /etc/swanctl/pistrong
+    if [ ! -f /etc/systemd/system/pistrong-iptables-load.service ]
+    then
+    cat > /etc/systemd/system/pistrong-iptables-load.service <<DEOF
+[Unit]
+Description=Load iptables for strongSwan
+Requires=network-online.target
+
+[Service]
+ExecStart=/sbin/iptables-restore /etc/swanctl/pistrong/iptables
+User=root
+StandardInput=null
+StandardOutput=null
+StandardError=null
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+DEOF
+    chmod 644 /etc/systemd/system/pistrong-iptables-load.service
+    fi
     if [ "$rmip" != "%any" ]
     then
 	cat >> /etc/swanctl/pistrong/VPNClients/$rmhost-Tunnel <<EOF
@@ -529,6 +553,7 @@ echo ""
 [ $fpack -eq 1 ] && echo "  *  Restart strongSwan: sudo systemctl restart strongswan"
 echo ""
 echo "  * Start the VPN tunnel:"
+echo "    Only start tunnel from one end if both servers are client-capable"
 echo ""
 [ "$myip" != "%any" ] &&  echo "     On $rmhost: pistrong client start $thishost-Tunnel"
 [ "$rmip" != "%any" ] &&  echo "     On $thishost: pistrong client start $rmhost-Tunnel"
@@ -537,5 +562,5 @@ echo ""
 echo ""
 echo "Once everything is working to your satisfaction, consider 'sudo systemctl enable strongswan'"
 echo "  to start the strongSwan service (but NOT the VPN tunnel) automatically"
-echo "Start the VPN tunnel automatically by...coming soon TBD"
+echo "See vpnmon on the pistrong GitHub for one method of starting the VPN tunnel automatically"
 exit
