@@ -23,6 +23,15 @@ pistrong components include:
 
 If you find pistrong useful, please consider starring it to help me understand how many people are using it. Thanks!
 
+## Installation Videos
+
+If you prefer to watch videos to learn, you'll find these interesting.
+
+* Install pistrong and strongSwan on Debian Bullseye &mdash; [Install and configure a VPN Server and Client Cert Manager](https://youtu.be/gDvglvgtYzY)
+* Install pistrong and strongSwan and configuring a site-to-site VPN &mdash; [Install and configure a Site-to-Site VPN](https://youtu.be/mUitM2JeKRc)
+
+Since Debian Bullseye is new, many people are still running Buster. The strongSwan package in Buster is a bit old, so InstallPiStrong will download and install strongSwan from the source tarball. Watch this [here](https://youtu.be/SONenXy4IiY). (Long wait times have been edited out of this video, so the 14-minute install on a Pi4 can be viewed in less than a minute.)
+
 ## Up and Running Nearly Instantly!
 
 Before diving in, decide if you're going to use a DNS name (highly recommended!) for external VPN access.Your public DNS IP address can be static or dynamic, depending on your Internet connection or ISP. If you don't use a DNS name, then you'll need to use your external IP address to access the VPN. If you're planning to use an IP address, there are ramifications so please read the section below: Using an IP Address for VPN Access.
