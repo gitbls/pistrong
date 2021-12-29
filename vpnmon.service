@@ -1,0 +1,15 @@
+[Unit]
+Description=VPN monitor ensures that tunnel %i is up and running
+After=network.target strongswan.service rpi-iptables.service
+
+[Service]
+Type=forking
+# Sleeps 20 seconds initially to ensure strongSwan started
+ExecStartPre=/bin/sleep 20
+ExecStart=/bin/bash -c '/usr/local/bin/vpnmon %i-Tunnel'
+TimeoutSec=0
+RemainAfterExit=yes
+GuessMainPID=no
+
+[Install]
+WantedBy=multi-user.target
