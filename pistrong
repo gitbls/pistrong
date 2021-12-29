@@ -41,7 +41,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "V3.8"
+version = "V3.9"
 dbversion = "3"
 
 def qdelfile(qfn):
@@ -230,6 +230,18 @@ def makevpnfns(pd, args):
     pd.vpnhostkey = "{}/{}-{}VPNKey.pem".format(pd.dprivate, pd.vpncertpfx, pd.swancertpfx)
     pd.dx['vpnsankey'] = args.vpnsankey if args.vpnsankey else pd.db['config']['vpnsankey']['value']
 
+def checkmailcfg(pd):
+
+    msg = ""
+    if pd.db['config']['smtpserver']['value'] == "":
+        msg = "--smtpserver"
+    if pd.db['config']['smtpusetls']['value']:
+        if pd.db['config']['smtpuser']['value'] == "":
+            msg = "{} {}".format(msg, "--smtpuser")
+        if pd.db['config']['smtppassword']['value'] == "":
+            msg = "{} {}".format(msg, "--smtppassword")
+    if msg != "": perrorexit("? Email configuration incomplete: {}".format(msg))
+
 def sendmsg(pd, mfrom, mto, msubj, mtext, mattach):
     """
     Send an email message. May still need work on authentication
@@ -369,7 +381,7 @@ def dbload(pd):
                            "debug":{"value":False,"help":"Debug mode"},\
                            "random":{"value":True,"help":"Generate random cert passwords"},\
                            "mailfrom":{"value":"PiStrongVPN<root@mydomain.com>","help":"'From' string for cert email"},\
-                           "smtpserver":{"value":"127.0.0.1","help":"SMTP mail server IP address or name"},\
+                           "smtpserver":{"value":"","help":"SMTP mail server IP address or name"},\
                            "smtpport":{"value":"25","help":"SMTP mail server port"},\
                            "smtpuser":{"value":"","help":"SMTP mail server username if required"},\
                            "smtppassword":{"value":"","help":"SMTP mail server password if required"},\
@@ -812,6 +824,7 @@ def cmd_add(pd, args):
         perrorexit("? Remote ID '{}' is not configured on this VPN".format(newremoteid))
     if ((args.ios and args.linux) or (args.ios and args.windows) or (args.linux and args.windows)):
         perrorexit("? Only one of --ios, --windows, or --linux can be specified")
+    checkmailcfg(pd)
     pd.dx['vpnaddr'] = pd.db['config']['vpnaddr']['value'] if args.vpnaddr is None else args.vpnaddr
     pd.dx['cname'] = pd.hostfqdn.replace(".","-") if args.cname is None else args.cname.replace(".","-")
     cmd = "pki --gen --type rsa --size {} --outform pem > {}".format(args.keybits, pd.clientkey)
@@ -888,6 +901,7 @@ def cmd_resend(pd, args):
     makeclientfnames(pd, args, newkey)
     checkcaexist(pd)
     if args.mail is None: perrorexit("? Resend command requires --mail to specify email address")
+    checkmailcfg(pd)
     if keyindb(pd, newkey):
         pd.dx['mailfrom'] = pd.db['config']['mailfrom']['value']
         pd.dx['webdir'] =   pd.db['config']['webdir']['value']
@@ -1188,7 +1202,7 @@ and bill-laptop.\n\
 \n\
 The revoke and resend commands always require a full name-dev.\n\
 \n\
-You MUST specify --vpnsankey when you first create a CA.\n\
+You MUST specify --vpnsankey or --novpncert when you first create a CA.\n\
 \n\
 See the full documentation at https://github.com/gitbls/pistrong\n".format(version)
     print(helpmsg)
