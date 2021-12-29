@@ -310,3 +310,7 @@ Please refer to the issues list if you have ideas for improving pistrong or have
 Or, if you're so inclined, do it yourself and leave a pull request.
 
 Testing and documenting cert installation steps for Android and MacOS is another area where I would really appreciate your help.
+
+## Troubleshooting
+
+If you're having problems and can't sort them out, please download and run the script `pscollect` and provide the output from it when you open an issue on this github. `pseollect` gathers up all the relevant information to help jump-start the process.
