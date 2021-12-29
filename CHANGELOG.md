@@ -1,5 +1,12 @@
 # Changelog
 
+## V3.9
+
+* Add pscollect to gather up problem-solving info
+* Check for valid email settings before sending mail
+* Improve validation of provided network configuration in makeMyCA and makeTunnel
+* makeMyCA and makeTunnel now check for and require sudo
+
 ## V3.8
 
 * Correct typo in client start error path
