@@ -180,12 +180,19 @@ function do_install_prereqs() {
     case "$osdistro" in
 	ubuntu|debian|raspbian|raspios)
 	    local pkgs=""
-	    [ "$(which curl)" == "" ] && pkgs="curl"
+	    [ "$(which curl)" == "" ] && pkgs="curl" 
 	    [ "$(which zip)" == "" ] && pkgs="$pkgs zip"
-	    [ "$pkgs" != "" ] && apt-get install --yes $pkgs || echo "* curl and zip are both already installed"
+	    [ "$(which iptables)" == "" ] && pkgs="$pkgs iptables"
+	    if [ "$pkgs" != "" ]
+	    then
+		echo ""
+		#echo "% pistrong requires 'curl', 'zip', and 'iptables'"
+		echo "  Doing 'apt update' and 'apt install' of prerequisite package(s): $pkgs"
+		apt-get update && apt-get install --yes $pkgs --no-install-recommends
+	    fi
 	    ;;
 	*)
-	    echo "? Cannot install prereqs; Unknown distro '$os'"
+	    echo "? Cannot install prerequisite packages; Unknown distro '$os'"
 	    ;;
     esac
     
@@ -357,7 +364,7 @@ esac
 function do_apt_install() {
     echo "> Installing strongSwan from apt"
     echo "* Installing packages 'strongswan-swanctl strongswan-pki charon-systemd python3-pexpect'"
-    apt-get --yes install strongswan-swanctl strongswan-pki charon-systemd libcharon-extra-plugins python3-pexpect
+    apt-get --yes install strongswan-swanctl strongswan-pki charon-systemd libcharon-extra-plugins python3-pexpect # iptables installed earlier
 }
 
 function do_post_config() {
@@ -458,11 +465,6 @@ function main() {
     check_hostname
     echo "** Installer for strongSwan/pistrong Management Tool **"
     echo ""
-    echo "This installer requires 'curl' and 'zip'"
-    echo "Doing an 'apt update' and installing them if necessary..."
-    echo ""
-    # ** Needs to be fixed when non-apt systems supported
-    apt-get update
     do_install_prereqs
     echo ""
     webssver=$(get_wssver)
