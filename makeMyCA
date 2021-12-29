@@ -1,9 +1,16 @@
 #!/bin/bash
+# Version V2.0
+version="V2.0"
 #
 # Run this script via sudo After strongSwan is installed
 # If you intend to send mail to cert recipients, you'll need an email server and web server
 # These don't need to be installed before running this script, but doing so may simplify redoes based on incorrect assumptions
 #
+function errexit() {
+    echo -e "$1"
+    exit 1
+}
+
 function askyn() {
     local ans
     echo -n "$1" '[y/N]? ' ; read $2 ans
@@ -24,6 +31,44 @@ function askdefault () {
 	[ "$ddfl" != "" ] && tmp="$ddfl" || tmp="$dfl"
     fi
     eval "${2}=\"${tmp}\""     # Defines a variable with the return value
+}
+
+function getnicip() {
+    #
+    # returns the IP address of the interface, or "" if there isn't one
+    #
+    local ipaddr="" dev=$1
+    ipaddr="$(ip -o -f inet address show dev "$dev" 2>/dev/null | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/[0-9]{1,2}')"
+    echo ${ipaddr%%/*}
+    return
+}
+
+function isipaddr() {
+    #
+    # Returns true if $1 is an IP address
+    #
+    [[ "$1" =~ ^([0-9]{1,3}[\.]){3}[0-9]{1,3} ]] && return 0 || return 1
+    return
+}
+
+function issubnet() {
+    #
+    # Returns true if $1 is a subnet
+    #
+    [[ "$1" =~ ^([0-9]{1,3}[\.]){3}0\/[0-9]{1,2}$ ]] && return 0 || return 1
+    return
+}
+
+function isnic() {
+    #
+    # Returns true if $1 is a network adapter (with an IP address)
+    #
+    [ "$(getnicip $1)" != "" ] && return 0 || return 1
+}
+
+function isdomain() {
+    local domain="$1"
+    [[ "$1" =~ ^([a-zA-Z0-9](([a-zA-Z0-9-]){0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]] && return 0 || return 1
 }
 
 function emitFirewall() {
@@ -85,12 +130,7 @@ EOF
     echo "** If you have another way to load iptables, you must add the code from $catables to it"
     echo "** Otherwise you must 'sudo systemctl enable --now pistrong-iptables-load'"
 }
-
-function isipaddr() {
-    local ip="$1"
-    [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] && return 0 || return 1
-}
-
+    
 function writemakeCAlog() {
     local dt=$(date +"%Y-%m-%d %H:%M:%S")
     local calog="/etc/swanctl/pistrong/makeCA.log"
@@ -98,6 +138,7 @@ function writemakeCAlog() {
     [ -f $calog ] && mv $calog $calog.bak
     cat >> $calog <<EOF
 date:          $dt
+version:       $version
 thisfqdn:      $thisfqdn
 vpnaddr:       $vpnaddr
 vpndev:        $vpndev
@@ -120,28 +161,33 @@ linuxkey:      $linuxkey
 EOF
 }
 
+cmd=$0
+[[ $EUID -ne 0 ]] && errexit "? Please rerun: 'sudo $cmd'"
 dbl=""
 thishost=$(hostname)        #This gets the hostname from Linux
 webdir="/var/www/html/vpn"
 ios="ios"
 windows="windows"
 linux="linux"
-# Get what we believe is the host IP address
-#myipaddr=$(hostname --ip-address)
-#[[ "$myipaddr" =~ "127.0" ]] && IFS=" " read myipaddr s2 <<< $(hostname --all-ip-addresses)
 caconf="/etc/swanctl/conf.d/pistrong-CAServerConnection.conf"
 catables="/etc/swanctl/pistrong/CA-iptables"
-[ -f $caconf ] && echo "? There is already a CA on this system" && echo "  Use 'sudo pistrong deleteca' to delete it if you really want to recreate it" && exit
+[ -f $caconf ] && echo "? There is already a CA on this system" && errexit "  Use 'sudo pistrong deleteca' to delete it if you really want to recreate it"
 
 echo "Build a prescriptive strongSwan CA for iOS, Windows, and Linux devices"
 echo ""
 echo "** You will be asked a series of configuration questions"
 echo "   You will be prompted before any changes are made to your system"
+echo "   Network configuration details are required to complete this script"
+echo ""
+echo "   NOTE: Although this script can accomodate multiple network adapters"
+echo "         on the system, it is not really network adapter aware."
 echo ""
 echo "** The CA requires a domain name"
 echo "   If you have a registered domain name to use for the VPN, use that"
 echo "   If not, you can use a name of your choice"
 echo "   NOTE: This must be a DNS name, not an IP address"
+echo "         If you are using DDNS, use that domain name (e.g., myddns.ddns.net)"
+echo "         See https://github.com/gitbls/pistrong for details"
 echo ""
 askdefault "Domain Name to use" thisdomain "noname.com"
 thisfqdn="$thishost.$thisdomain"
@@ -152,44 +198,71 @@ weburl="http://$thisfqdn/vpn"
 
 echo ""
 echo "** Configuring strongSwan for host FQDN $thisfqdn"
-echo ""
-echo "** 'vpnaddr' is the DNS name or IP address that VPN clients use when connecting to the VPN Server"
-echo "   Use your externally available DNS name if you have one, otherwise use your Internet IP address"
-echo ""
-askdefault "vpnaddr for your VPN" vpnaddr "$thisfqdn"
+while [ 0 ]
+do
+    echo ""
+    echo "** DNS name or IP address that VPN clients will use when connecting to the VPN Server"
+    echo "   Use your externally available DNS name if you have one, otherwise use your Internet IP address"
+    echo ""
+    askdefault "VPN DNS Name or IP Address for your VPN" vpnaddr "$thisfqdn"
+    isipaddr $vpnaddr && break
+    isdomain $vpnaddr && break
+    echo "? '$vpnaddr' is neither a valid IP Address nor DNS name"
+done
 
-echo ""
-echo "** 'vpndev' is the network device that will be connected to the Internet"
-echo "   If your system has:"
-echo "    One network device: Use that device"
-echo "    > 1 network device: Use the device that is or will be connected to the Internet"
-echo "                        either directly or indirectly through a router"
-echo ""
-askdefault "Network device that will be connected to the Internet" vpndev "eth0"
-echo ""
-echo "** 'landev' is the network device that is connected to the local LAN"
-echo "   If your system has:"
-echo "    One network device:  Use that device"
-echo "    > 1 network device:  Use the device that is not '$vpndev'"
-echo ""
-askdefault "Network device that will be connected to the local LAN" landev "eth0"
-# Get LAN IP address and subnet information
-ipline="$(ip -o -f inet addr show | grep $landev)"
-[ "$ipline" == "" ] && echo "? No IP address is assigned to network device '$landev'" && exit
-myipaddr=$(awk '{print $4}' <<< $(echo "$ipline") | (IFS='/'; read a b; echo $a))
-subnetbrd=$(awk '{print $6}' <<< $(echo "$ipline"))
-mysubnetx=$(sed -e 's/.255//' <<< $(echo "$subnetbrd"))
-myfullsubnet=$(sed -e 's/255/0/' <<< $(echo "$subnetbrd"))/$(awk '{print $4}' <<< $(echo "$ipline") | (IFS='/'; read a b; echo $b))
+while [ 0 ]
+do
+    echo ""
+    echo "** Name of the network device connected to the Internet"
+    echo "   If your system has:"
+    echo "    One network device: Use that device"
+    echo "    > 1 network device: Use the device that is or will be connected to the Internet"
+    echo "                        either directly or indirectly through a router"
+    echo ""
+    askdefault "Name of network device connected to the Internet" vpndev "eth0"
+    isnic $vpndev && break
+    echo "? '$vpndev' is not a valid network device name on this system"
+done
+
+while [ 0 ]
+do
+    echo ""
+    echo "** Name of the network device connected to the local LAN"
+    echo "   If your system has:"
+    echo "    One network device:  Use that device"
+    echo "    > 1 network device:  Use the device that is not '$vpndev'"
+    echo ""
+    askdefault "Name of network device connected to the local LAN" landev "eth0"
+    isnic $landev && break
+    echo "? '$landev' is not a valid network device name on this system"
+done
+
+# Get LAN IP address and subnet information from ip command
+ipline="$(ip -o -f inet addr show dev $landev)"
+[ "$ipline" == "" ] && errexit "? Cannot determine IP address for network device '$landev'"
+ipaddr="$(echo $ipline | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/[0-9]{1,2}')"  # Gets xx.xx.xx.xx/xx
+myipaddr=${ipaddr%%/*}            # Get IP address w/o /xx
+maskbits=${ipaddr##$myipaddr/}  # Get xx from /xx
+subnetbrd=$(read f1 f2 f3 f4 f5 f6 f7 <<< $(echo "$ipline"); echo $f6) # Get xx.xx.xx.255
+mysubnetx=${subnetbrd%.255}       # Strip the .255
+myfullsubnet="${mysubnetx}.0/$maskbits" # ... and add ".0/xx"
+# myipaddr=<ip address>, maskbits=<width of mask in bits>, subnetbrd=<broadcast mask (xx.xx.xx.255)>
+# mysubnetx=<xx.xx.xx subnet>, myfullsubnet="<xx.xx.xx.0>/xx"
 
 echo ""
 echo "** VPN Server IP configuration"
-echo "** 'myipaddr' Local LAN IP Address"
-echo "   If your system has:"
-echo "    One network device: Use the IP Address of that device"
-echo "    > 1 network device: Use the IP Address of '$landev'"
-echo ""
+while [ 0 ]
+do
+    echo "** Local LAN IP Address"
+    echo "   If your system has:"
+    echo "    One network device: Use the IP Address of that device"
+    echo "    > 1 network device: Use the IP Address of '$landev'"
+    echo ""
+    askdefault "VPN Server Local LAN IP Address" tmyipaddr "$myipaddr"
+    isipaddr $tmyipaddr && break
+    echo "? '$tmyipaddr' is not a valid IP Address"
+done
 
-askdefault "VPN Server Local LAN IP Address" tmyipaddr "$myipaddr"
 if [ "$tmyipaddr" != "$myipaddr" ]
 then
     #  set mysubnetx, myfullsubnet 
@@ -199,58 +272,79 @@ then
 fi
 #
 
-echo ""
-echo "** 'mysubnet' is the Local LAN Subnet"
-echo "   If you have multiple network adapters this is the subnet of the adapter"
-echo "    connected to the LAN network ($landev) rather than"
-echo "    the adapter connected to the Internet ($vpndev)"
-echo ""
-askdefault "VPN Server Local LAN Subnet" mysubnet "$myfullsubnet"
+while [ 0 ]
+do
+    echo ""
+    echo "** Local LAN Subnet"
+    echo "   If your system has:"
+    echo "    One network device: Use the Subnet of that device"
+    echo "    > 1 network device: Use the Subnet of '$landev'"
+    echo ""
+    askdefault "VPN Server Local LAN Subnet" mysubnet "$myfullsubnet"
+    issubnet $mysubnet && break
+    echo "? '$mysubnet' is not a valid LAN Subnet"
+done
 myfullsubnet=$mysubnet
 
 if [ "$vpndev" != "$landev" ]
 then
     ipline="$(ip -o -f inet addr show | grep $vpndev)"
-    [ "$ipline" == "" ] && echo "? No IP address is assigned to network device '$vpndev'" && exit
-    emyipaddr=$(awk '{print $4}' <<< $(echo "$ipline") | (IFS='/'; read a b; echo $a))
-    echo ""
-    echo "** VPN Server Internet-connected network device ($vpndev) IP address"
-    askdefault "VPN Server Internet-connected network device ($vpndev) IP address" emyipaddr "$emyipaddr"
+    [ "$ipline" == "" ] && errexit "? Network device '$vpndev' does not have an IP Address"
+    emyipaddr="$(echo $ipline | grep -oE '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\/[0-9]{1,2}')"
+    emyipaddr=${emyipaddr%%/*}
+    while [ 0 ]
+    do
+	echo ""
+	echo "** VPN Server Internet-connected network device ($vpndev) IP address"
+	askdefault "VPN Server Internet-connected network device ($vpndev) IP address" emyipaddr "$emyipaddr"
+	isipaddr $emyipaddr && break
+	echo "? '$emyipaddr' is not a valid IP Address"
+    done
 else
     emyipaddr=$myipaddr
 fi
 
-echo ""
-echo "** The Subnet for VPN Clients is a virtual subnet used between"
-echo "   the VPN Server and Clients. It must not be used on your network"
-echo "   and requires iptables configuration, which will be created"
-echo "   by this script (although you'll need to enable it)"
-echo ""
-askdefault "Subnet for VPN Clients" vpnsubnet "10.1.10.0/24"
+while [ 0 ]
+do
+    echo ""
+    echo "** The Subnet for VPN Clients is a virtual subnet used between"
+    echo "   the VPN Server and Clients. It must not be used on your network"
+    echo "   and requires iptables configuration, which will be created"
+    echo "   by this script (You will need to enable it)"
+    echo ""
+    askdefault "Subnet for VPN Clients" vpnsubnet "10.1.10.0/24"
+    issubnet $vpnsubnet && break
+    echo "? '$vpnsubnet' is not a valid subnet for VPN Clients"
+done
 
-# Default to subnet.1 for DNS, since that's where most people's routers are
-echo ""
-echo "** The DNS Server should be a DNS Server on your network"
-echo "   This can be your router (if so configured) or another DNS Server"
-echo ""
-askdefault "DNS Server for connected VPN Clients" vpndns "${mysubnetx}.1"
+while [ 0 ]
+do
+    # Default to subnet.1 for DNS, since that's where most people's routers are
+    echo ""
+    echo "** The DNS Server should be a DNS Server on your network"
+    echo "   This can be your router (if so configured) or other DNS Server"
+    echo ""
+    askdefault "DNS Server for connected VPN Clients" vpndns "${mysubnetx}.1"
+    isipaddr $vpndns && break
+    echo "? '$vpndns' is not a valid IP Address"
+done
 
 echo ""
-echo "** 'cnsuffix' is a naming string only used in user certs"
+echo "** Common Name (CN) string only used in user certs"
 echo "   (e.g., username-device-$thishost@cnsuffix)"
 echo "   It is used by iOS for additional Cert validation"
 echo "   and will be visible for strongSwan connections in the system log"
 echo ""
-askdefault "cnsuffix for your CA" cnsuffix "myvpn.net"
+askdefault "Common Name (CN) suffix for your CA" cnsuffix "myvpn.net"
 
 echo ""
-echo "** 'webdir' is the directory in the file system where certs will be shared via your web server"
+echo "** File system directory where certs will be shared via your web server"
 echo ""
 askdefault "webdir for your system" webdir "$webdir"
 [ ! -d $webdir ] && echo "% Directory $webdir does not exist. Be sure to create it before using pistrong --mail"
 
 echo ""
-echo "** 'weburl' is the URL that will be used in emails to users with their certs"
+echo "** URL that will be used in emails to users with their certs"
 echo ""
 askdefault "weburl for your system" weburl "$weburl"
 

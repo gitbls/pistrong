@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# makeTunnel V1.2
+# makeTunnel V1.3
+version="V1.3"
 #
 # Run this script via sudo After strongSwan is installed
 # Builds a tunnel
@@ -26,6 +27,11 @@
 #    you'd do something like this on a Linux system on the 10.1.10.0 LAN:
 #      route add -net 10.2.10.0 gw 10.1.10.2 netmask 255.255.255.0
 #
+
+function errexit() {
+    echo -e "$1"
+    exit 1
+}
 
 function askyn() {
     local ans
@@ -66,6 +72,28 @@ function askdefault () {
     fi
     eval "${2}=\"$tmp\""     # Defines a variable with the return value
 }
+
+function isipaddr() {
+    #
+    # Returns true if $1 is an IP address
+    #
+    [[ "$1" =~ ^([0-9]{1,3}[\.]){3}[0-9]{1,3} ]] && return 0 || return 1
+    return
+}
+
+function issubnet() {
+    #
+    # Returns true if $1 is a subnet
+    #
+    [[ "$1" =~ ^([0-9]{1,3}[\.]){3}0\/[0-9]{1,2}$ ]] && return 0 || return 1
+    return
+}
+
+function isdomain() {
+    local domain="$1"
+    [[ "$1" =~ ^([a-zA-Z0-9](([a-zA-Z0-9-]){0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]] && return 0 || return 1
+}
+
 function makeconnconf() {
 # $1=cfgfile $1=ikename $3=remoteip $4=thisvpncert $5=thisid $6=remotevpncert $7=remoteid $8=thisrange $9=remoterange
     local tcnfile="$1" tike="$2" trip="$3" tvpnf="$4" tid="$5"
@@ -262,16 +290,43 @@ EOF
 
 }
 
+function writemakeTunnelLog() {
+    local dt=$(date +"%Y-%m-%d %H:%M:%S")
+    local mkt="/etc/swanctl/pistrong/makeTunnel.log"
+    [ -f $mkt.bak ] && rm -f $mkt.bak
+    [ -f $mkt ] && mv $mkt $mkt.bak
+    cat >> $mkt <<EOF
+date:          $dt
+version:       $version
+ttype:         $ttype
+tunnelname:    $tunnelname
+thishost:      $thishost
+thistostx:     $thishostx
+rmhost:        $rmhost
+myrange:       $myrange
+mylanip:       $mylanip
+rmrange:       $rmrange
+rmlanip:       $rmlanip
+myip:          $myip
+rmip:          $rmip
+mytid:         $mytid
+rtid:          $rtid
+rekeytime:     $connrekeytime
+EOF
+}
+
 #
 # Main
 #
+cmd=$0
+[[ $EUID -ne 0 ]] && errexit "? Please rerun: 'sudo $cmd'"
 dbl=""
 debug=1
 #debug=0               # 0=debug 1=production
 thishostx=$(hostname)
 thishost="$thishostx"
 echo ""
-echo "Build a site-to-site tunnel configuration"
+echo "Build a Site-to-Site tunnel configuration"
 echo ""
 echo "After the configuration information has been gathered, it will be displayed"
 echo "for review/confirmation before any changes are made to the system"
@@ -303,7 +358,7 @@ echo ""
 askdefault "Tunnel name" tunnelname "newtunnel"
 # Error if Tunnel config file exists
 fs=$(ls /etc/swanctl/conf.d/Tunnel-${tunnelname}*.conf  2> /dev/null)
-[ "$fs" != "" ] && echo "? A tunnel named '$tunnelname' already exists" && exit
+[ "$fs" != "" ] && errexit "? A tunnel named '$tunnelname' already exists"
 askdefault "Name for this end of the tunnel" thishost "$thishostx"
 [ "$thishost" != "$thishostx" ] && fpack=0 || fpack=1
 echo "** Use the host name (for example) for the remote end of the tunnel"
@@ -332,10 +387,39 @@ echo ""
 echo "** IP ranges are entered as a.b.c.d/nn (e.g., 192.168.1.0/24)"
 echo "   See CIDR: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing"
 echo ""
-mustanswer "IP range for the '$thishost' LAN" myrange ""
-mustanswer "LAN IP address for '$thishost' in subnet $myrange" mylanip ""
-mustanswer "IP range for the '$rmhost' LAN" rmrange ""
-mustanswer "LAN IP address for '$rmhost' in subnet $rmrange" rmlanip ""
+while [ 0 ]
+do
+    mustanswer "IP range for the '$thishost' LAN" myrange ""
+    issubnet $myrange && break
+    echo "? '$myrange' is not a subnet in the form a.b.c.d/nn"
+done
+
+while [ 0 ]
+do
+    mustanswer "LAN IP address for '$thishost' in subnet $myrange" mylanip ""
+    isipaddr $mylanip && break
+    echo "? '$mylanip' is not a valid IP Address"
+done
+
+[[ ! "$myrange" =~ "${mylanip%.*}" ]] && echo "% My LAN IP [$mylanip] is not in the IP range for '$thishost' [$myrange]; Continuing..."
+
+while [ 0 ]
+do
+    mustanswer "IP range for the '$rmhost' LAN" rmrange ""
+    issubnet $rmrange && break
+    echo "? '$rmrange' is not a subnet in the form a.b.c.d/nn"
+done
+
+[ "$myrange" == "$rmrange" ] && errexit "? Tunnel endpoint LANs must be in different subnets"
+
+while [ 0 ]
+do
+    mustanswer "LAN IP address for '$rmhost' in subnet $rmrange" rmlanip ""
+    isipaddr $rmlanip && break
+    echo "? '$rmlanip' is not a valid IP Address"
+done
+
+[[ ! "$rmrange" =~ "${rmlanip%.*}" ]] && echo "% LAN IP [$rmlanip] is not in the IP range for '$rmhost' [$rmrange]; Continuing..."
 
 dynurl="http://ipinfo.io.ip"
 myip=""
@@ -353,24 +437,45 @@ echo ""
 echo "   Let's get the external DNS name or IP address for the two hosts"
 echo ""
 echo "   If a host does not have a DNS name or IP address assigned to it, it cannot"
-echo "   be a VPN Server for this tunnel and is only capable of initiating the VPN"
-echo ""
-echo "** Enter the public DNS name/IP address for host '$thishost'"
+echo "   be a VPN Server for this tunnel and is only capable of initiating the VPN (Client)"
 [ "$myip" == "" ] && dfl="Client Only" || dfl=$myip
-askdefault "DNS name or IP address for host '$thishost'" myip "$dfl" "%any"
-echo ""
-echo "** Enter the public DNS name/IP address for host '$rmhost'"
-askdefault "DNS name or IP address for host '$rmhost'" rmip "Client Only" "%any"
+while [ 0 ]
+do
+    while [ 0 ]
+    do
+	echo ""
+	echo "** Enter the public DNS name/IP address for host '$thishost'"
+	askdefault "DNS name or IP address for host '$thishost'" myip "$dfl" "%any"
+	[ "$myip" == "%any" ] && break
+	isipaddr $myip && break
+	isdomain $myip && break
+	echo "? '$myip' is not a recognized IP Address or domain name"
+    done
 
-if [ "$myip" == "%any" -a "$rmip" == "%any" ]
-then
-    echo ""
-    echo "% Neither host can be a Server for this VPN"
-    if ! askyn "Do you want to continue"
+    while [ 0 ]
+    do
+	echo ""
+	echo "** Enter the public DNS name/IP address for host '$rmhost'"
+	askdefault "DNS name or IP address for host '$rmhost'" rmip "Client Only" "%any"
+	[ "$rmip" == "%any" ] && break
+	isipaddr $rmip && break
+	isdomain $rmip && break
+	echo "? '$rmip' is not a recognized IP Address or domain name"
+    done
+
+    if [ "$myip" == "%any" -a "$rmip" == "%any" ]
     then
-	exit
-    fi
-fi    
+	echo ""
+	echo "% Neither host can be a Server for this VPN"
+	if  ! askyn "Do you want to redo this configuration"
+	then
+	    echo "% Rerun with 'sudo $cmd' when you're ready to proceed"
+	    exit
+	fi
+    else
+	break
+    fi    
+done
 
 echo ""
 echo "** The VPN ID is used as part of the authentication process"
@@ -534,6 +639,8 @@ EOF
 fi
 popd > /dev/null
 rm -rf $tmpdir
+
+writemakeTunnelLog
 
 echo ""
 echo "Next Steps"
