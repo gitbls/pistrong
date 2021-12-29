@@ -1,0 +1,72 @@
+#!/bin/bash
+
+cmd=$0
+[[ $EUID -ne 0 ]] && errexit "? Please rerun: 'sudo $cmd'"
+
+fl="/tmp/pistrong-diagnostics"
+echo "*** Gathering diagnostic information for pistrong/strongSwan ***"
+rm -f $fl
+
+echo "...Environmental details"
+
+echo -e "\n*** System Info ***" >> $fl
+cat /etc/os-release >> $fl
+uname -a >> $fl
+
+if [ -d /root/piStrong ]
+then
+    ls -l /root/piStrong >> $fl
+else
+    apt policy strongswan
+fi
+
+echo "...systemctl status strongswan"
+echo -e "\n*** systemctl status strongswan ***" >> $fl
+systemctl status strongswan >> $fl
+
+echo "...pistrong config [minus smtp credentials]"
+echo -e "\n*** pistrong config ***" >> $fl
+pistrong config | grep -v -E "smtpuser|smtppassword" >> $fl
+
+echo "...pistrong showca"
+echo -e "\n*** pistrong showca ***" >> $fl
+pistrong showca >> $fl
+
+echo "...pistrong list --full"
+echo -e "\n*** pistrong list --full ***" >> $fl
+pistrong list --full >> $fl
+
+if [ -f /etc/swanctl/pistrong/makeCA.log ]
+then
+    echo "...copy /etc/swanctl/pistrong/makeCA.log"
+    echo -e "\n*** /etc/swanctl/pistrong/makeCA.log ***" >> $fl
+    cat /etc/swanctl/pistrong/makeCA.log >> $fl
+fi
+
+if [ -f /etc/swanctl/pistrong/makeTunnel.log ]
+then
+    echo "...copy /etc/swanctl/pistrong/makeTunnel.log"
+    echo -e "\n*** /etc/swanctl/pistrong/makeTunnel.log ***" >> $fl
+    cat /etc/swanctl/pistrong/makeTunnel.log >> $fl
+fi
+
+echo "...ls -lR /etc/swanctl"
+echo -e "\n*** ls -l /etc/swanctl ***" >> $fl
+ls -lR /etc/swanctl >> $fl
+
+echo "...iptables filter table"
+echo -e "\n*** iptables filter table ***" >> $fl
+iptables -L -v -n >> $fl
+
+echo "...iptables nat table"
+echo -e "\n*** iptables nat table ***" >> $fl
+iptables -L -v -n -t nat >> $fl
+
+echo "...journalctl for charon and swanctl"
+echo -e "\n*** journalctl ***" >> $fl
+journalctl -b | grep -E "charon\[|swanctl\[" >> $fl
+
+echo "Done."
+echo -e "\n*** Done *** " >> $fl
+echo "Please provide $fl to the pistrong maintainer as requested"
+exit
