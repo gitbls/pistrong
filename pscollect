@@ -1,5 +1,10 @@
 #!/bin/bash
 
+function errexit() {
+    echo -e "$1"
+    exit 1
+}
+
 cmd=$0
 [[ $EUID -ne 0 ]] && errexit "? Please rerun: 'sudo $cmd'"
 
