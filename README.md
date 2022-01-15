@@ -313,4 +313,4 @@ Testing and documenting cert installation steps for Android and MacOS is another
 
 ## Troubleshooting
 
-If you're having problems and can't sort them out, please download and run the script `pscollect` and provide the output from it when you open an issue on this github. `pseollect` gathers up all the relevant information to help jump-start the process.
+If you're having problems and can't sort them out, please download and run the script `pscollect` and provide the output from it when you open an issue on this github. `pscollect` gathers up all the relevant information to help jump-start the process.
