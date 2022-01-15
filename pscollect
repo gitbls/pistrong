@@ -20,9 +20,13 @@ uname -a >> $fl
 
 if [ -d /root/piStrong ]
 then
+    echo "...ls -l /root/piStrong"
+    echo -e "\n*** ls -l /root/piStrong" >> $fl
     ls -l /root/piStrong >> $fl
 else
-    apt policy strongswan
+    echo "...apt-cache policy strongswan"
+    echo -e "\n*** apt-cache policy strongswan" >> $fl
+    apt-cache policy strongswan >> $fl
 fi
 
 echo "...systemctl status strongswan"
@@ -53,6 +57,13 @@ then
     echo "...copy /etc/swanctl/pistrong/makeTunnel.log"
     echo -e "\n*** /etc/swanctl/pistrong/makeTunnel.log ***" >> $fl
     cat /etc/swanctl/pistrong/makeTunnel.log >> $fl
+fi
+
+if [ -f /etc/swanctl/conf.d/pistrong-CAServerConnection.conf ]
+then
+    echo "...copy /etc/swanctl/conf.d/pistrong-CAServerConnection.conf"
+    echo -e "\n***  /etc/swanctl/conf.d/pistrong-CAServerConnection.conf ***" >> $fl
+    cat /etc/swanctl/conf.d/pistrong-CAServerConnection.conf >> $fl
 fi
 
 echo "...ls -lR /etc/swanctl"
