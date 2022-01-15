@@ -1,5 +1,9 @@
 # Changelog
 
+## V3.10
+
+* makeMyCA improvements
+
 ## V3.9
 
 * Add pscollect to gather up problem-solving info
