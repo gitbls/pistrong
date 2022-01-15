@@ -1,11 +1,12 @@
 #!/bin/bash
-# Version V2.0
-version="V2.0"
+# Version V3.0
+version="V3.0"
 #
 # Run this script via sudo After strongSwan is installed
 # If you intend to send mail to cert recipients, you'll need an email server and web server
 # These don't need to be installed before running this script, but doing so may simplify redoes based on incorrect assumptions
 #
+
 function errexit() {
     echo -e "$1"
     exit 1
@@ -19,6 +20,11 @@ function askyn() {
         y*|Y*) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+function pressenter() {
+    local ans
+    echo -n "$1" ; read $2 ans
 }
 
 function askdefault () {
@@ -69,6 +75,10 @@ function isnic() {
 function isdomain() {
     local domain="$1"
     [[ "$1" =~ ^([a-zA-Z0-9](([a-zA-Z0-9-]){0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$ ]] && return 0 || return 1
+}
+
+function pingcheck() {
+    ping -n -c 1 -w 2 $1 >/dev/null 2>&1
 }
 
 function emitFirewall() {
@@ -126,9 +136,9 @@ WantedBy=multi-user.target
 
 EOF
     chmod 644 /etc/systemd/system/pistrong-iptables-load.service
-    echo "** I have created the service pistrong-iptables-load, but it is not enabled"
-    echo "** If you have another way to load iptables, you must add the code from $catables to it"
-    echo "** Otherwise you must 'sudo systemctl enable --now pistrong-iptables-load'"
+    echo $"** I have created the service pistrong-iptables-load, but it is not enabled
+** If you have another way to load iptables, you must add the code from $catables to it
+** Otherwise you must 'sudo systemctl enable --now pistrong-iptables-load'"
 }
     
 function writemakeCAlog() {
@@ -139,11 +149,17 @@ function writemakeCAlog() {
     cat >> $calog <<EOF
 date:          $dt
 version:       $version
+dnsoffline:    $dnsoffline
+unkvpndns:     $unkvpndns
+thishost:      $thishost
+thisdomain:    $thisdomain
 thisfqdn:      $thisfqdn
+vpnaddrhasname: $vpnaddrhasname
 vpnaddr:       $vpnaddr
 vpndev:        $vpndev
 landev:        $landev
 myipaddr:      $myipaddr
+emyipaddr:     $emyipaddr
 mysubnetx:     $mysubnetx
 myfullsubnet:  $myfullsubnet
 vpnsubnet:     $vpnsubnet
@@ -151,7 +167,7 @@ vpndns:        $vpndns
 cnsuffix:      $cnsuffix
 webdir:        $webdir
 weburl:        $weburl
-san2:          $san2
+san2x:         $san2x
 ios:           $ios
 ioskey:        $ioskey
 windows:       $windows
@@ -165,76 +181,204 @@ cmd=$0
 [[ $EUID -ne 0 ]] && errexit "? Please rerun: 'sudo $cmd'"
 dbl=""
 thishost=$(hostname)        #This gets the hostname from Linux
+thisdomain=""
+thisfqdn=""
 webdir="/var/www/html/vpn"
 ios="ios"
 windows="windows"
 linux="linux"
 caconf="/etc/swanctl/conf.d/pistrong-CAServerConnection.conf"
 catables="/etc/swanctl/pistrong/CA-iptables"
+vpnaddrhasname=0
+unkvpndns=0
 [ -f $caconf ] && echo "? There is already a CA on this system" && errexit "  Use 'sudo pistrong deleteca' to delete it if you really want to recreate it"
 
-echo "Build a prescriptive strongSwan CA for iOS, Windows, and Linux devices"
-echo ""
-echo "** You will be asked a series of configuration questions"
-echo "   You will be prompted before any changes are made to your system"
-echo "   Network configuration details are required to complete this script"
-echo ""
-echo "   NOTE: Although this script can accomodate multiple network adapters"
-echo "         on the system, it is not really network adapter aware."
-echo ""
-echo "** The CA requires a domain name"
-echo "   If you have a registered domain name to use for the VPN, use that"
-echo "   If not, you can use a name of your choice"
-echo "   NOTE: This must be a DNS name, not an IP address"
-echo "         If you are using DDNS, use that domain name (e.g., myddns.ddns.net)"
-echo "         See https://github.com/gitbls/pistrong for details"
-echo ""
-askdefault "Domain Name to use" thisdomain "noname.com"
-thisfqdn="$thishost.$thisdomain"
+echo $"
+Build a prescriptive strongSwan Certificate Authority (CA) for iOS, Windows, and Linux client devices
+
+** Network configuration details are required to configure your strongSwan CA
+   You will be asked to provide these configuration details
+   The default response, if any, is provided in a string in backets (e.g., [something])
+
+   ** You will be prompted for confirmation before ANY changes are made to your system **
+
+   NOTE: Although this script can accomodate multiple network adapters
+         on the system, it is not really network adapter aware. Some invalid
+         combinations may not be identified.
+"
+echo $"** If you are using a DNS name for your External IP Address please read the detailed DNS information
+"
+if askyn "Do you want to read the detailed DNS information before proceeding"
+then
+    echo $"
+In order to configure your VPN to be on the Internet, you will need an
+External IP Address. External IP Addresses do NOT start with:
+
+  192.168.x.x, 172.16.x.x, 172.31.x.x, or 10.x.x.x
+
+Unless you have a static External IP Address, your ISP may change your
+external IP Address at times for a variety of reasons.
+
+To ensure that your VPN continues to work if your External IP Address
+changes, you need to set up public DNS name that points to your IP Address.
+
+There are a couple of ways to do this:
+
+* Use a Dynamic DNS (DDNS) name. For example, 'mydom.ddns.net' is an example of a DDNS name.
+There are many DDNS services to choose from on the internet. The primary difference between a
+DDNS name and your own domain name is that the DDNS name is a sub-domain of the shared domain
+owned by the DDNS provider. For instance, 'mydom.ddns.net' is a sub-domain of the DNS top-level
+Domain name 'ddns.net'. Some DDNS services have several top-level shared domain names for you to
+choose from.
+
+* Acquire your own domain on the internet from a Domain Name Registrar.  If you opt to use your
+own domain, you must have a way to change the DNS Name to IP Address mapping if your External IP
+Address can change. Some Domain Name Registrars enable dynamic DNS updates to your
+domains. Indeed, this is effectively another DDNS, but with your own DNS Name instead of a
+sub-domain of a DDNS provider. If your ISP has provided you with a dynamic IP Address, you
+should find a Domain Name Registrar that supports dynamic DNS updates. Some DDNS services also
+provide the ability to register and manage your own domain name, rather than using a shared
+domain name. noip.com is an example of a DDNS provider that also provides this service.
+
+In either dynamic DNS case, as well as the static IP with DNS name case, you can use one of:
+
+* A domain name, such as 'mydom.ddns.net', or 'mydom.com' in the case of a domain you own
+* A hostname, such as 'myhost.mydom.ddns.net' or 'myhost.mydom.com'
+
+You will be asked for the public DNS name to use for your VPN
+
+If you don't have a public DNS name, you can configure your VPN using your External IP
+Address. HOWEVER, if your External IP Address changes, your VPN will fail to operate.
+
+If you provide a domain name to the question 'External DNS Name or IP Address', you will be
+asked whether the name contains a hostname, as described above.
+
+Answer Y if it does, or N if it does not. This is needed so that makeMyCA can
+set the correct domain name in your CA. The domain name is used for identification
+within the VPN configuration and can only be changed by rebuilding the CA and all Certs.
+" | less ###-c -d -I -M -X
+    pressenter "Press Enter to Continue: "
+fi
+
+while [ 0 ]
+do
+    echo $"
+** DNS name or IP address that VPN clients will use when connecting to the VPN Server
+   Use your externally available DNS name if you have one, otherwise use your Internet IP Address
+"
+    askdefault "External DNS Name or IP Address for your VPN" vpnaddr ""
+    if isipaddr $vpnaddr
+    then
+	echo $"
+% '$vpnaddr' is an IP Address rather than a DNS name
+  Your VPN will work as configured but WILL fail if your External IP Address ever changes
+  Continuing.."
+	break
+    fi
+    if isdomain $vpnaddr
+    then
+	dnsoffline=0
+	if pingcheck 1.1.1.1
+	then
+	    if [ "$(dig -4 +short $vpnaddr @1.1.1.1)" == "" ]
+	    then
+		echo $"
+% '$vpnaddr' does not appear to be a DNS name known on the external Internet
+  The CA will be built with the information you provide but you will
+  not be able to connect to your VPN until this is corrected
+  Continuing..."
+		unkvpndns=1
+	    fi
+	    break
+	else
+	    dnsoffline=1
+	    echo $"
+% Internet DNS Server 1.1.1.1 is not available to check DNS Name '$vpnaddr' validity
+  The CA will be built with the information you provide but will not
+  operate properly if the DNS name '$vpnaddr' is incorrect
+  Continuing..."
+	fi
+    else
+	[ "$vpnaddr" != "" ] && errexit "? '$vpnaddr' is not a valid IP Address or DNS name"
+    fi
+done
+
+checkhost=$thishost
+if isdomain $vpnaddr
+then
+   thisdomain=$vpnaddr
+   echo $"
+** DNS name disambiguation
+
+   Answer Y if '${vpnaddr%%.*}' is a hostname and domain name is '${vpnaddr#*.}'
+   Answer N if there is no hostname and domain name is '$vpnaddr'
+"
+   if askyn "Is '${vpnaddr%%.*}' a hostname in the DNS domain '${vpnaddr#*.}'"
+   then
+       vpnaddrhasname=1
+       thisdomain=${vpnaddr#*.}
+       checkhost=${vpnaddr%%.*}
+   fi
+   #checkhost=$thishost             #Disable check until something changes requiring this
+   if [ "$checkhost" != "$thishost" ]
+   then
+       echo $"
+% The host name of this system is '$thishost' which is different than the VPN DNS name '$checkhost'
+  The CA will be built with the information you provided, but you  should consider
+  setting your system and VPN host names to be the same to minimize confusion
+  Continuing..."
+   fi
+else
+    # If IP Address prompt for domain and host names
+    echo $"
+** Domain and host names
+   Domain name: If you have a registered domain name, use that
+                Otherwise use whatever you'd like (advanced feature)
+   Host name:   Defaults to the system host name
+
+   ** This must be a DNS name, not an IP address; no syntax checking is done **
+"
+    askdefault "Domain Name" thisdomain "noname.com"
+    askdefault "Host Name" thishost $thishost
+fi
+
+# Only append domain if it's not already there 
+[[ ! $thishost =~ $thisdomain ]] && thisfqdn="$thishost.$thisdomain" || thisfqdn="$thishost"
 ioskey="ios.$thisdomain"
 winkey="windows.$thisdomain"
 linuxkey="linux.$thisdomain"
 weburl="http://$thisfqdn/vpn"
 
 echo ""
-echo "** Configuring strongSwan for host FQDN $thisfqdn"
-while [ 0 ]
-do
-    echo ""
-    echo "** DNS name or IP address that VPN clients will use when connecting to the VPN Server"
-    echo "   Use your externally available DNS name if you have one, otherwise use your Internet IP address"
-    echo ""
-    askdefault "VPN DNS Name or IP Address for your VPN" vpnaddr "$thisfqdn"
-    isipaddr $vpnaddr && break
-    isdomain $vpnaddr && break
-    echo "? '$vpnaddr' is neither a valid IP Address nor DNS name"
-done
+echo "** Configuring strongSwan for VPN Server '$thisfqdn'"
 
 while [ 0 ]
 do
-    echo ""
-    echo "** Name of the network device connected to the Internet"
-    echo "   If your system has:"
-    echo "    One network device: Use that device"
-    echo "    > 1 network device: Use the device that is or will be connected to the Internet"
-    echo "                        either directly or indirectly through a router"
-    echo ""
-    askdefault "Name of network device connected to the Internet" vpndev "eth0"
+    echo $"
+** Network device connected to the Internet
+   If your system has:
+    One network device: Use that device
+    > 1 network device: Use the device that is or will be connected to the Internet
+                        either directly or indirectly through a router
+"
+    askdefault "Network device connected to the Internet" vpndev "eth0"
     isnic $vpndev && break
-    echo "? '$vpndev' is not a valid network device name on this system"
+    echo $"
+? '$vpndev' is not a valid network device name on this system"
 done
 
 while [ 0 ]
 do
-    echo ""
-    echo "** Name of the network device connected to the local LAN"
-    echo "   If your system has:"
-    echo "    One network device:  Use that device"
-    echo "    > 1 network device:  Use the device that is not '$vpndev'"
-    echo ""
-    askdefault "Name of network device connected to the local LAN" landev "eth0"
+    echo $"
+** Network device connected to the local LAN
+   If your system has:
+    One network device: Use that device
+    > 1 network device: Use the device that is not '$vpndev'
+"
+    askdefault "Network device connected to the local LAN" landev "eth0"
     isnic $landev && break
-    echo "? '$landev' is not a valid network device name on this system"
+    echo $"
+? '$landev' is not a valid network device name on this system"
 done
 
 # Get LAN IP address and subnet information from ip command
@@ -249,18 +393,20 @@ myfullsubnet="${mysubnetx}.0/$maskbits" # ... and add ".0/xx"
 # myipaddr=<ip address>, maskbits=<width of mask in bits>, subnetbrd=<broadcast mask (xx.xx.xx.255)>
 # mysubnetx=<xx.xx.xx subnet>, myfullsubnet="<xx.xx.xx.0>/xx"
 
-echo ""
-echo "** VPN Server IP configuration"
+echo $"
+** VPN Server IP configuration"
 while [ 0 ]
 do
-    echo "** Local LAN IP Address"
-    echo "   If your system has:"
-    echo "    One network device: Use the IP Address of that device"
-    echo "    > 1 network device: Use the IP Address of '$landev'"
-    echo ""
+    echo $"
+** Local LAN IP Address
+   If your system has:
+    One network device: Use the IP Address of that device
+    > 1 network device: Use the IP Address of '$landev'
+"
     askdefault "VPN Server Local LAN IP Address" tmyipaddr "$myipaddr"
     isipaddr $tmyipaddr && break
-    echo "? '$tmyipaddr' is not a valid IP Address"
+    echo $"
+? '$tmyipaddr' is not a valid IP Address"
 done
 
 if [ "$tmyipaddr" != "$myipaddr" ]
@@ -274,15 +420,16 @@ fi
 
 while [ 0 ]
 do
-    echo ""
-    echo "** Local LAN Subnet"
-    echo "   If your system has:"
-    echo "    One network device: Use the Subnet of that device"
-    echo "    > 1 network device: Use the Subnet of '$landev'"
-    echo ""
+    echo $"
+** Local LAN Subnet
+   If your system has:
+    One network device: Use the Subnet of that device
+    > 1 network device: Use the Subnet of '$landev'
+"
     askdefault "VPN Server Local LAN Subnet" mysubnet "$myfullsubnet"
     issubnet $mysubnet && break
-    echo "? '$mysubnet' is not a valid LAN Subnet"
+    echo $"
+? '$mysubnet' is not a valid LAN Subnet"
 done
 myfullsubnet=$mysubnet
 
@@ -294,11 +441,14 @@ then
     emyipaddr=${emyipaddr%%/*}
     while [ 0 ]
     do
-	echo ""
-	echo "** VPN Server Internet-connected network device ($vpndev) IP address"
+	echo $"
+** VPN Server Internet-connected network device ($vpndev) IP address
+   Enter the IP Address for the network device connected to the Internet ($vpndev)
+"
 	askdefault "VPN Server Internet-connected network device ($vpndev) IP address" emyipaddr "$emyipaddr"
 	isipaddr $emyipaddr && break
-	echo "? '$emyipaddr' is not a valid IP Address"
+	echo $"
+? '$emyipaddr' is not a valid IP Address"
     done
 else
     emyipaddr=$myipaddr
@@ -306,59 +456,70 @@ fi
 
 while [ 0 ]
 do
-    echo ""
-    echo "** The Subnet for VPN Clients is a virtual subnet used between"
-    echo "   the VPN Server and Clients. It must not be used on your network"
-    echo "   and requires iptables configuration, which will be created"
-    echo "   by this script (You will need to enable it)"
-    echo ""
+    echo $"
+** The Subnet for VPN Clients is a virtual subnet used between the VPN Server and Clients
+   It must not be used anywhere on your network and requires iptables configuration
+   You must enable the iptables settings created by this script
+   See https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
+"
     askdefault "Subnet for VPN Clients" vpnsubnet "10.1.10.0/24"
     issubnet $vpnsubnet && break
-    echo "? '$vpnsubnet' is not a valid subnet for VPN Clients"
+    echo $"
+? '$vpnsubnet' is not a valid subnet for VPN Clients"
 done
 
 while [ 0 ]
 do
     # Default to subnet.1 for DNS, since that's where most people's routers are
-    echo ""
-    echo "** The DNS Server should be a DNS Server on your network"
-    echo "   This can be your router (if so configured) or other DNS Server"
-    echo ""
-    askdefault "DNS Server for connected VPN Clients" vpndns "${mysubnetx}.1"
+    echo $"
+** The DNS Server should be a DNS Server on your network
+   This can be your router (if so configured) or another system on your LAN with a DNS Server
+"
+    askdefault "DNS Server IP Address for connected VPN Clients" vpndns "${mysubnetx}.1"
     isipaddr $vpndns && break
-    echo "? '$vpndns' is not a valid IP Address"
+    echo $"
+? '$vpndns' is not a valid IP Address"
 done
 
-echo ""
-echo "** Common Name (CN) string only used in user certs"
-echo "   (e.g., username-device-$thishost@cnsuffix)"
-echo "   It is used by iOS for additional Cert validation"
-echo "   and will be visible for strongSwan connections in the system log"
-echo ""
+echo $"
+** Common Name (CN) string only used in user certs (e.g., username-device-$thishost@cnsuffix)
+   The CN is used for additional Cert validation and will be visible in the VPN connection log
+   Users will need to type this once when configuring a VPN Client
+   The default is fine, but can be changed if desired
+   If you decide to change it later you will need to rebuild the CA and all Certs
+"
 askdefault "Common Name (CN) suffix for your CA" cnsuffix "myvpn.net"
 
-echo ""
-echo "** File system directory where certs will be shared via your web server"
-echo ""
+echo $"
+** File system directory where certs will be shared via your web server
+   Used if/when emailing certs to users with a link to certs instead of a zip file
+   If you are not going to email links to certs, just press Enter
+   This setting can be changed later with 'sudo pistrong config --webdir'
+"
 askdefault "webdir for your system" webdir "$webdir"
-[ ! -d $webdir ] && echo "% Directory $webdir does not exist. Be sure to create it before using pistrong --mail"
+#[ ! -d $webdir ] && echo "% Directory $webdir does not exist. Be sure to create it before using pistrong --mail"
 
-echo ""
-echo "** URL that will be used in emails to users with their certs"
-echo ""
+echo $"
+** URL that will be used in emails to users with their certs
+   Used if/when emailing certs to users with a link to certs in '$webdir'
+   If you are not going to email links to certs, just press Enter
+   This setting can be changed later with 'sudo pistrong config --weburl'
+"
 askdefault "weburl for your system" weburl "$weburl"
 
-echo ""
-echo "** Configure the SAN Key (remoteid) and VPN Cert name for iOS, Windows, and Linux users"
-echo "   The VPN Cert name prefix is important because it helps you retain your sanity"
-echo "   The remoteid identifies the connection to strongSwan, and is assigned to users when they are added"
-echo "   The defaults are acceptable, but you may change them if you wish"
-echo ""
+echo $"
+** VPN Cert name prefix and SAN Key (remoteid) for iOS, Windows, and Linux users
+   The SAN Key used to identify the connecting OS type (Linux, Windows, iOS)
+   You assign a SAN Key (remoteid) when adding user Certs
+   The VPN Cert name prefix can be helpful during troubleshooting
+   The defaults are fine, but you may change them if you wish
+   If you decide to change these later you will need to rebuild the CA and all Certs
+"
 askdefault "VPN Cert name prefix for iOS VPN Cert" ios "$ios"
 askdefault "VPN SAN key for iOS users" ioskey "$ioskey"
 
 askdefault "VPN Cert name prefix for Windows VPN Cert" windows "$windows"
-# Get Windows VPN SAN Key even though Windows IPSec stack at least as of Win10 1903 doesn't use it
+# Get Windows VPN SAN Key even though Windows IPSec stack as of Win10 1903 doesn't use it
 askdefault "VPN SAN key for Windows users" winkey "$winkey"
 
 askdefault "VPN Cert name prefix for Linux VPN Cert" linux "$linux"
@@ -369,41 +530,52 @@ if isipaddr "$vpnaddr"
 then
     dsan="$vpnaddr,$thisfqdn"
 else
-    [ "$thisfqdn" == "$vpnaddr" ] && dsan=$thisfqdn || dsan="$thisfqdn,$vpnaddr"
+    dsan="$vpnaddr"
 fi
-echo "** The default secondary VPN SAN Key is '$dsan'"
-echo "   You can add additional SAN Keys if desired"
-echo ""
-askdefault "Additional Secondary VPN SAN Key(s)" san2 ""
-[ "$san2" == "" ] && san2="$dsan" || san2="$dsan,$san2"
+echo $"** Default secondary VPN SAN Key(s): '$dsan'
+   You can add additional SAN Keys if desired
+   Precede the string with a '%' (e.g., %newkey.foo.com) to replace the entire string
+    rather than appending the key(s) to '$dsan'
 
-echo ""
-echo "** This script will now create:"
-echo "      Connection Config:    $caconf"
-echo "      CA Cert:              strongSwanCACert.pem"
-echo "      VPN Cert for iOS:     $ios-strongSwanVPNCert.pem with VPN SAN key '$ioskey'"
-echo "      VPN Cert for Windows: $windows-strongSwanVPNCert.pem with VPN SAN key '$winkey'"
-echo "      VPN Cert for Linux:   $linux-strongSwanVPNCert.pem with VPN SAN key '$linuxkey'"
-echo ""
-echo "   For VPN Server LAN IP $myipaddr subnet $myfullsubnet with VPN Client DNS servers $vpndns"
-echo ""
-echo "   The VPN will use virtual subnet $vpnsubnet for VPN Clients"
-echo ""
-echo "   Each VPN cert will have '$san2' as secondary VPN SAN key(s)"
-echo ""
-echo "   The default VPN Server Address is '$vpnaddr'"
-echo "   This can be changed on a per-user basis on the 'sudo pistrong add' command for a single user"
-echo "    using the --vpnaddr new-vpn-address switch"
-echo "    (You might want to do this, for example, if you're using an IP address to connect externally"
-echo "     but also want to test connecting to the VPN server from your internal network)"
-echo "   See https://github.com/gitbls/pistrong/blob/master/README.md"
-echo "    for additional VPN Server IP Address considerations"
-echo ""
-echo "See 'sudo pistrong config --list' for a list of all the pistrong configuration parameters"
-echo " and make any changes necessary for your configuration"
-echo ""
-echo "** If you'd like to change anything, answer N to the next question and restart the script"
-echo ""
+   Additional VPN SAN keys beyond the defaults are required only for certain advanced configurations
+   If you don't understand what VPN SAN keys are, simply press Enter
+"
+askdefault "Additional Secondary VPN SAN Key(s)" san2 ""
+[ "$san2" == "" ] && san2x="$dsan" || san2x="$dsan,$san2"
+
+echo $"
+** This script will now create:
+      Connection Config:    $caconf
+      CA Cert:              strongSwanCACert.pem
+      VPN Cert for iOS:     $ios-strongSwanVPNCert.pem with VPN SAN key '$ioskey'
+      VPN Cert for Windows: $windows-strongSwanVPNCert.pem with VPN SAN key '$winkey'
+      VPN Cert for Linux:   $linux-strongSwanVPNCert.pem with VPN SAN key '$linuxkey'
+
+   For VPN Server LAN IP $myipaddr subnet $myfullsubnet with VPN Client DNS servers $vpndns
+
+   The VPN will use virtual subnet $vpnsubnet for VPN Clients
+
+   Each VPN Cert will have '$san2x' as secondary VPN SAN key(s)
+
+   The default VPN Server Address is '$vpnaddr'
+   This can be changed on a per-user basis on the 'sudo pistrong add' command for a single user
+    using the --vpnaddr new-vpn-address switch
+    You might want to do this, for example, if you're using an IP address to connect externally
+     but also want to test connecting to the VPN server from your internal network
+   See https://github.com/gitbls/pistrong/blob/master/README.md
+    for additional VPN Server IP Address considerations"
+isipaddr $vpnaddr && echo $"
+   NOTE: You have set your VPN Server Address to '$vpnaddr', which is an IP Address
+         rather than a DNS name. Your VPN WILL fail if the external IP Address
+         of your VPN Server ever changes"
+echo $"
+See 'sudo pistrong config --list' for a list of all the pistrong configuration parameters
+ and make any changes necessary for your configuration
+
+** If you'd like to change anything, answer N (or Enter) to the next question and restart the script
+"
+
+writemakeCAlog
 
 if ! askyn "Do you want to continue"
 then
@@ -412,7 +584,7 @@ fi
 #
 # Set hostname in apache config as a convenience, and make sure that the $webdir directory exists
 #
-if [ -d /etc/apache2/conf-enabled ];
+if [ -d /etc/apache2/conf-enabled ]
 then
     if [ ! -f /etc/apache2/conf-enabled/servername.conf ]
     then
@@ -421,33 +593,31 @@ then
     [ ! -d $webdir ] && mkdir -p $webdir
 fi
 
+echo "Updating pistrong configuration..."
 pistrong config --myfqdn $thisfqdn
 pistrong config --vpnaddr $vpnaddr
-pistrong config --cnsuffix $cnsuffix --mailfrom "PiStrongVPN<root@$thisfqdn>"
+pistrong config --cnsuffix $cnsuffix --mailfrom "PiStrongVPN<root@$thisfqdn>" --smtpserver 127.0.0.1
 pistrong config --webdir $webdir --weburl $weburl
 # This sets the default SAN Key (remoteid) for the add command
 pistrong config --vpnsankey $ioskey --vpncertpfx $ios
 
+echo "Building the CA and VPN Certs..."
 # Make the CA and VPN certs (one for each: iOS, Windows, and Linux)
 pistrong createca --nocamsg --novpncert
-pistrong makevpncert $ios --vpnsankey $ioskey,$san2
-pistrong makevpncert $windows --vpnsankey $winkey,$san2
-pistrong makevpncert $linux --vpnsankey $linuxkey,$san2
+pistrong makevpncert $ios --vpnsankey $ioskey,$san2x
+pistrong makevpncert $windows --vpnsankey $winkey,$san2x
+pistrong makevpncert $linux --vpnsankey $linuxkey,$san2x
 
-echo ""
-echo "When adding iOS     users apply --remoteid $ioskey"
-echo "When adding Windows users apply --remoteid $winkey"
-echo "When adding Linux   users apply --remoteid $linuxkey --linux"
-echo ""
-echo "Your strongSwan CA is configured"
-echo ""
-echo "Creating $catables with firewall rules"
+echo "Creating '$catables' with firewall rules"
 emitFirewall
 echo ""
-echo "Creating $caconf with the new VPN Server definitions"
+echo "Creating '$caconf' with the new VPN Server definitions"
 updowns="/usr/lib/ipsec/_updown"
-# If $updowns not found we were built from tarball, so use alternate location
+# If $updowns not found, strongSwan was built from tarball, so use alternate location
 [ ! -f $updowns ] && updowns="/libexec/ipsec/_updown"
+[ ! -f $updowns ] && echo $"
+% Cannot find ${updowns}; Please file a ticket on the pistrong github
+"
 cat > $caconf <<EOF
 connections {
     linux-pubkey-ikev2 {
@@ -543,10 +713,21 @@ EOF
 
 writemakeCAlog
 
-echo ""
-echo " ** Next steps:"
-echo "    * Ensure that the firewall rules in $catables are correct"
-echo "    * Review and follow https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
-echo "    * Establish port forwarding on your router to IP $emyipaddr for UDP ports 500 and 4500"
-echo "    * Set up a mail server and web server if you want to email cert information to users"
-echo ""
+echo $"
+Be sure to apply the correct switch when adding users:
+ For iOS     users: --remoteid $ioskey
+ For Windows users: --remoteid $winkey
+ For Linux   users: --remoteid $linuxkey --linux
+
+  NOTE: If you use the wrong remoteid for an OS the VPN client will likely fail to connect
+  because of differing VPN software implementations among the client operating systems"
+
+echo $"
+Your strongSwan CA is configured
+
+** Next steps:
+   * Ensure that the firewall rules in $catables are correct
+   * Review and follow https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
+   * Establish port forwarding on your router to IP $emyipaddr for UDP ports 500 and 4500
+   * Set up a mail server and web server if you want to email cert information to users
+"
