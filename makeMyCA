@@ -542,6 +542,8 @@ echo $"** Default secondary VPN SAN Key(s): '$dsan'
 "
 askdefault "Additional Secondary VPN SAN Key(s)" san2 ""
 [ "$san2" == "" ] && san2x="$dsan" || san2x="$dsan,$san2"
+# If prefixed with "%" strip it and replace san key
+[ "$san2" != "${san2#%}" ] && san2x=${san2#%}
 
 echo $"
 ** This script will now create:
