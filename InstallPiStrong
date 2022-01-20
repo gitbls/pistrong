@@ -32,11 +32,13 @@ function get_osdistro() {
     if [ -f "/etc/os-release" ]
     then
         osdistro=$(grep ^ID= /etc/os-release | (IFS='='; read a b ; echo $b))
+        oslike=$(grep ^ID_LIKE= /etc/os-release | (IFS='='; read a b ; echo $b))
     else
         osdistro="unknown"
     fi
     osdistro=${osdistro%\"}
     osdistro=${osdistro#\"}
+    [ "$oslike" == "ubuntu" ] && osdistro="ubuntu"
     declare -x osdistro
 }
 
