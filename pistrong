@@ -41,7 +41,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "V3.10"
+version = "V3.11"
 dbversion = "3"
 
 def qdelfile(qfn):
@@ -1085,7 +1085,7 @@ def cmd_client_start(pd, args):
     return
 
 def cmd_client_stop(pd, args):
-    r = dosystem(pd, "swanctl --list-sas")
+    r = dosystem(pd, "swanctl --list-sas", pout=False)
     ikename = (decodeutf(r.stdout).split("\n")[0]).split(':')[0]
     if isikeup(pd, ikename): killike(pd, ikename, False)
     return
