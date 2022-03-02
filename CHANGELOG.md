@@ -1,5 +1,14 @@
 # Changelog
 
+## V3.11
+
+* Make 'client stop' a wee bit quieter
+* In addition to ike, also set enc and net logging to 0 in /etc/strongswan.d/charon-systemd.conf
+* makeTunnel improvements
+  * Ask about and configure dead peer detection
+  * Ease of use improvements
+  * General code cleanup
+
 ## V3.10
 
 * makeMyCA improvements
