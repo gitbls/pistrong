@@ -437,9 +437,12 @@ charon-systemd {
         # Default loglevel.
         # default = 1
 
-        # ** pistrong set IKE=0 to turn off keep-alive message logging
-        # ** comment out next line to re-enable keep-alive message logging
+        # ** pistrong set {ENC,IKE,NET}=0 to turn off frequently irrelevant message logging
+        # ** comment out these lines to re-enable keep-alive message logging
+
+        enc = 0
 	ike = 0
+        net = 0
 
     }
 }
