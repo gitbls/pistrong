@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# makeTunnel V1.3
-version="V1.3"
+# makeTunnel V1.4
+version="V1.4"
 #
 # Run this script via sudo After strongSwan is installed
 # Builds a tunnel
@@ -108,6 +108,7 @@ connections {
       fragmentation = yes
       proposals = aes128-sha256-x25519
       rekey_time = $connrekeytime
+      dpd_delay = ${dpddelay}s
       local {
          auth = pubkey
          cacerts = $cacertfn
@@ -131,6 +132,7 @@ EOF
             remote_ts = $rrange
             updown = $updowns iptables
             rekey_time = $childrekeytime
+            dpd_action = $dpdaction
             esp_proposals = aes128gcm128-x25519
          }
       }
@@ -300,6 +302,7 @@ date:          $dt
 version:       $version
 ttype:         $ttype
 tunnelname:    $tunnelname
+hostname:      $(hostname)
 thishost:      $thishost
 thistostx:     $thishostx
 rmhost:        $rmhost
@@ -324,22 +327,22 @@ dbl=""
 debug=1
 #debug=0               # 0=debug 1=production
 thishostx=$(hostname)
+thishostx=${thishostx%%.*} # Strip domain name(s)
 thishost="$thishostx"
-echo ""
-echo "Build a Site-to-Site tunnel configuration"
-echo ""
-echo "After the configuration information has been gathered, it will be displayed"
-echo "for review/confirmation before any changes are made to the system"
+echo $"
+Build a Site-to-Site tunnel configuration
 
-echo ""
-echo "Details required for each end of the Tunnel:"
-echo " * Hostname, LAN IP address, LAN IP range (CIDR), WAN IP address or DNS name"
-echo "   * The LAN IP range (CIDR) is explained below"
-echo "   * The WAN IP address is required for a host to act as a VPN Server"
-echo "     (that is, able to receive VPN tunnel connection requests)"
-echo ""
-echo "The tunnel can be site-to-site (routing onto remote LAN) or host-to-host"
-echo ""
+After the configuration information has been gathered, it will be displayed
+for review/confirmation before any changes are made to the system
+
+Details required for each end of the Tunnel:
+ * Hostname, LAN IP address, LAN IP range (CIDR), WAN IP address or DNS name
+   * The LAN IP range (CIDR) is explained below
+   * The WAN IP address is required for a host to act as a VPN Server
+     (that is, able to receive VPN tunnel connection requests)
+
+The tunnel can be site-to-site (routing onto remote LAN) or host-to-host
+"
 echo -n "Tunnel type [S]ite or Host: " ; read tmp
 case "${tmp,,}" in
     h|host) echo "Host-to-host tunnel selected"
@@ -351,10 +354,10 @@ case "${tmp,,}" in
 	      fsite=0
 	      ;;
 esac
-echo ""
-echo "** The tunnel name is used for configuration naming"
-echo "   Each tunnel must have a unique name"
-echo ""
+echo $"
+** The tunnel name is used for configuration naming
+   Each tunnel must have a unique name
+"
 askdefault "Tunnel name" tunnelname "newtunnel"
 # Error if Tunnel config file exists
 fs=$(ls /etc/swanctl/conf.d/Tunnel-${tunnelname}*.conf  2> /dev/null)
@@ -363,30 +366,30 @@ askdefault "Name for this end of the tunnel" thishost "$thishostx"
 [ "$thishost" != "$thishostx" ] && fpack=0 || fpack=1
 echo "** Use the host name (for example) for the remote end of the tunnel"
 askdefault "Remote VPN Server name" rmhost "remote"
-echo ""
-echo "** The IP ranges for each end of the tunnel must be carefully and accurately specified"
-echo ""
-echo "   This script will build a $ttype VPN with this configuration:"
-echo ""
+echo $"
+** The IP ranges for each end of the tunnel must be carefully and accurately specified
+
+   This script will build a $ttype VPN with this configuration:
+"
 [ $fsite == 0 ] && echo "   LocalNet1 <---> VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost) <---> LocalNet2"
 [ $fsite == 1 ] && echo "   VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost)"
-echo "   Where:"
-echo "        LocalNet1         Local LAN IP Range for ${thishost}'s network"
-echo "        VPN Server 1      Server at one end of the tunnel ($thishost)"
-echo "        Tunnel            VPN tunnel transporting traffic between the two networks"
-echo "        VPN Server 2      Server at other end of the tunnel ($rmhost)"
-echo "        LocalNet2         Local LAN IP Range for ${rmhost}'s network"
-echo ""
-echo "   Site-to-site VPN: Hosts on each LAN can access the remote LAN with appropriate routing settings"
-echo "   Host-to-host VPN: VPN Servers can access each other but not hosts on the remote LAN"
-echo ""
-echo "   NOTE: LocalNet1 and LocalNet2 cannot be the same subnet (e.g., 192.168.1.0/24 on both networks)"
-echo "   If both networks are the same, one network must be completely IP-reassigned before configuring this VPN"
-echo "   This script does NO IP range syntax checking. If it's wrong the VPN will fail or will not pass traffic"
-echo ""
-echo "** IP ranges are entered as a.b.c.d/nn (e.g., 192.168.1.0/24)"
-echo "   See CIDR: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing"
-echo ""
+echo $"   Where:
+        LocalNet1         Local LAN IP Range for ${thishost}'s network
+        VPN Server 1      Server at one end of the tunnel ($thishost)
+        Tunnel            VPN tunnel transporting traffic between the two networks
+        VPN Server 2      Server at other end of the tunnel ($rmhost)
+        LocalNet2         Local LAN IP Range for ${rmhost}'s network
+
+   Site-to-site VPN: Hosts on each LAN can access the remote LAN with appropriate routing settings
+   Host-to-host VPN: VPN Servers can access each other but not hosts on the remote LAN
+
+   NOTE: LocalNet1 and LocalNet2 cannot be the same subnet (e.g., 192.168.1.0/24 on both networks)
+   If both networks are the same, one network must be completely IP-reassigned before configuring this VPN
+   This script does NO IP range syntax checking. If it's wrong the VPN will fail or will not pass traffic
+
+** IP ranges are entered as a.b.c.d/nn (e.g., 192.168.1.0/24)
+   See CIDR: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
+"
 while [ 0 ]
 do
     mustanswer "IP range for the '$thishost' LAN" myrange ""
@@ -410,7 +413,7 @@ do
     echo "? '$rmrange' is not a subnet in the form a.b.c.d/nn"
 done
 
-[ "$myrange" == "$rmrange" ] && errexit "? Tunnel endpoint LANs must be in different subnets"
+[ "$myrange" == "$rmrange" ] && echo "% Tunnel endpoint LANs use the same subnet; VPN Routing may not work as desired"
 
 while [ 0 ]
 do
@@ -429,22 +432,21 @@ then
     myip="$(curl -s $dynurl)"
 fi
 
-echo ""
-echo "** The VPN configuration requires one or both of the VPN Servers be the VPN Server"
-echo "   A VPN Server has ports 500 and 4500 forwarded to it, if required,"
-echo "   and its external IP address is accessible from the remote system"
-echo ""
-echo "   Let's get the external DNS name or IP address for the two hosts"
-echo ""
-echo "   If a host does not have a DNS name or IP address assigned to it, it cannot"
-echo "   be a VPN Server for this tunnel and is only capable of initiating the VPN (Client)"
+echo $"
+** The VPN configuration requires one or both of the VPN Servers be the VPN Server
+   A VPN Server has ports 500 and 4500 forwarded to it, if required,
+   and its external IP address is accessible from the remote system
+
+   Let's get the external DNS name or IP address for the two hosts
+
+   If a host does not have a DNS name or IP address assigned to it, it cannot
+   be a VPN Server for this tunnel and is only capable of initiating the VPN (Client)"
 [ "$myip" == "" ] && dfl="Client Only" || dfl=$myip
 while [ 0 ]
 do
     while [ 0 ]
     do
-	echo ""
-	echo "** Enter the public DNS name/IP address for host '$thishost'"
+	printf "\n** Enter the public DNS name/IP address for host '$thishost'\n"
 	askdefault "DNS name or IP address for host '$thishost'" myip "$dfl" "%any"
 	[ "$myip" == "%any" ] && break
 	isipaddr $myip && break
@@ -454,8 +456,7 @@ do
 
     while [ 0 ]
     do
-	echo ""
-	echo "** Enter the public DNS name/IP address for host '$rmhost'"
+	printf "\n** Enter the public DNS name/IP address for host '$rmhost'\n"
 	askdefault "DNS name or IP address for host '$rmhost'" rmip "Client Only" "%any"
 	[ "$rmip" == "%any" ] && break
 	isipaddr $rmip && break
@@ -465,9 +466,9 @@ do
 
     if [ "$myip" == "%any" -a "$rmip" == "%any" ]
     then
+	echo "% Neither host is configured to be a Server for this VPN"
 	echo ""
-	echo "% Neither host can be a Server for this VPN"
-	if  ! askyn "Do you want to redo this configuration"
+	if  ! askyn "Do you want to redo VPN server public name/address configuration"
 	then
 	    echo "% Rerun with 'sudo $cmd' when you're ready to proceed"
 	    exit
@@ -477,22 +478,70 @@ do
     fi    
 done
 
-echo ""
-echo "** The VPN ID is used as part of the authentication process"
-echo "   The defaults are fine, but change them as desired"
-echo ""
+echo $"
+** The VPN ID is used as part of the authentication process
+   The defaults are fine, but change them as desired
+"
 askdefault "VPN ID for the '$thishost' VPN Server" mytid "$thishost.$tunnelname.com"
 askdefault "VPN ID for the '$rmhost' VPN Server" rtid "$rmhost.$tunnelname.com"
 
-echo ""
-echo "** Rekeying the connection increases security"
-echo "   Default rekey times set by this script:"
-echo "     Connection rekey: 86400 (24*60*60=1 day)"
-echo "     Child tunnel rekey: Connection rekey minus 3 minutes"
-echo "   You can change the rekey time here or edit the connection config files later"
-echo ""
+echo $"
+** Rekeying the connection increases security
+   Default rekey times in seconds set by this script:
+     Connection rekey: 86400 (24*60*60=1 day)
+     Child tunnel rekey: Connection rekey minus 3 minutes
+   You can change the rekey time here or edit the connection config files later
+"
 askdefault "Connection rekey time" connrekeytime "86400"
 childrekeytime=$((connrekeytime-180))
+#
+# Dead peer delay configuration
+
+echo $"
+** Dead peer detection enables the VPN to recognize that the tunnel is
+   not responding. This is done by sending an 'ruthere' message every
+   dpd-delay seconds. If you want to use dpd, a good delay is 10 seconds
+   and can be 2-60.
+
+   Once the tunnel has been built you can edit the configuration file
+   if you want to change dead peer detection settings
+
+** dpd-delay specifies the delay in seconds between ruthere messages
+   Press Return or enter 0 to disable dead peer detection
+"
+while [ 0 ]
+do
+    askdefault "Dead peer detection delay" dpddelay "10"
+    [ $dpddelay -eq 0 -o $dpddelay -gt 2 ] && break
+    echo "% Dead peer detection delay must be great than 2"
+done
+dpdaction="none"
+if [ $dpddelay -ne 0 ]
+then
+    echo $"
+** Dead peer detection can take one of these actions when a dead peer is detected:
+   * clear:   Close the tunnel
+   * restart: Restarts the tunnel
+   * trap:    Catch matching traffic and try to re-negotiate the tunnel on demand
+   * none:    Disable dead peer detection 
+
+  You must specify one of clear, restart, trap, or none
+  or press Enter to accept the default [clear]
+"
+    while [ 0 ]
+    do
+	askdefault "Dead peer detection action (clear, restart, trap)" dpdaction "clear"
+	dpdaction=${dpdaction,,}
+	case $dpdaction in
+	    clear|restart|trap|none)
+		break
+		;;
+	    *)
+		echo "? '$dpdaction' is an invalid action"
+		;;
+	esac
+    done
+fi
 #
 # All done asking questions!
 #
@@ -507,22 +556,22 @@ tunnelrmhost="${tunnelname}-${rmhost}"
 ikesfx="-Tunnel"
 thisike="${thishost}${ikesfx}"
 rmike="${rmhost}${ikesfx}"
-echo ""
-echo "** Ready to create the tunnel '$tunnelname'"
-echo ""
-echo "      CA  Cert  $cacertfn"
-echo "      VPN Cert  $myvpncertfn with id '$mytid'"
-echo "      VPN Cert  $rmvpncertfn with id '$rtid'"
-echo ""
-echo "             Tunnel assets on $thishost"
-echo "      Tunnel Config File    /etc/swanctl/conf.d/Tunnel-${tunnelrmhost}.conf"
+echo $"
+** Ready to create the tunnel '$tunnelname'
+
+      CA  Cert  $cacertfn
+      VPN Cert  $myvpncertfn with id '$mytid'
+      VPN Cert  $rmvpncertfn with id '$rtid'
+
+             Tunnel assets on $thishost
+      Tunnel Config File    /etc/swanctl/conf.d/Tunnel-${tunnelrmhost}.conf"
 [ $fpack -eq 0 ] && echo "      VPN Config Pack       /etc/swanctl/pistrong/server-assets/Tunnel-${tunnelmyhost}.zip"
 [ $fpack -eq 0 ] && echo "        for '$thishost'"
-echo "      VPN Config Pack       /etc/swanctl/pistrong/server-assets/Tunnel-${tunnelrmhost}.zip"
-echo "        for '$rmhost'"
-echo ""
-echo "** VPN Network configuration"
-echo ""
+echo $"      VPN Config Pack       /etc/swanctl/pistrong/server-assets/Tunnel-${tunnelrmhost}.zip
+        for '$rmhost'
+
+** VPN Network configuration
+"
 if [ $fsite -eq 0 ]
 then
     printf "%16s %16s %16s  %-16s\n" "Host name" "LAN IP" "LAN range" "External Address"
@@ -533,10 +582,11 @@ else
     printf "%16s %16s %16s\n" "$thishost" $mylanip $myip
     printf "%16s %16s %16s\n" "$rmhost" $rmlanip $rmip
 fi
-[ "$myip" == "%any" -o "$rmip" == "%any" ] && echo "* Hosts with an External Address of '%any' are VPN clients only"
-
-echo ""
-echo "** Answer N and restart the script if you'd like to change anything"
+[ "$myip" == "%any" -o "$rmip" == "%any" ] && echo "   * Hosts with an External Address of '%any' are VPN clients only"
+printf "\n** Dead peer detection configuration\n"
+[ $dpddelay -ne 0 ] && printf "   Dead peer detection is enabled\n   Delay:  %s seconds\n   Action: %s\n" $dpddelay $dpdaction || \
+	printf "   Dead peer detection is disabled\n"
+printf "\n** Answer N and restart the script if you'd like to change anything\n"
 
 if ! askyn "Do you want to continue"
 then
@@ -642,32 +692,33 @@ rm -rf $tmpdir
 
 writemakeTunnelLog
 
-echo ""
-echo "Next Steps"
-echo "  * On host '$rmhost':"
-echo "  *  Copy the VPN Config Pack (/etc/swanctl/pistrong/server-assets/Tunnel-${tunnelrmhost}.zip) to host '$rmhost'"
-echo "  *  'sudo pistrong client install Tunnel-${tunnelrmhost}.zip' to install the tunnel configuration"
-echo "  *  Configure iptables using /etc/swanctl/pistrong/Tunnel-${tunnelmyhost}-VPNRouting.iptables"
-echo "       and https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
-echo "  *  Restart strongSwan: sudo systemctl restart strongswan"
-echo ""
+echo $"
+Next Steps
+  * On host '$rmhost':
+    *  Copy the VPN Config Pack (/etc/swanctl/pistrong/server-assets/Tunnel-${tunnelrmhost}.zip) to host '$rmhost'
+    *  'sudo pistrong client install Tunnel-${tunnelrmhost}.zip' to install the tunnel configuration
+    *  Configure iptables using /etc/swanctl/pistrong/Tunnel-${tunnelmyhost}-VPNRouting.iptables
+       and https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
+    *  Restart strongSwan: sudo systemctl restart strongswan
+"
 [ $fpack -ne 3 ] && echo "  * On host '$thishost':"  # Always printed
-[ $fpack -eq 0 ] && echo "  *  Copy the VPN Config Pack (/etc/swanctl/pistrong/server-assets/Tunnel-${tunnelmyhost}.zip) to '$thishost'"
-[ $fpack -eq 0 ] && echo "  *  'sudo pistrong client install Tunnel-${tunnelrmhost}.zip' to install the tunnel configuration"
-[ $fpack -eq 1 ] && echo "  *  The tunnel configuration has been installed on host '$thishost'"
-[ $fpack -eq 1 ] && echo "  *  Configure iptables using /etc/swanctl/pistrong/Tunnel-${tunnelrmhost}-VPNRouting.iptables"
+[ $fpack -eq 0 ] && echo "    *  Copy the VPN Config Pack (/etc/swanctl/pistrong/server-assets/Tunnel-${tunnelmyhost}.zip) to '$thishost'"
+[ $fpack -eq 0 ] && echo "    *  'sudo pistrong client install Tunnel-${tunnelrmhost}.zip' to install the tunnel configuration"
+[ $fpack -eq 1 ] && echo "    *  The tunnel configuration has been installed on host '$thishost'"
+[ $fpack -eq 1 ] && echo "    *  Configure iptables using /etc/swanctl/pistrong/Tunnel-${tunnelrmhost}-VPNRouting.iptables"
 [ $fpack -eq 1 ] && echo "       and https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations"
-[ $fpack -eq 1 ] && echo "  *  Restart strongSwan: sudo systemctl restart strongswan"
-echo ""
-echo "  * Start the VPN tunnel:"
-echo "    Only start tunnel from one end if both servers are client-capable"
-echo ""
-[ "$myip" != "%any" ] &&  echo "     On $rmhost: pistrong client start $thishost-Tunnel"
-[ "$rmip" != "%any" ] &&  echo "     On $thishost: pistrong client start $rmhost-Tunnel"
+[ $fpack -eq 1 ] && echo "    *  Restart strongSwan: sudo systemctl restart strongswan"
+echo $"
+  * Start the VPN tunnel:
+    Only start tunnel from one end if both servers are client-capable
+"
+[ "$myip" != "%any" ] &&  echo "     On $rmhost: sudo pistrong client start $thishost-Tunnel"
+[ "$rmip" != "%any" ] &&  echo "     On $thishost: sudo pistrong client start $rmhost-Tunnel"
 [ "$myip" == "%any" ] && echo "     [This tunnel cannot be initiated from host '$rmhost'; the address of host '$thishost' is not known]"
 [ "$rmip" == "%any" ] && echo "     [This tunnel cannot be initiated from host '$thishost'; the address of host '$rmhost' is not known]"
-echo ""
-echo "Once everything is working to your satisfaction, consider 'sudo systemctl enable strongswan'"
-echo "  to start the strongSwan service (but NOT the VPN tunnel) automatically"
-echo "See vpnmon on the pistrong GitHub for one method of starting the VPN tunnel automatically"
+echo $"
+Once everything is working to your satisfaction, consider 'sudo systemctl enable strongswan'
+  to start the strongSwan service (but NOT the VPN tunnel) automatically
+See vpnmon on the pistrong GitHub for one method of starting the VPN tunnel automatically
+"
 exit
