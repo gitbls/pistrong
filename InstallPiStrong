@@ -185,10 +185,11 @@ function do_install_prereqs() {
 	    [ "$(which curl)" == "" ] && pkgs="curl" 
 	    [ "$(which zip)" == "" ] && pkgs="$pkgs zip"
 	    [ "$(which iptables)" == "" ] && pkgs="$pkgs iptables"
+	    [ "$(which dig)" == "" ] && pkgs="$pkgs bind9-dnsutils"
 	    if [ "$pkgs" != "" ]
 	    then
 		echo ""
-		#echo "% pistrong requires 'curl', 'zip', and 'iptables'"
+		#echo "% pistrong requires 'curl', 'zip', 'bind9-dnsutils', and 'iptables'"
 		echo "  Doing 'apt update' and 'apt install' of prerequisite package(s): $pkgs"
 		apt-get update && apt-get install --yes $pkgs --no-install-recommends
 	    fi
