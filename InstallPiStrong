@@ -366,8 +366,8 @@ esac
 
 function do_apt_install() {
     echo "> Installing strongSwan from apt"
-    echo "* Installing packages 'strongswan-swanctl strongswan-pki charon-systemd python3-pexpect'"
-    apt-get --yes install strongswan-swanctl strongswan-pki charon-systemd libcharon-extra-plugins python3-pexpect # iptables installed earlier
+    echo "* Installing packages 'strongswan-swanctl strongswan-pki charon-systemd libcharon-extauth-plugins libcharon-extra-plugins libstrongswan-standard-plugins python3-pexpect'"
+    apt-get --yes install strongswan-swanctl strongswan-pki charon-systemd libcharon-extauth-plugins libcharon-extra-plugins libstrongswan-standard-plugins python3-pexpect # iptables installed earlier
 }
 
 function do_post_config() {
