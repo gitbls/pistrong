@@ -4,12 +4,31 @@
 #
 # $1: Name of tunnel (e.g., otherhost-Tunnel)
 #
-vpnup() {
+vpntunup() {
     #
     # $1 has tunnel name
     #
     sas=$(swanctl --list-sas | grep $1)
     [[ "$sas" =~ "ESTABLISHED" ]] && return 0 || return 1
+}
+
+vpnup() {
+    #
+    # $1 has tunnel name
+    #
+    if [ "$VPNMONPINGIP" != "" ]
+    then
+	if (ping -c 1 -W 1 $VPNMONPINGIP > /dev/null 2>&1)
+	then
+	    return 0
+	else
+	    return 2
+	fi
+    fi
+    vpntunup $1
+    return $?
+    #sas=$(swanctl --list-sas | grep $1)
+    #[[ "$sas" =~ "ESTABLISHED" ]] && return 0 || return 1
 }
 
 tryreconnect() {
@@ -38,11 +57,22 @@ fi
 #
 # Running in the fork
 #
+vpntunnel=$1
+# /etc/default/pistrong-vpnmon-$vpntunnel: VPNMONPINGIP="ip.ad.dd.rs" # to monitor specific IP accessibility
+# and force tunnel down if that IP is not accesible
+[ -f /etc/default/pistrong-vpnmon-$vpntunnel ] && source /etc/default/pistrong-vpnmon-$vpntunnel
 
 [ "$1" == "" ] && logger "VPNmon: No VPN name specified" && exit
 
 while [ 1 ]
 do
-    ! vpnup $1 && tryreconnect $1
+    vpnup $vpntunnel
+    if [ $? -eq 2 ]
+    then
+	logger "VPNmon: Tunnel $vpntunnel remote IP $VPNMONPINGIP is not accessible; stopping tunnel so it can be restarted"
+	pistrong client stop $vpntunnel
+	sleep 5
+    fi
+    ! vpntunup $vpntunnel && tryreconnect $vpntunnel
     sleep 10
 done
