@@ -70,6 +70,15 @@ echo "...ls -lR /etc/swanctl"
 echo -e "\n*** ls -l /etc/swanctl ***" >> $fl
 ls -lR /etc/swanctl >> $fl
 
+echo "...ip configuration information"
+echo -e "\n*** IP information ***" >> $fl
+echo " ** ip a **" >> $fl
+ip a >> $fl
+echo " ** ip r **" >> $fl
+ip r >> $fl
+echo " ** ip r show table 220 **" >> $fl
+ip r show table 220 >> $fl
+
 echo "...iptables filter table"
 echo -e "\n*** iptables filter table ***" >> $fl
 iptables -L -v -n >> $fl
@@ -80,7 +89,7 @@ iptables -L -v -n -t nat >> $fl
 
 echo "...journalctl for charon and swanctl"
 echo -e "\n*** journalctl ***" >> $fl
-journalctl -b | grep -E "charon\[|swanctl\[" >> $fl
+journalctl -b | grep -E "charon|swanctl" >> $fl
 
 echo "Done."
 echo -e "\n*** Done *** " >> $fl
