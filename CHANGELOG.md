@@ -1,5 +1,15 @@
 # Changelog
 
+## V3.12
+
+* Add Android client support
+* MacOS should work, but alas! I have no way test it 
+* Restructure and improve /etc/swanctl/conf.d/pistrong-CAServerConnection.conf
+* Enable vpnmon to monitor a specific, per-monitored-VPN IP address
+* Improve pistrong error handling
+* pistrong code cleanups
+* Python 3.7 or later now required
+
 ## V3.11
 
 * Make 'client stop' a wee bit quieter
