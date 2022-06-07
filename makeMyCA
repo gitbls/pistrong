@@ -1,6 +1,6 @@
 #!/bin/bash
-# Version V3.0
-version="V3.0"
+#
+version="V3.1"
 #
 # Run this script via sudo After strongSwan is installed
 # If you intend to send mail to cert recipients, you'll need an email server and web server
@@ -168,12 +168,14 @@ cnsuffix:      $cnsuffix
 webdir:        $webdir
 weburl:        $weburl
 san2x:         $san2x
+android:       $android
+androidkey:    $androidkey
 ios:           $ios
 ioskey:        $ioskey
-windows:       $windows
-winkey:        $winkey
 linux:         $linux
 linuxkey:      $linuxkey
+windows:       $windows
+winkey:        $winkey
 EOF
 }
 
@@ -184,9 +186,10 @@ thishost=$(hostname)        #This gets the hostname from Linux
 thisdomain=""
 thisfqdn=""
 webdir="/var/www/html/vpn"
+android="android"
 ios="ios"
-windows="windows"
 linux="linux"
+windows="windows"
 caconf="/etc/swanctl/conf.d/pistrong-CAServerConnection.conf"
 catables="/etc/swanctl/pistrong/CA-iptables"
 vpnaddrhasname=0
@@ -194,7 +197,7 @@ unkvpndns=0
 [ -f $caconf ] && echo "? There is already a CA on this system" && errexit "  Use 'sudo pistrong deleteca' to delete it if you really want to recreate it"
 
 echo $"
-Build a prescriptive strongSwan Certificate Authority (CA) for iOS, Windows, and Linux client devices
+Build a prescriptive strongSwan Certificate Authority (CA) for Android, iOS/MacOS, Linux, and Windows client devices
 
 ** Network configuration details are required to configure your strongSwan CA
    You will be asked to provide these configuration details
@@ -344,9 +347,10 @@ fi
 
 # Only append domain if it's not already there 
 [[ ! $thishost =~ $thisdomain ]] && thisfqdn="$thishost.$thisdomain" || thisfqdn="$thishost"
+androidkey="android.$thisdomain"
 ioskey="ios.$thisdomain"
-winkey="windows.$thisdomain"
 linuxkey="linux.$thisdomain"
+winkey="windows.$thisdomain"
 weburl="http://$thisfqdn/vpn"
 
 echo ""
@@ -508,22 +512,25 @@ echo $"
 askdefault "weburl for your system" weburl "$weburl"
 
 echo $"
-** VPN Cert name prefix and SAN Key (remoteid) for iOS, Windows, and Linux users
-   The SAN Key used to identify the connecting OS type (Linux, Windows, iOS)
+** VPN Cert name prefix and SAN Key (remoteid) for Android, iOS/MacOS, Linux, and Windows users
+   The SAN Key used to identify the connecting OS type (Android, iOS/MacOS, Linux, Windows)
    You assign a SAN Key (remoteid) when adding user Certs
    The VPN Cert name prefix can be helpful during troubleshooting
    The defaults are fine, but you may change them if you wish
    If you decide to change these later you will need to rebuild the CA and all Certs
 "
-askdefault "VPN Cert name prefix for iOS VPN Cert" ios "$ios"
-askdefault "VPN SAN key for iOS users" ioskey "$ioskey"
+askdefault "VPN Cert name prefix for Android VPN Cert" android "$android"
+askdefault "VPN SAN key for Android users" androidkey "$androidkey"
+
+askdefault "VPN Cert name prefix for iOS/MacOS VPN Cert" ios "$ios"
+askdefault "VPN SAN key for iOS/MacOS users" ioskey "$ioskey"
+
+askdefault "VPN Cert name prefix for Linux VPN Cert" linux "$linux"
+askdefault "VPN SAN key for Linux users" linuxkey "$linuxkey"
 
 askdefault "VPN Cert name prefix for Windows VPN Cert" windows "$windows"
 # Get Windows VPN SAN Key even though Windows IPSec stack as of Win10 1903 doesn't use it
 askdefault "VPN SAN key for Windows users" winkey "$winkey"
-
-askdefault "VPN Cert name prefix for Linux VPN Cert" linux "$linux"
-askdefault "VPN SAN key for Linux users" linuxkey "$linuxkey"
 
 echo ""
 if isipaddr "$vpnaddr"
@@ -547,11 +554,12 @@ askdefault "Additional Secondary VPN SAN Key(s)" san2 ""
 
 echo $"
 ** This script will now create:
-      Connection Config:    $caconf
-      CA Cert:              strongSwanCACert.pem
-      VPN Cert for iOS:     $ios-strongSwanVPNCert.pem with VPN SAN key '$ioskey'
-      VPN Cert for Windows: $windows-strongSwanVPNCert.pem with VPN SAN key '$winkey'
-      VPN Cert for Linux:   $linux-strongSwanVPNCert.pem with VPN SAN key '$linuxkey'
+      Connection Config:      $caconf
+      CA Cert:                strongSwanCACert.pem
+      VPN Cert for Android:   $android-strongSwanVPNCert.pem with VPN SAN key '$androidkey'
+      VPN Cert for iOS/MacOS: $ios-strongSwanVPNCert.pem with VPN SAN key '$ioskey'
+      VPN Cert for Linux:     $linux-strongSwanVPNCert.pem with VPN SAN key '$linuxkey'
+      VPN Cert for Windows:   $windows-strongSwanVPNCert.pem with VPN SAN key '$winkey'
 
    For VPN Server LAN IP $myipaddr subnet $myfullsubnet with VPN Client DNS servers $vpndns
 
@@ -606,9 +614,10 @@ pistrong config --vpnsankey $ioskey --vpncertpfx $ios
 echo "Building the CA and VPN Certs..."
 # Make the CA and VPN certs (one for each: iOS, Windows, and Linux)
 pistrong createca --nocamsg --novpncert
+pistrong makevpncert $android --vpnsankey $androidkey,$san2x
 pistrong makevpncert $ios --vpnsankey $ioskey,$san2x
-pistrong makevpncert $windows --vpnsankey $winkey,$san2x
 pistrong makevpncert $linux --vpnsankey $linuxkey,$san2x
+pistrong makevpncert $windows --vpnsankey $winkey,$san2x
 
 echo "Creating '$catables' with firewall rules"
 emitFirewall
@@ -621,91 +630,104 @@ updowns="/usr/lib/ipsec/_updown"
 % Cannot find ${updowns}; Please file a ticket on the pistrong github
 "
 cat > $caconf <<EOF
-connections {
-    linux-pubkey-ikev2 {
-        version = 2
-        proposals = aes192gcm16-aes128gcm16-prfsha256-ecp256-ecp521,aes192-sha256-modp3072,default
+# Configuration written by pistrong makeMyCA $version on $(date)
+
+conn-defaults {
+    version = 2
+    send_certreq = yes
+    send_cert = always
+    unique = never
+    fragmentation = yes
+    # Force esp encapsulation for restrictive firewalls
+    encap = yes
+    dpd_delay = 120s
+    rekey_time = 0s
+    pools = primary-pool-ipv4
+
+    local {
+        auth = pubkey
+        cacerts = strongSwanCACert.pem
+    }
+}
+
+remote-defaults {
+    remote {
+        id = %any
+    }
+
+}
+child-defaults {
+    net {
+        dpd_action = clear
         rekey_time = 0s
-        pools = primary-pool-ipv4
-        fragmentation = yes
-        local-1 {
-             auth = pubkey
-             cacerts = strongSwanCACert.pem
-             certs = $linux-strongSwanVPNCert.pem
-             id = $linuxkey
-        }
-        remote-1 {
-             auth = pubkey
-        }
+        updown = $updowns iptables
+    }
+}
+
+connections {
+    conn-android: conn-defaults, remote-defaults {
+        proposals =  aes256-aes192-aes128-sha384-sha256-sha1-modp3072-modp2048-modp1536
+        local {
+            certs = $android-strongSwanVPNCert.pem
+            id = $androidkey
+            }
         children {
-            net-linux {
-                remote_ts = $vpnsubnet
-                local_ts = $myfullsubnet
-                updown = $updowns iptables
-		esp_proposals = aes128gcm128-x25519
+            net : child-defaults {
+                local_ts = 0.0.0.0/0
+                esp_proposals = aes256-sha256
             }
         }
     }
-    ios-pubkey-ikev2 {
-        version = 2
-        proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,aes128-sha1-modp1536,aes128-sha256-modp1536,aes128-sha256-modp2048,default
-        rekey_time = 0s
-        pools = primary-pool-ipv4
-        fragmentation = no
-        dpd_delay = 30s
-        send_cert = always
 
-        local-1 {
-             auth = pubkey
-             cacerts = strongSwanCACert.pem
-             certs = $ios-strongSwanVPNCert.pem
-             id = $ioskey
-        }
-
-        remote-1 {
-             auth = eap-tls
-             id = %any
-        }
-
+    conn-windows: conn-defaults, remote-defaults {
+        proposals = aes256-sha256-modp1024
+        local {
+            certs = $windows-strongSwanVPNCert.pem
+            id = $winkey
+            }
         children {
-             net-ios {
-                 local_ts = 0.0.0.0/0
-                 rekey_time = 0s
-                 dpd_action = clear
-                 esp_proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,aes128-sha1-modp1536,aes128-sha256-modp1536,aes128-sha256-modp2048,default
-             }
+            net : child-defaults {
+                local_ts = 0.0.0.0/0
+                esp_proposals = aes256-sha256-sha1-modp1024
+            }
         }
     }
-    windows-pubkey-ikev2 {
-        version = 2
-        proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,default
-        rekey_time = 0s
-        pools = primary-pool-ipv4
-        fragmentation = yes
-        dpd_delay = 30s
 
-        local-1 {
+    conn-linux: conn-defaults, remote-defaults {
+        proposals = aes192-sha256-modp3072
+        local {
+             certs = $linux-strongSwanVPNCert.pem
+             id = $linuxkey
+        }
+        remote {
              auth = pubkey
-             cacerts = strongSwanCACert.pem
-             certs = $windows-strongSwanVPNCert.pem
-             id = $winkey
         }
-
-        remote-1 {
-             id = %any
-        }
-
         children {
-             net-windows {
-                 local_ts = 0.0.0.0/0
-                 rekey_time = 0s
-                 dpd_action = clear
-                 esp_proposals = aes256-sha1-modp1024,aes192-sha256-modp3072,default
-             }
+            net : child-defaults {
+                local_ts = 0.0.0.0/0
+                esp_proposals = aes128gcm128-x25519
+            }
+        }
+    }
+    conn-ios : conn-defaults, remote-defaults {
+        proposals = aes256-sha256-modp2048, aes256-sha256-modp1024,aes256-sha1-modp1024
+        local {
+            certs = $ios-strongSwanVPNCert.pem
+            id = $ioskey
+            }
+        remote {
+            auth = eap-tls
+            }
+        children {
+            net : child-defaults {
+                local_ts = 0.0.0.0/0
+                esp_proposals = aes256-sha256
+            }
         }
     }
 }
-    pools {
+ 
+pools {
     primary-pool-ipv4 {
         addrs = $vpnsubnet
         dns = $vpndns
@@ -717,12 +739,13 @@ writemakeCAlog
 
 echo $"
 Be sure to apply the correct switch when adding users:
- For iOS     users: --remoteid $ioskey
- For Windows users: --remoteid $winkey
- For Linux   users: --remoteid $linuxkey --linux
+ For Android users:   --remoteid $androidkey
+ For iOS/MacOS users: --remoteid $ioskey
+ For Linux users:     --remoteid $linuxkey --linux
+ For Windows users:   --remoteid $winkey
 
   NOTE: If you use the wrong remoteid for an OS the VPN client will likely fail to connect
-  because of differing VPN software implementations among the client operating systems"
+  because of differing VPN client software implementations among the operating systems"
 
 echo $"
 Your strongSwan CA is configured
