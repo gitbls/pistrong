@@ -41,7 +41,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "V3.11"
+version = "V3.12"
 dbversion = "3"
 
 def qdelfile(qfn):
@@ -108,11 +108,6 @@ def trueorfalse(answer):
     if "no".startswith(s) or s == "off": return False
     perrorexit("? Unrecognized switch value '{}'".format(answer))  #SNH due to parser checking
 
-def isrootordebug(pd, args):
-    pd.dx['debug'] = trueorfalse(args.debug) if args.debug else pd.db['config']['debug']['value']
-    pd.dx['cmds'] = trueorfalse(args.cmds) if args.cmds else pd.db['config']['cmds']['value']
-    if not pd.dx['debug'] and os.geteuid() != 0: perrorexit("? Must be run as root or --debug on")
-
 def which(fname):
     """
     Returns the full path for for the executable if found on PATH
@@ -129,17 +124,16 @@ def decodeutf(utfstring):
 def printutf(utfstring):
     if utfstring != b'': print(utfstring.decode('utf-8'))
     
-def dosystem(pd, docmd, doecho=True, pout=True):
+def dosystem(pd, docmd, doecho=True, pout=True, timout=None):
     """
     Execute the string as a separate process, pout=display output, doecho=display cmd if --cmd
     Returns the result from subprocess.run, which contains stdout, returncode, etc.
     """
     if pd.dx['cmds'] and doecho: print("[{}]".format(docmd))
-    r = subprocess.run(docmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+    r = subprocess.run(docmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, text=True, timeout=int(timout) if type(timout) is int else None)
     if pout:
-        printutf(r.stdout)
-        if r.returncode != 0 and r.stderr != b'':
-            printutf(r.stderr)
+        if r.stdout != "": print(r.stdout)
+        if r.returncode != 0 and r.stderr != "": print(r.stderr)
     return r
 
 def isrunning(pd):
@@ -174,13 +168,13 @@ if strongswan was running before, as indicated by argument, restart it
 def isikeup(pd, ikename):
     ikes = "--ike {}".format(ikename) if ikename != "" else ""
     r = dosystem(pd, "swanctl --list-sas {}".format(ikes), doecho=False, pout=False)
-    if "ESTABLISHED" in decodeutf(r.stdout): return True
+    if "ESTABLISHED" in r.stdout: return True
     return False
 
 def istunnelup(pd, ikename):
     ikes = "--ike {}".format(ikename) if ikename != "" else ""
     r = dosystem(pd, "swanctl --list-sas {}".format(ikes), doecho=False, pout=False)
-    if "INSTALLED" in decodeutf(r.stdout): return True
+    if "INSTALLED" in r.stdout: return True
     return False
 
 def killike(pd, ikename, silently):
@@ -258,8 +252,13 @@ def sendmsg(pd, mfrom, mto, msubj, mtext, mattach):
         encoders.encode_base64(part)
         part.add_header("Content-Disposition", "attachment; filename={}".format(os.path.basename(mattach)))
         mmsg.attach(part)
-    msmtp = smtplib.SMTP(pd.db['config']['smtpserver']['value'], pd.db['config']['smtpport']['value'])
-    msmtp.ehlo()
+    try:
+        msmtp = smtplib.SMTP(pd.db['config']['smtpserver']['value'], pd.db['config']['smtpport']['value'])
+        msmtp.ehlo()
+    except ConnectionRefusedError as err:
+        print("? Unable to connect to mail server '{}'".format(pd.db['config']['smtpserver']['value']))
+        perrorexit(err)
+
     if pd.db['config']['smtpusetls']['value']:
        msmtp.starttls()
     try:
@@ -352,11 +351,16 @@ def dbload(pd):
     Read the cert database and build a dictionary
     """
     if os.path.isfile(pd.certdb):
-        with open(pd.certdb,'r') as dbf:
-            try:
-                pd.db = json.load(dbf)
-            except ValueError:
-                perrorexit("? Database {} has invalid syntax".format(pd.certdb))
+        try:
+            with open(pd.certdb,'r') as dbf:
+                try:
+                    pd.db = json.load(dbf)
+                except ValueError:
+                    perrorexit("? Database {} has invalid syntax".format(pd.certdb))
+        #except (FileNotFoundError, PermissionError): just report generic error if a problem
+        except Exception as err:
+            print("? Unable to open database '{}'".format(pd.certdb))
+            perrorexit(err)
     # If a section isn't there, create it. Will be saved later
     if not (('users' in pd.db) and ('config' in pd.db) and ('certs' in pd.db)): pd.dbmodified = True
     if not 'users' in pd.db:
@@ -376,9 +380,7 @@ def dbload(pd):
                            "vpnsankey":{"value":"ipsec.vpn.net","help":"Default VPN SAN key"},\
                            "cnsuffix":{"value":"ipsec.vpn","help":"Suffix for user cert names"},\
                            "service":{"value":"strongswan.service","help":"strongSwan service name"},\
-                           "cmds":{"value":False,"help":"Echo executed commands"},\
                            "lxscript":{"value":"pistrong-vpn-installer","help":"Linux VPN Config Pack script name"},\
-                           "debug":{"value":False,"help":"Debug mode"},\
                            "random":{"value":True,"help":"Generate random cert passwords"},\
                            "mailfrom":{"value":"PiStrongVPN<root@mydomain.com>","help":"'From' string for cert email"},\
                            "smtpserver":{"value":"","help":"SMTP mail server IP address or name"},\
@@ -400,6 +402,12 @@ def dbload(pd):
             pd.db['users'][u]['linux'] = False
             pd.dbmodified = True
     pd.db['config']['version']['value'] = dbversion    # Force to current version. Will get written to DB first time a real update is done
+    if 'cmds' in pd.db['config']:
+        del(pd.db['config']['cmds'])
+        pd.dbmodified = True
+    if 'debug' in pd.db['config']:
+        del(pd.db['config']['debug'])
+        pd.dbmodified = True
     if not 'myfqdn' in pd.db['config']:
         pd.db['config']['myfqdn'] = {"value":"","help":"VPN host Fully Qualified Domain Name"}
         pd.dbmodified = True
@@ -425,9 +433,12 @@ def dbflush(pd):
     Flush the database to disk. Do any time database changes
     """
     qdelfile(pd.certdbtmp)
-    with open(pd.certdbtmp, "w") as dbfw:
-        json.dump(pd.db, dbfw, indent=4, sort_keys=True)
-        dbfw.write("\n") # json.dump doesn't put out a final eol lol
+    try:
+        with open(pd.certdbtmp, "w") as dbfw:
+            json.dump(pd.db, dbfw, indent=4, sort_keys=True)
+            dbfw.write("\n") # json.dump doesn't put out a final eol lol
+    except:
+        perrorexit("? Unable to write database '{}'".format(pd.certdbtmp))
     os.chmod(pd.certdbtmp, 0o600)
     qdelfile(pd.certdbak)
     qrename(pd.certdb, pd.certdbak)
@@ -463,7 +474,7 @@ def findvalidids(pd):
     for fn in os.listdir(pd.dx509):
         filename = os.fsdecode(fn)
         if filename.endswith("{}VPNCert.pem".format(pd.swancertpfx)):
-            sankeys = getcertkey("{}/{}".format(pd.dx509, filename), "altNames:")
+            sankeys = getcertkey(pd, "{}/{}".format(pd.dx509, filename), "altNames:")
             skey = sankeys.split(",")[0].strip()    # The SAN key is always first. FQDN or IP address is second
             addidtodb(pd, skey)
     return
@@ -478,12 +489,12 @@ def makekeyname(pd, args):
     if " " in newkey: perrorexit("? Space not allowed in user name")
     return newkey
 
-def getcertkey(certfile, keyname):
+def getcertkey(pd, certfile, keyname):
     """
     Returns the specified "keyname:" from a cert in readable format
     """
-    acert = subprocess.check_output(("pki --print --type x509 --in {}".format(certfile)), shell=True)
-    for line in decodeutf(acert).split("\n"):
+    r = dosystem(pd, "pki --print --type x509 --in {}".format(certfile), doecho=False, pout=False)
+    for line in r.stdout.split("\n"):
         if keyname in line:
             return line.replace(keyname,"").strip()
     return ""
@@ -528,10 +539,9 @@ def listentry(pd, listkey, maxkey, maxcertlen, maxrid):
                                                               password=pd.db['users'][listkey]['password']))
     if args.full:
         if os.path.isfile(listcert):
-            acert = subprocess.check_output(("pki --print --type x509 --in {}".format(listcert)), shell=True)
-            for line in decodeutf(acert).split("\n"):
-                if line != "":
-                    print(line)
+            r = dosystem(pd, "pki --print --type x509 --in {}".format(listcert), doecho=False, pout=False)
+            for line in r.stdout.split("\n"):
+                if line != "": print(line)
         else:
             print("% Cert '{}' for user '{}' not found".format(listcert, listkey))
         print("")
@@ -562,8 +572,8 @@ def certdetailmsg(pd, args, newkey, tfmail):
     msg =  "See https://github.com/gitbls/pistrong/blob/master/CertInstall.md\n"
     msg += "for detailed certificate installation instructions\n\n"
     msg += "Conection Details:\n"
-    msg += "   Server:      {}\n   Remote ID:   {}\n   Local ID:    {}\n".format(pd.dx['vpnaddr'], pd.db['users'][newkey]['remoteid'], pd.cn)
-    msg += "   Cert Name:   {}\n\n".format(pd.cn)
+    msg += "   Server:                {}\n   Remote ID/Server ID:   {}\n   Local ID/Client ID:    {}\n".format(pd.dx['vpnaddr'], pd.db['users'][newkey]['remoteid'], pd.cn)
+    msg += "   Cert Name:             {}\n\n".format(pd.cn)
     if pd.db['users'][newkey]['password'] == "":
         msg += "\nThis certificate does not have a password\n"
     else:
@@ -622,13 +632,14 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
         f.write("        local_addrs  = %any\n")
         f.write("        vips = 0.0.0.0\n")
         f.write("        mobike = yes\n")
-        f.write("        reauth_time = 10800\n\n")
-        f.write("        local-1 {\n")
+        f.write("        reauth_time = 10800\n")
+        f.write("        proposals = aes192-sha256-modp3072\n")
+        f.write("        local {\n")
         f.write("            auth = pubkey\n")
         f.write("            certs = {}\n".format(pd.clientcert))
         f.write("            id = {}\n".format(pd.cn))
-        f.write("        }\n\n")
-        f.write("        remote-1 {\n")
+        f.write("        }\n")
+        f.write("        remote {\n")
         f.write("            id = {}\n".format(newremoteid))
         f.write("        }\n")
         f.write("        children {\n")
@@ -733,7 +744,7 @@ def makecacert(pd, args):
     dosystem(pd, "pki --self --ca --lifetime {} --in {} --type rsa\
     --dn \"C=US, O={}, CN={}\" --outform pem > {}".format(pd.db['config']['calife']['value'], pd.swankey, pd.dnou, pd.rootca, pd.swancert))
     dosystem(pd, "pki --print --in {}".format(pd.swancert))
-    pd.db['certs'][pd.swancertpfx.replace(".pem","")] = getcertkey(pd.swancert, "subjkey:")
+    pd.db['certs'][pd.swancertpfx.replace(".pem","")] = getcertkey(pd, pd.swancert, "subjkey:")
     pd.dbmodified = True
 
 def checkcaexist(pd):
@@ -767,18 +778,16 @@ def doconfigitem(pd, dest, argval, tfitem=False):
         pd.dbmodified = True
 
 def cmd_config(pd, args):
+    # cmds and debug are only per-command and not stored in db
     doconfigitem(pd, 'cacert', args.cacert)
     doconfigitem(pd, 'calife', args.calife)
-    doconfigitem(pd, 'cmds', args.cmds, tfitem=True)
     doconfigitem(pd, 'cnsuffix', args.cnsuffix)
     doconfigitem(pd, 'crllife', args.crllife)
-    doconfigitem(pd, 'debug', args.debug, tfitem=True)
     doconfigitem(pd, 'mailfrom', args.mailfrom)
     doconfigitem(pd, 'myfqdn', args.myfqdn)
     doconfigitem(pd, 'random', args.random, tfitem=True)
     doconfigitem(pd, 'rootca', args.rootca)
     doconfigitem(pd, 'service', args.service)
-#    if args.smtppassword != None: doconfigitem(pd, 'smtppassword', args.smtppassword)
     doconfigitem(pd, 'smtppassword', args.smtppassword)
     doconfigitem(pd, 'smtpport', args.smtpport)
     doconfigitem(pd, 'smtpserver', args.smtpserver)
@@ -795,8 +804,19 @@ def cmd_config(pd, args):
     if args.list or not pd.dbmodified or (pd.dbmodified and not os.path.isfile(pd.certdb)): listconfig(pd, args)
     return
 
+def ckosconflict(pd, args):
+    oslist = { "android":[args.android, args.ios, args.linux, args.macos, args.windows],\
+               "ios":[args.ios, args.android, args.linux, args.macos, args.windows],\
+               "linux":[args.linux, args.android, args.ios, args.macos, args.windows],\
+               "macos":[args.macos, args.android, args.ios, args.linux, args.windows],\
+               "windows":[args.windows, args.android, args.ios, args.linux, args.macos] }
+
+    for os in ["android", "ios", "linux", "windows"]:
+        if oslist[os][0]:
+            if True in oslist[os][1:]:
+                perrorexit("? Only one of --android, --ios, --linux, --macos, or --windows can be specified")
+
 def cmd_add(pd, args):
-    isrootordebug(pd, args)
     newkey = makekeyname(pd, args)
     if newkey == "":
         perrorexit("? No user name specified")
@@ -808,9 +828,6 @@ def cmd_add(pd, args):
         webvpndir = args.webdir if args.webdir != None else pd.db['config']['webdir']['value']
         if not os.path.exists(webvpndir):
             perrorexit("? Directory '{}' does not exist\n  Please correct or use --zip to mail the zip file\n  or change using 'sudo pistrong config --webdir'".format(webvpndir))
-#? Checking wrong directory (need to check args.webdir and pd.db[webdir]
-#?    if args.mail != None and not os.path.exists("/var/www/html/vpn"):
-#?        perrorexit("? Directory /var/www/html/vpn does not exist\n  Use 'sudo mkdir -p /var/www/html/vpn' to correct")
     if keyindb(pd, newkey):
         perrorexit("? Key '{}' already in use".format(newkey))
     ipwd = "" if args.password is None else args.password
@@ -822,8 +839,7 @@ def cmd_add(pd, args):
     newremoteid = pd.db['config']['vpnsankey']['value'].split(',')[0] if args.remoteid is None else args.remoteid
     if not isidvalid(pd, newremoteid):
         perrorexit("? Remote ID '{}' is not configured on this VPN".format(newremoteid))
-    if ((args.ios and args.linux) or (args.ios and args.windows) or (args.linux and args.windows)):
-        perrorexit("? Only one of --ios, --windows, or --linux can be specified")
+    ckosconflict(pd, args)
     checkmailcfg(pd)
     pd.dx['vpnaddr'] = pd.db['config']['vpnaddr']['value'] if args.vpnaddr is None else args.vpnaddr
     pd.dx['cname'] = pd.hostfqdn.replace(".","-") if args.cname is None else args.cname.replace(".","-")
@@ -844,7 +860,6 @@ def cmd_add(pd, args):
     dbupdate(pd, newkey, "V", ipwd, pd.swancertpfx, newremoteid, args.linux)
     if args.linux:
         buildlinuxpack(pd, args, newkey, newremoteid)
-#        print("% Linux VPN Config Pack for '{}' is in '{}'".format(newkey, pd.cpackzip))
         print("% Linux VPN Config Pack '{}' created for '{}'".format(pd.cpackzip, newkey))
     else:
         makeuserzip(pd, args, newkey)
@@ -855,12 +870,9 @@ def cmd_add(pd, args):
         pd.dx['weburl'] = args.weburl if args.weburl != None else pd.db['config']['weburl']['value']
         mailcert(pd, args, newkey)
     print("% Added '{}' with Remote ID '{}' using CA Cert '{}'".format(newkey, newremoteid, pd.swancertpfx))
-#    if args.linux and args.mail == None:
-#        print("% Linux VPN Config Pack for '{}' is in '{}'".format(newkey, pd.cpackzip))
     return
 
 def cmd_delete(pd, args):
-    isrootordebug(pd, args)
     newkey = makekeyname(pd, args)
     makeclientfnames(pd, args, newkey)
     checkcaexist(pd)
@@ -876,7 +888,6 @@ def cmd_delete(pd, args):
     return
 
 def cmd_revoke(pd, args):
-    isrootordebug(pd, args)
     newkey = makekeyname(pd, args)
     makeclientfnames(pd, args, newkey)
     checkcaexist(pd)
@@ -896,7 +907,6 @@ def cmd_revoke(pd, args):
     return
 
 def cmd_resend(pd, args):
-    isrootordebug(pd, args)
     newkey = makekeyname(pd, args)
     makeclientfnames(pd, args, newkey)
     checkcaexist(pd)
@@ -913,7 +923,6 @@ def cmd_resend(pd, args):
     return
 
 def cmd_list(pd, args):
-    isrootordebug(pd, args)
     checkcaexist(pd)
     maxnam = 0
     maxcert = maxcacertname(pd)
@@ -948,7 +957,6 @@ def cmd_createca(pd, args):
     """
     makeca command execution
     """
-    isrootordebug(pd, args)
     for cadir in pd.cadirlist:
         if not os.path.isdir(cadir): os.mkdir(cadir, pd.cadirlist[cadir])
     if os.path.isfile(pd.swancert):
@@ -967,7 +975,6 @@ def cmd_deleteca(pd, args):
     """
     Deletes the CA. Everything.
     """
-    isrootordebug(pd, args)
     print("% WARNING: This will delete all CA and user certs and all keys in {}".format(pd.swandir))
     if asktwice("Do you want to continue?"):
         stopifrunning(pd)
@@ -994,7 +1001,6 @@ def cmd_makevpncert(pd, args):
     """
     Make a new VPN cert command. pistrong makevpncert --vpncert MyCert makes MyCertVPNCert/MyCertVPNKey
     """
-    isrootordebug(pd, args)
     checkcaexist(pd)
     makevpnfns(pd, args)
     if os.path.isfile(pd.vpnhostcert) or os.path.isfile(pd.vpnhostkey):
@@ -1006,14 +1012,12 @@ def cmd_makecacert(pd, args):
     """
     Make an additional CA Cert/Key
     """
-    isrootordebug(pd, args)
     if os.path.isfile(pd.swancert) or os.path.isfile(pd.swankey):
         perrorexit("? CA Cert {} or CA Key {} already exist".format(pd.swancert, pd.swankey))
     makecacert(pd, args)
     return
 
 def cmd_showcert(pd, args):
-    isrootordebug(pd, args)
     if os.path.isfile(args.certname):
         print("[Certificate {}]".format(args.certname))
         dosystem(pd, "pki --print --in {}".format(args.certname))
@@ -1022,11 +1026,10 @@ def cmd_showcert(pd, args):
     return
 
 def cmd_showca(pd, args):
-    isrootordebug(pd, args)
     checkcaexist(pd)
     print("[CA Certificate {}]".format(pd.swancert))
     dosystem(pd, "pki --print --in {}".format(pd.swancert))
-    for fn in os.listdir(pd.dx509):
+    for fn in sorted(os.listdir(pd.dx509)):
         filename = os.fsdecode(fn)
         if filename.endswith("{}VPNCert.pem".format(pd.swancertpfx)):
             print("\n[VPN Host Certificate {}]".format("{}/{}".format(pd.dx509, filename)))
@@ -1038,7 +1041,6 @@ def cmd_showca(pd, args):
     return
 
 def cmd_listca(pd, args):
-    isrootordebug(pd, args)
     checkcaexist(pd)
     maxnam = maxcacertname(pd)
     maxvpncert = maxvpncertname(pd)
@@ -1047,14 +1049,13 @@ def cmd_listca(pd, args):
     for cacertfn in sorted(pd.db['certs']):
         print(" CA {cfn:<{mx1}}  {skey}".format(mx1=maxnam, cfn=cacertfn, skey=pd.db['certs'][cacertfn]))
         caname = cacertfn.replace("CACert", "")
-        for fn2 in os.listdir(pd.dx509):
+        for fn2 in sorted(os.listdir(pd.dx509)):
             filename = os.fsdecode(fn2)
             if filename.endswith("{}VPNCert.pem".format(caname)):
-                print("  VPN {cfn:<{mx1}} SAN: {skey}".format(mx1=maxvpncert, cfn=filename.replace("VPNCert.pem",""), skey=getcertkey("{}/{}".format(pd.dx509,fn2), "altNames:")))
+                print("  VPN {cfn:<{mx1}} SAN: {skey}".format(mx1=maxvpncert, cfn=filename.replace("VPNCert.pem",""), skey=getcertkey(pd, "{}/{}".format(pd.dx509,fn2), "altNames:")))
     return
 
 def cmd_service(pd, args):
-    isrootordebug(pd, args)
     if os.geteuid() == 0:
         if args.action == "reload":
             reloadcreds(pd)
@@ -1073,21 +1074,34 @@ def cmd_client_start(pd, args):
     if isikeup(pd, ""): perrorexit("? VPN already started\n  Use 'sudo pistrong client stop' to stop VPN first")
     waitsec = args.wait
     try:
-        subp = subprocess.run(shlex.split("swanctl --initiate --ike {} --child {}".format(dvpn, dvpn)), timeout=int(waitsec), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except subprocess.TimeoutExpired:
+        subp = dosystem(pd, "swanctl --initiate --ike {} --child {}".format(dvpn, dvpn), timout=int(waitsec), pout=False)
+    except subprocess.TimeoutExpired as err:
         killike(pd, dvpn, True)
         print("? VPN IKE connection timed out after {} seconds".format(waitsec))
         print("  Check remote strongSwan Server, internet connection, and router port forwards for ports 500 and 4500")
-#        printutf(subp.stderr) # if swanctl fails, subp isn't set. :(
-        return
-    printutf(subp.stdout)
-    printutf(subp.stderr)
+        print("  And review the system logs")
+        raise SystemExit(err)
+    except Exception as err:
+        print("? Error starting client VPN '{}'".format(dvpn))
+        print("  Review the system logs")
+        raise SystemExit(err)
+    else:
+        if subp.returncode == 0:
+            print(subp.stdout)
+            print(subp.stderr)
+        else:
+            print("? Error starting client VPN '{}'".format(dvpn))
+            print("  Review the system logs")
+            exit(2)
     return
 
 def cmd_client_stop(pd, args):
     r = dosystem(pd, "swanctl --list-sas", pout=False)
-    ikename = (decodeutf(r.stdout).split("\n")[0]).split(':')[0]
-    if isikeup(pd, ikename): killike(pd, ikename, False)
+    ikename = (r.stdout.split("\n")[0]).split(':')[0]
+    if isikeup(pd, ikename):
+        killike(pd, ikename, False)
+    else:
+        print("? No active client VPN connection")
     return
 
 def cmd_client_install(pd, args):
@@ -1170,7 +1184,7 @@ def cmd_help(pd, args):
 \n\
 Command-line switches override config file settings.\n\
 \n\
-Examples:\n\
+Examples [All pistrong commands must be preceded by sudo or run as root]:\n\
 \n\
 pistrong --help\n          Get help about switches\n\
 pistrong createca\n          Create a new CA in the root directory (/etc/swanctl)\n\
@@ -1227,8 +1241,8 @@ parser.set_defaults(func=cmd_help, cacert=None, debug=False, myfqdn=None, swance
 
 ynchoices = ['y', 'yes', 'no', 'n']
 parent_parser = argparse.ArgumentParser(add_help=False)
-parent_parser.add_argument("--debug", help="Enable debug mode", choices=ynchoices)
-parent_parser.add_argument("--cmds", help="Show executed system commands", choices=ynchoices)
+parent_parser.add_argument("--debug", help="Enable debug mode [N]", choices=ynchoices)
+parent_parser.add_argument("--cmds", help="Show executed system commands [N]", choices=ynchoices)
 parent_parser.add_argument("--root", help="Alternate CA root")
 subparsers = parser.add_subparsers(help="Sub-command help")
 
@@ -1294,12 +1308,14 @@ subparser_listca.set_defaults(func=cmd_listca)
 
 subparser_add = subparsers.add_parser("add", help="Add new user", parents=[parent_parser])
 subparser_add.add_argument("username", help="Username to add")
+subparser_add.add_argument("--android", help="Build an Android Cert", action='store_true')
 subparser_add.add_argument("--cacert", help="CA cert to use")
 subparser_add.add_argument("--cname", help="Connection name")
 subparser_add.add_argument("--device", help="Device name for identification")
 subparser_add.add_argument("--ios", help="Build an iOS Cert", action='store_true')
 subparser_add.add_argument("--keybits", default="2048", help="User cert key bits [2048]")
 subparser_add.add_argument("--linux", help="Build a Linux VPN Config Pack for this user", action='store_true')
+subparser_add.add_argument("--macos", help="Build a MacOS Cert", action='store_true')
 subparser_add.add_argument("--mail", help="User email address")
 subparser_add.add_argument("--nopass", help="Cert install requires no password", action='store_true')
 subparser_add.add_argument("--password", help="Cert install password")
@@ -1362,12 +1378,8 @@ subparser_version.set_defaults(func=cmd_version, usedb=False)
 #
 args = parser.parse_args()
 
-usedb = args.usedb
-thefunc = args.func
-# Need to test thefunc as well b/c pistrong cmd w/no args has usedb set to true (argparse defaulting convenience)
-if usedb and thefunc != cmd_help:
-    pd.dx['debug'] = trueorfalse(args.debug) if args.debug else False # This isn't known yet :( pd.db['config']['debug']['value']
-
+# Need to test args.func as well b/c pistrong cmd w/no args has usedb set to true (argparse defaulting convenience)
+if args.usedb and args.func != cmd_help:
     pd.swandir = "." if pd.dx['debug'] else "/etc/swanctl"
     if (args.root != None):
         pd.swandir = args.root
@@ -1376,15 +1388,16 @@ if usedb and thefunc != cmd_help:
     pd.pswandir = "{}/pistrong".format(pd.swandir)
     pd.certdb = "{}/pistrongdb.json".format(pd.pswandir)
     pd.dbmodified = False
+    pd.dx['debug'] = trueorfalse(args.debug) if args.debug else False
+    pd.dx['cmds'] = trueorfalse(args.cmds) if args.cmds else False
+    if not pd.dx['debug'] and os.geteuid() != 0: perrorexit("? pistrong must be run as root")
     dbload(pd)
     gethostfqdn(pd, args)
     makefilenames(pd, args)
     if pd.db['config']['validids']['value'] == "": findvalidids(pd)   # Fix old pistrongdb.json 
     if pd.db['config']['vpnaddr']['value'] == "": pd.db['config']['vpnaddr']['value'] = pd.hostfqdn
-    pd.dx['debug'] = trueorfalse(args.debug) if args.debug else pd.db['config']['debug']['value']
-    pd.dx['cmds'] = trueorfalse(args.cmds) if args.cmds else pd.db['config']['cmds']['value']
     if pd.db['config']['service']['value'] == "":
         perrorexit("? Can't determine strongSwan service name\n% Edit service name in {}".format(pd.certdb))
-thefunc(pd, args)
+args.func(pd, args)
 if pd.dbmodified: dbflush(pd)
 exit
