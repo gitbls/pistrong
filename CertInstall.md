@@ -2,6 +2,25 @@
 
 A client device must have the correct certificates installed in order to use the VPN. The details for installing certificate(s) and configuring the VPN vary by operating system. Here are step-by-step instructions for tested client operating systems.
 
+## Android
+
+I'm not an Android user, and I'm sure there are better/alternate ways to install Certs on Android. This is how I did it.
+
+* I put the .p12 Cert on a web server and browsed to that URL with the browser. The browser noticed that it was a Cert and asked if I wanted to install it. Simple, except for needing to type in the Cert password
+* Another approach is to get the Cert onto the Android system somehow and then use *Install certificates from storage* in the *Settings* app to install them
+* Once the Cert is installed, download and install the strongSwan VPN Client from the Play Store
+* Start the VPN Client and add a new VPN Profile:
+   * **Server identity:** the server name (Fully-qualified domain name or IP address) provided in the mail from `pistrong`
+   * **VPN Type:** IKEv2 Certificate
+   * **User Certificate:** choose the certificate matching the Local ID for the Cert
+   * **Profile name:** Your own descriptive name for the VPN
+   * **Server identity:** The Remote ID provided in the mail (This is the VPN SAN key)
+   * **Client identity:** the Local ID given to you in the mail (this is also the certificate/profile name, e.g., *user@dev-vpnhost@myvpn.net*)
+   * **User Authentication:** Tap and change to **Certificate**
+   * Tap **Save**
+
+Start the VPN by tapping on the new VPN connection in the strongSwan VPN Client
+
 ## iOS Cert Installation
 
 Here are two different methods to install the Certs on an iOS device, depending on how the Certs are sent. Other methods can be used, such as the Apple Configurator, but they are out of scope for pistrong and this document.
@@ -71,6 +90,20 @@ You can now connect to the VPN from your iOS device.
 
 If you have a problem connecting to the VPN from iOS, make sure you have the correct certificates installed and carefully check all the VPN settings.
 
+## Linux Cert Installation
+
+Certs for Linux systems are created using pistrong with `sudo pistrong add username --linux` (plus other switches as required). The certs are stored in a Linux Client Cert Pack at /etc/swanctl/pistrong/server-assets/username-devicename.zip.
+
+Copy the Cert Pack to your Linux client system in a convenient directory, then issue the command: `sudo pistrong client install username-devicename.zip`
+
+pistrong will display the pistrong-vpn-installer script from the zip file. Once you approve, pistrong will add the certs and connection information to the strongSwan configuration. Restart the strongSwan server, and then connect using `sudo pistrong client connect server.fqdn.com`. 
+
+Use `sudo pistrong client stop` to disconnect the VPN connection.
+
+## MacOS
+
+I don't have a Mac for testing to document this. Can you help?
+
 ## Windows 10 Cert Installation
 
 * Install the certificate
@@ -136,20 +169,3 @@ If you've set everything up correctly, it should, of course, *just work*. But, s
     * User/device certificates can be found in the Personal Certificates store
     * The strongSwan root certificate will be found in the Trusted Root Certification Authorities
 
-## Linux Cert Installation
-
-Certs for Linux systems are created using pistrong with `sudo pistrong add username --linux` (plus other switches as required). The certs are stored in a Linux Client Cert Pack at /etc/swanctl/pistrong/server-assets/username-devicename.zip.
-
-Copy the Cert Pack to your Linux client system in a convenient directory, then issue the command: `sudo pistrong client install username-devicename.zip`
-
-pistrong will display the pistrong-vpn-installer script from the zip file. Once you approve, pistrong will add the certs and connection information to the strongSwan configuration. Restart the strongSwan server, and then connect using `sudo pistrong client connect server.fqdn.com`. 
-
-Use `sudo pistrong client stop` to disconnect the VPN connection.
-
-## MacOS
-
-TBD
-
-## Android
-
-TBD
