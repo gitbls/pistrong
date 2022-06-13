@@ -130,7 +130,7 @@ function do_wrapup() {
 ** Required Post-installation Steps:
 
 * If this system will be a VPN Server:
-  * Configure your CA. Use /usr/local/bin/makeMyCA to fully configure a CA that supports iOS, Windows, and Linux VPN Clients
+  * Configure your CA. Use /usr/local/bin/makeMyCA to fully configure a CA that supports Android, iOS/MacOS, Linux, and Windows VPN Clients
   * Configure iptables. See https://github.com/gitbls/pistrong/blob/master/README.md#firewall-considerations
   * Configure email settings via pistrong if you intend to email certs (See 'Sending email' in the README)
   * Configure strongSwan service to automatically start if desired

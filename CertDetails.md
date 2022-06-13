@@ -2,11 +2,11 @@
 
 pistrong is designed to be easy-to-use with no need to for the administrator to know about Certificate Authority (CA) Certs/Keys and VPN Certs/Keys. However, in more complex configurations, learning more about this is probably unavoidable. The goal of this document is to make that easier.
 
-If you want to get started quickly, download and use the makeMyCA script after strongSwan is installed. makeMyCA builds a very prescriptive CA for iOS and Windows users.
+If you want to get started quickly, download and use the makeMyCA script after strongSwan is installed. makeMyCA builds a very prescriptive CA for Android, iOS/MacOS, Linux and Windows users.
 
-`sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA -o /usr/local/bin/makeMyCA`
-`sudo chmod 755 /usr/local/bin/makeMyCA`
-`sudo makeMyCA`
+* `sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA -o /usr/local/bin/makeMyCA`
+* `sudo chmod 755 /usr/local/bin/makeMyCA`
+* `sudo makeMyCA`
 
 ## CA overview
 The strongSwan CA is maintained in /etc/swanctl, which is the structure used by the strongSwan service. The CA is maintained on behalf of strongSwan in several subdirectories:
