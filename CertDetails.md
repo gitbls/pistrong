@@ -44,7 +44,7 @@ The command switch --vpnsankey controls the SAN contents in the VPN Cert.
 
 ## /etc/swanctl/swanctl.conf
 
-pistrong doesn't touch /etc/swanctl.conf. makeMyCA creates its configuration information in /etc/swanctl/conf.d/pistrong-CAServer-Connection.conf. If you're using multiple CAs and/or multiple VPN keys, refer to [https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf](URL). If you change the vpnsankey, add new client types, or use other than the default CA Cert names, you will need to create a new connection file in /etc/swanctl/conf.d. strongSwan automatically sources all of the config files in this directory when it starts up.
+pistrong doesn't touch /etc/swanctl.conf. makeMyCA creates its configuration information in /etc/swanctl/conf.d/pistrong-CAServer-Connection.conf. If you're using multiple CAs and/or multiple VPN keys, refer to [swanctl.conf](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf). If you change the vpnsankey, add new client types, or use other than the default CA Cert names, you will need to create a new connection file in /etc/swanctl/conf.d. strongSwan automatically sources all of the config files in this directory when it starts up.
 
 ## User/device Certificates
 

@@ -273,7 +273,7 @@ To send with **gmail**, perform these configuration steps:
 
 To send with **Outlook.com**, perform these configuration steps:
 
-* Configure an app password for pistrong to use. Go to [https://account.microsoft.com/security](URL), Select *Advanced Security options*, and then scroll down and select *Create a new app password*. The next screen will display the created app password. Save the app password in a secure location.
+* Configure an app password for pistrong to use. Go to [Microsoft Account Security](https://account.microsoft.com/security), Select *Advanced Security options*, and then scroll down and select *Create a new app password*. The next screen will display the created app password. Save the app password in a secure location.
 
 * Then configure pistrong to use outlook.com (or equivalently, live.com):
     * `sudo pistrong config --smtpserver smtp-mail.outlook.com --smtpport 587 --smtpusetls y`
