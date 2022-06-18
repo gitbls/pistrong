@@ -2,6 +2,14 @@
 
 A client device must have the correct certificates installed in order to use the VPN. The details for installing certificate(s) and configuring the VPN vary by operating system. Here are step-by-step instructions for tested client operating systems.
 
+## Cert Passwords
+
+By default, Certs are password-protected. The password is sent in a separate email if `--mail` is used. If not, the password can be viewed via `sudo pistrong list`.
+
+Alternatively, when creating the Cert via `sudo pistrong add`, use `--password` to set a Cert password of your choice (possibly less secure) when creating the Cert, or `--nopass` to create a Cert with no password (even less secure).
+
+Using a less secure password can make it easier for someone unintended to install and use the Cert.
+
 ## Android
 
 I'm not an Android user, and I'm sure there are better/alternate ways to install Certs on Android. This is how I did it.
