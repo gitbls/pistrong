@@ -183,7 +183,7 @@ Many users either have or want more than this very minimal firewall. In that cas
 
     * Create a new .conf file in /etc/swanctl/conf.d with the new connection using the secondary CA, VPN SAN Key, and secondary VPN Cert. Also add a secondary IP address pool.
 
-    * When adding users, always specify --cacert and --remoteid to specify the secondary VPN SAN Key to ensure that the user Cert is assigned to the correct connction.
+    * When adding users, always specify --cacert and --remoteid to specify the secondary VPN SAN Key to ensure that the user Cert is assigned to the correct connection.
 
     * **NOTE:** If you ever re-create the CA using deleteca/createca you'll need to recreate the secondary Cert/Key and validate the connection details the secondary .conf file in /etc/swanctl/conf.d/
 
