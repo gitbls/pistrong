@@ -1,5 +1,10 @@
 # Changelog
 
+## V3.13
+
+* macOS tested, verified, and documented!
+* Fix broken 'resend' command
+
 ## V3.12
 
 * Add Android client support
