@@ -108,9 +108,30 @@ pistrong will display the pistrong-vpn-installer script from the zip file. Once 
 
 Use `sudo pistrong client stop` to disconnect the VPN connection.
 
-## MacOS
+## macOS Cert Installation
 
-I don't have a Mac for testing to document this. Can you help?
+Get the .p12 and .pem files onto the Mac. On macOS double-click the .p12 file, enter the Cert password. This will add the user/device Cert to te keychain. Make sure that you install them into the system keychain.
+
+Next, double-click on the .pem file and install the CA Cert in the system keychain as well.
+
+For each of the two just-installed Certs, double-click on them in the Keychain Access.app, expand the Trust section, and choose ***Always Trust***
+
+Now define the VPN connection:
+* Open the Network system preferences pane
+* Click the '+' button to add a new connection
+    * **Interface:** VPN
+    * **VPN Type:** IKEv2
+    * **Service Name:** Your own descriptive name for the VPN
+    * Click ***Create*** and fill in the connection details:
+        * **Server Address:** The server name (Fully-qualified domain name or IP address) provided in the mail from `pistrong`
+        * **Remote ID:** The remote ID provided in the mail (This is the VPN SAN key)
+        * **Local ID:** The local ID given to you in the mail (this is also the certificate/profile name)
+        * Click ***Authentication Settings...***
+            * Select *Certificate* from the authentication settings dropdown
+            * Click *Select...* and choose the just-installed user/device Certificate
+            * Click *OK* to close the Authentication Settings
+
+You can now connect to the VPN from your macOS device.
 
 ## Windows 10 Cert Installation
 
