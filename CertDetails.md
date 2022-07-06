@@ -2,7 +2,7 @@
 
 pistrong is designed to be easy-to-use with no need to for the administrator to know about Certificate Authority (CA) Certs/Keys and VPN Certs/Keys. However, in more complex configurations, learning more about this is probably unavoidable. The goal of this document is to make that easier.
 
-If you want to get started quickly, download and use the makeMyCA script after strongSwan is installed. makeMyCA builds a very prescriptive CA for Android, iOS/MacOS, Linux and Windows users.
+If you want to get started quickly, download and use the makeMyCA script after strongSwan is installed. makeMyCA builds a very prescriptive CA for Android, iOS/macOS, Linux and Windows users.
 
 * `sudo curl -L https://raw.githubusercontent.com/gitbls/pistrong/master/makeMyCA -o /usr/local/bin/makeMyCA`
 * `sudo chmod 755 /usr/local/bin/makeMyCA`
@@ -34,7 +34,7 @@ A client can validate the VPN Cert (and hence the remote VPN host) in several wa
 * Is the VPN Cert signed by the CA that the client thinks it should be?
 
 * Does the VPN Cert have a SAN key that matches the one the client wants?
-    *  **iOS**: Is the remote ID in the iOS VPN configuration one of the SAN keys? (It probably checks the hostname as well, but this has not been validated by the author)
+    *  **iOS/macOS**: Is the remote ID in the iOS VPN configuration one of the SAN keys? (It probably checks the hostname as well, but this has not been validated by the author)
 
     *  **Windows**: Is one of the SAN keys set as the VPN server hostname/IP address as specified in the Windows VPN configuration? If you use a hostname, the FQDN host must be a SAN key. Likewise, if you're accessing the VPN using an IP address (NOT recommended), the IP address must be a SAN key. Note if you use an IP address and the IP address changes, you'll need to recreate the VPN and client Certs.
 
