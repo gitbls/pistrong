@@ -41,7 +41,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "V3.12"
+version = "V3.13"
 dbversion = "3"
 
 def qdelfile(qfn):
@@ -911,6 +911,7 @@ def cmd_resend(pd, args):
     makeclientfnames(pd, args, newkey)
     checkcaexist(pd)
     if args.mail is None: perrorexit("? Resend command requires --mail to specify email address")
+    pd.dx['vpnaddr'] = pd.db['config']['vpnaddr']['value']
     checkmailcfg(pd)
     if keyindb(pd, newkey):
         pd.dx['mailfrom'] = pd.db['config']['mailfrom']['value']
