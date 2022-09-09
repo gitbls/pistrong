@@ -3,11 +3,19 @@ Simple, Secure Certificate-based authentication manager for the strongSwan VPN
 
 ## Overview
 
-`pistrong` dramatically simplifies installing and configuring the strongSwan VPN. Once installed, pistrong simplifies managing the strongSwan Certificate Authority (CA) and Certificates for remote user devices connecting to the VPN. pistrong fully supports the Cert-authenticated use case (users on devices), and can be used to create and manage certs for other strongSwan VPN scenarios, such as host-to-host or site-to-site tunnels.
+`pistrong` dramatically simplifies installing and configuring the highly secure, high performance strongSwan IPSEC/IKEV2 VPN.
+
+pistrong supports 3 different VPN server usage scenarios:
+
+* **Client/Server** &mdash; Client devices running Android, iOS, MacOS, and Windows connect to the VPN Server with certificate-based authentication
+* **Host-to-Host** &mdash; The VPN server on each end can access only the remote VPN server
+* **Site-to-Site** &mdash; The VPN server on each end can access the remote VPN server and its LAN
+
+pistrong simplifies managing the strongSwan Certificate Authority (CA) and Certificates for remote user devices connecting to the VPN (Client/Server). pistrong fully supports the Cert-authenticated use case (users on devices), and can be used to create and manage certs for other strongSwan VPN scenarios, such as host-to-host or site-to-site tunnels, which can be easily configured with a provided tool.
 
 The pistrong software package includes complete installation, configuration, and management support for Raspbian/RasPiOS and Debian-based distros. Other distros can be easily supported, since the only required changes are in the installer. Support for additional distros will be added based on inquiries.
 
-Using pistrong, it's typically possible to have strongSwan up and running with clients securely connecting in **less than an hour**.
+Using pistrong, it's typically possible to have strongSwan up and running with clients securely connecting in ***less than an hour***.
 
 pistrong components include:
 
@@ -15,11 +23,11 @@ pistrong components include:
 
 * `InstallPiStrong` - Install and configure strongSwan
 
-* `makeMyCA` - Create your secure custom CA supporting Android, iOS/macOS, Linux, and Windows Clients after completing the installation. 
+* `makeMyCA` - Create a secure custom CA supporting Android, iOS/macOS, Linux, and Windows Clients
 
-* `makeTunnel` - Use makeTunnel to create a Site-to-Site (remote LANs are accessible) or Host-to-Host VPN (remote LANs are not accessible) with strongSwan on both ends of the VPN.
+* `makeTunnel` - Create a Site-to-Site (remote LANs are accessible) or Host-to-Host VPN (remote LANs are not accessible) configurations with strongSwan on both ends of the VPN.
 
-If you find pistrong useful, please consider starring it so I can better understand how many people are using it. Thanks!
+If you find pistrong useful, please consider starring it so I can better understand how many people are using it. Thanks! And, if you have questions, problems, or requests for enhancements, please open an issue on this github.
 
 ## Installation Videos
 
@@ -28,7 +36,7 @@ If you prefer to watch videos to learn, you'll find these interesting.
 * Install pistrong and strongSwan on Debian Bullseye &mdash; [Install and configure a VPN Server and Client Cert Manager](https://youtu.be/gDvglvgtYzY)
 * Install pistrong and strongSwan and configuring a site-to-site VPN &mdash; [Install and configure a Site-to-Site VPN](https://youtu.be/mUitM2JeKRc)
 
-Since Debian Bullseye is new, many people are still running Buster. The strongSwan package in Buster is a bit old, so InstallPiStrong will download and install strongSwan from the source tarball. Watch this [here](https://youtu.be/SONenXy4IiY). (Long wait times have been edited out of this video, so the 14-minute install on a Pi4 can be viewed in less than a minute.)
+Debian Bullseye is out and stable, but some people are still running Buster. The strongSwan package in Buster is a bit old, so InstallPiStrong will download and install strongSwan from the source tarball. Watch this [here](https://youtu.be/SONenXy4IiY). (Long wait times have been edited out of this video, so the 14-minute install on a Pi4 can be viewed in less than a minute.)
 
 ## Up and Running Nearly Instantly!
 
@@ -40,7 +48,7 @@ To access your VPN from outside your LAN, configure your router to forward UDP p
 
 Now that you've attended to the external network considerations, it's time to install and configure pistrong and strongSwan.
 
-* **Download and run InstallPiStrong**. InstallPiStrong will download the remaining pistrong components from GitHub, and then install strongSwan. You will have the choice of installing either the strongSwan that is delivered with your apt-based distro, or building the latest version from sources from strongswan.org
+* **Download and run InstallPiStrong.** InstallPiStrong will download the remaining pistrong components from GitHub, and then install strongSwan. You will have the choice of installing either the strongSwan that is delivered with your apt-based distro, or building the latest version from sources from strongswan.org
 
 Download and run the installer on your local system:
 
@@ -48,9 +56,9 @@ Download and run the installer on your local system:
     sudo chmod 755 /usr/local/bin/InstallPiStrong
     sudo /usr/local/bin/InstallPiStrong
 
-* **Create your CA** You can do this manually, or use the makeMyCA script. makeMyCA uses pistrong to create a complete, secure, and ready-to-use CA for Android, iOS/macOS, Linux, and Windows clients. See below for details.
+* **Create your CA.** The makeMyCA script uses pistrong to create a complete, secure, and ready-to-use CA for Android, iOS/macOS, Linux, and Windows clients. See below for details.
 
-* **Add your users and devices.** These examples assume the username is *username*, and are taking the default *dev* for the device name. You can ease your management by adding `--dev something` which directs pistrong to add the string *something* to the name of this user. This is especially important if a user has multiple devices and you want to use a different cert on each device. Conversely, if a user's cert is going to be used across multiple devices, you don't need to use `--dev`, although you certainly can.
+* **Add your users and devices.** These examples assume the username is *username*, and are taking the default *dev* for the device name. You may find it simpler to use a meaningful name by adding `--dev something` which directs pistrong to add the string *something* to the name of this user. This is especially important if a user has multiple devices and you want to use a different cert on each device. Conversely, if a user's cert is going to be used across multiple devices, you don't need to use `--dev`, although you certainly can.
     *  Android users: `pistrong add username --remoteid android.yourdomain.com`
     *  iOS/macOS users: `pistrong add username --remoteid ios.yourdomain.com`
     *  Linux users: `pistrong add username --remoteid linux.yourdomain.com --linux`
@@ -69,6 +77,18 @@ Download and run the installer on your local system:
 Once the certs for a client device or system have been created, you will install and configure the VPN on the client or device. Follow the OS-specific Cert installation instructions at [Client Certificate Installation and VPN Configuration](https://github.com/gitbls/pistrong/blob/master/CertInstall.md) to install the Cert and configure the VPN.
 
 See [Installation Log](https://github.com/gitbls/pistrong/blob/master/log-installpistrong.txt) for a session log which is the result of installing and configuring pistrong and InstallPiStrong. Also see [makeMyCA log](https://github.com/gitbls/pistrong/blob/master/log-makeca.txt) to see the configuration of a CA and adding a couple of users.
+
+## Important IP Address Considerations
+
+There are a couple of IP Address considerations that you should be aware of. These are due to the current IP routing implementation, and are under investigation.
+
+For Client/Server VPNs (built with makeMyCA), The IP Address range for the VPN Server and the VPN Client must be different. By default many routers use 192.168.0.x or 192.168.1.x. If your VPN Client is on a LAN with the same IP Address range, you will be able to connect to the VPN, but will not be able to access any other hosts on the VPN Server LAN.
+
+Similarly, for tunnels built with makeTunnel, the LANs on each end of a Site-to-Site tunnel can not be the same. For instance, both LANs can't be 192.168.1.0/24 networks. 
+
+However, the LANs on each end of a Host-to-Host tunnel CAN be the same, but the LAN IP addresses of the two VPN hosts must be different.
+
+If your VPN Server LAN is a "*common*" IP Address range (.0.x, .1.x, etc), you should consider changing to a different, less commonly-used IP Address range to avoid this issue. 
 
 ## pistrong
 
@@ -146,6 +166,46 @@ makeMyCA prompts for all the configuration information and provides explanations
 
 * `/etc/swanctl/conf.d/pistrong-CAServerConnection.conf` strongSwan config file for Android, iOS/macOS, Linux, and Windows client VPN connections
 * `/etc/swanctl/pistrong/CA-iptables` required iptables addition for IPV4 routing to work. See Firewall Considerations section below.
+
+## Site-to-Site and Host-to-Host tunnels
+
+Use makeTunnel to configure Site-to-Site and Host-to-Host tunnels. You give each tunnel a name, which is used in the tunnel configuration files.
+
+You'll also need the following configuration information:
+* LAN IP Range for each end of the VPN (Site-to-Site only)
+* LAN IP Address of each VPN server
+* Public IP Address or DNS Name for each end of the tunnel. If a tunnel endpoint does not have this, it can only initiate VPN connections. This must be configured for at least one of the endpoints.
+* A few advanced configuration options for which you can press enter and take the provided default
+
+Once all questions have been asked, makeTunnel will print the configuration information and ask if you want to continue.
+
+After makeTunnel has completed, find the newly-generated tunnel file for the remote end in /etc/swanctl/pistrong/server-assets and copy it to the remote VPN system. On that system (which must also have pistrong installed), install the VPN configuration:
+
+`sudo pistrong client install Tunnel-tunnelname-remotename.zip`
+
+Once the configuration has been installed, start the VPN connection:
+```
+$ sudo pistrong client list
+ remotename-Tunnel
+$ sudo pistrong client start remotename
+```
+
+### Site-to-Site and Host-to-Host tunnel IP Address restrictions
+
+Reiterating, since mentioned above. The LANs on each end of a Site-to-Site tunnel can not be the same. For instance, both LANs can't be 192.168.1.0/24 networks. 
+
+The LANs on each end of a Host-to-Host tunnel CAN be the same, but the LAN IP addresses of the two VPN hosts must be different.
+
+### Starting a Site-To-Site Tunnel Automatically
+
+It's easy to keep a site-to-site or host-to-host tunnel up and running using vpnmon (available on this github). Download vpnmon.service and vpnmon.sh to your system and then:
+
+* `sudo cp vpnmon.service /etc/systemd/system/vpnmon@.service`
+* `sudo cp vpnmon.sh /usr/local/bin/vpnmon`
+* `sudo pistrong client list` to get the name of the tunnel (e.g., otherhost-Tunnel)
+* sudo enable vpnmon@*otherhost*
+
+Generally, for any pair of tunnel endpoints, decide which will be the client (the one that initiates the VPN tunnel connection) and install vpnmon on that endpoint.
 
 ## Resetting Everything
 
@@ -253,7 +313,7 @@ While using a DNS name is the best way to access the VPN, that may not always be
             * `--cname some-name` &mdash; Specifies the name you'll use to reference the connection on a `pistrong client start` command. This has nothing to do with DNS CNAMEs.
             * `--vpnaddr VPNSERVER-LANAddr` &mdash; Specifies the LAN IP address for the VPN Server. This only affects the address that is in the Client connection config file.
 
-## Tunnels
+## Tunnel Routing
 
 A simple way to enable LAN clients to utilize the tunnel is to add a route to the remote server's IP address(es) to the router. It does cause outgoing traffic to hit the router twice, which may be a consideration on a heavily-utilized tunnel. It's easy to add routes to Linux clients, which can be used to ameliorate the router impact.
 
@@ -293,28 +353,19 @@ If you'd prefer to use your own mail server, you can configure pistrong to use t
 
 * If you don't use the `--zip` switch, you'll also need to have a webserver installed, so that users can pick up the zip file from your web server. If you `sudo apt-get install apache2` before running makeMyCA everything will be set up correctly. You may need to restart the apache2 service after running makeMyCA. If you install apache2 after running makeMyCA, you may need to execute this command: `echo "ServerName vpnserver.fqdn" > /etc/apache2/conf-enabled/servername.conf`, of course, replacing vpnserver.fqdn with the fully-qualified domain name for your VPN Server.
 
-## Starting a Site-To-Site Tunnel Automatically
-
-It's easy to keep a site-to-site tunnel up and running using vpnmon (available on this github). Download vpnmon.service and vpnmon.sh to your system and then:
-
-* `sudo cp vpnmon.service /etc/systemd/system/vpnmon@.service`
-* `sudo cp vpnmon.sh /usr/local/bin/vpnmon`
-* `sudo pistrong client list` to get the name of the tunnel (e.g., otherhost-Tunnel)
-* sudo enable vpnmon@*otherhost*
-
-Generally, for any pair of tunnel endpoints, decide which will be the client (the one that initiates the VPN tunnel connection) and install vpnmon on that endpoint.
-
 ## Not Yet Completed
 
   * In-depth crypto performance/security tradeoff evaluation.
 
-  * Install on other distros - Additional popular distros should be added to InstallPiStrong
+  * Install on other distros - Additional popular distros should be added to InstallPiStrong. What distros are important to you?
 
   * More usage. Besides me, that is. 
 
   * pistrong does not provide a way to delete a single CA or VPN Cert.
 
   * pistrong does not encrypt Certs in a Linux Cert Pack
+
+  * Sharing certs across devices does not work with Linux devices (client/server mode) because no Cert pack is configured. Use a unique Cert generated with the `--linux` switch for each Linux client.
 
 ## If you're interested...
 
