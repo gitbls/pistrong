@@ -1,7 +1,6 @@
 #!/bin/bash
 #
-# makeTunnel V1.4
-version="V1.4"
+version="V2.0"
 #
 # Run this script via sudo After strongSwan is installed
 # Builds a tunnel
@@ -27,7 +26,8 @@ version="V1.4"
 #    you'd do something like this on a Linux system on the 10.1.10.0 LAN:
 #      route add -net 10.2.10.0 gw 10.1.10.2 netmask 255.255.255.0
 #
-
+# Dev note: Same-subnet implementation details at https://www.strongswan.org/testing/testresults/ikev2/net2net-same-nets/
+#
 function errexit() {
     echo -e "$1"
     exit 1
@@ -95,9 +95,9 @@ function isdomain() {
 }
 
 function makeconnconf() {
-# $1=cfgfile $1=ikename $3=remoteip $4=thisvpncert $5=thisid $6=remotevpncert $7=remoteid $8=thisrange $9=remoterange
+# $1=cfgfile $1=ikename $3=remoteip $4=thisvpncert $5=thisid $6=remotevpncert $7=remoteid $8=thisrange $9=remoterange $10='remote' or 'primary'
     local tcnfile="$1" tike="$2" trip="$3" tvpnf="$4" tid="$5"
-    local rvpnf="$6" rid="$7" trange="$8" rrange="$9"
+    local rvpnf="$6" rid="$7" trange="$8" rrange="$9" premote="${10}"
     cat > $tcnfile <<EOF
 connections {
     $tike {
@@ -124,11 +124,16 @@ connections {
       children {
          $tike {
 EOF
-    [ $fsite == 0 ] && echo "            local_ts  = $trange" >> $tcnfile
     updowns="/usr/lib/ipsec/_updown"
     # If $updowns not found we were built from tarball, so use alternate location
     [ ! -f $updowns ] && updowns="/libexec/ipsec/_updown"
-    cat >> $tcnfile <<EOF
+    [ ! -f $updowns ] && echo "% Configuration problem: _updown script not found in /usr/lib/ipsec or /libexec/ipsec"
+    # net2 is always 0
+    if [ $net2 -eq 0 ]
+    then
+	[ $fsite -eq 0 ] && echo "            local_ts  = $trange" >> $tcnfile
+	# Standard VPN connection
+	cat >> $tcnfile <<EOF
             remote_ts = $rrange
             updown = $updowns iptables
             rekey_time = $childrekeytime
@@ -136,9 +141,47 @@ EOF
             esp_proposals = aes128gcm128-x25519
          }
       }
-    }
+   }
 }
 EOF
+    else
+	# Both ends of network using same subnet
+	# ** This is not working and is tied off for now 
+	if [ "$premote" == "primary" ]
+	then
+	    # primary site-to-site
+	    cat >> $tcnfile <<EOF
+            local_ts = $mylocalts
+            remote_ts = $myrmtts
+            mark_in = 8
+            set_mark_in = %same
+            mark_out = 4
+            updown = /usr/local/bin/mark_updown.pistrong
+            #updown = $updowns iptables
+            rekey_time = $childrekeytime
+            dpd_action = $dpdaction
+            esp_proposals = aes128gcm128-x25519
+         }
+      }
+   }
+}
+EOF
+	else
+	    # secondary site-to-site
+	    cat >> $tcnfile <<EOF
+            local_ts = $rmlocalts
+            remote_ts = $rmrmtts
+            updown = $updowns iptables
+            rekey_time = $childrekeytime
+            dpd_action = $dpdaction
+            esp_proposals = aes128gcm128-x25519
+         }
+      }
+   }
+}
+EOF
+	fi
+    fi
 }
 
 function makeInstallScript() {
@@ -152,15 +195,20 @@ function makeInstallScript() {
 zf=\$1
 zfn=\$(basename \$zf)
 swandir=\${2:-/etc/swanctl}
+[ -f \$swandir/pistrong/VPNClients/$tother-Tunnel ] && echo "? Client VPN connection named '$tother-Tunnel' already exists" && exit 1
+for f in \$swandir/x509ca/$cacertfn \$swandir/x509/$myvpncertfn \$swandir/private/${myvpnf}VPNKey.pem \$swandir/private/${rmvpnf}VPNKey.pem\$swandir/conf.d/$tcnfile 
+do
+    [ -f \$f ] && echo "? File '\$f' already exists; Aborting" && exit 1
+done
 unzip -d \$swandir/x509ca    \$zf $cacertfn
 unzip -d \$swandir/x509      \$zf $myvpncertfn
 unzip -d \$swandir/x509      \$zf $rmvpncertfn
 unzip -d \$swandir/private   \$zf ${myvpnf}VPNKey.pem
 unzip -d \$swandir/private   \$zf ${rmvpnf}VPNKey.pem
 unzip -d \$swandir/conf.d    \$zf $tcnfile
-[ -f \$swandir/pistrong/$tipfile ] && rm -f \$swandir/pistrong/$tipfile
+rm -f \$swandir/pistrong/$tipfile
 unzip -d \$swandir/pistrong  \$zf $tipfile
-[ -f \$swandir/pistrong/$tfwfile ] && rm -f \$swandir/pistrong/$tfwfile
+rm -f \$swandir/pistrong/$tfwfile
 unzip -d \$swandir/pistrong  \$zf $tfwfile
 cp \$zf \$swandir/pistrong/client-assets
 cat >> \$swandir/pistrong/VPNClients/$tother-Tunnel <<IEOF
@@ -227,9 +275,11 @@ EOF
 }
 
 function makevpniptables() {
-    local cnfile=$1 therange=$2
+    local cnfile=$1 therange=$2 premote=$3
     [ -f $cnfile ] && rm -f $cnfile
-    cat > $cnfile <<EOF
+    if [ $net2 -eq 0 ]
+    then
+	cat > $cnfile <<EOF
 # These firewall rules must be added to iptables on this VPN Server host
 #
 *nat
@@ -238,6 +288,73 @@ function makevpniptables() {
 -A POSTROUTING -s $therange -o eth0 -j MASQUERADE
 COMMIT
 EOF
+    else
+	# ** This is tied off b/c net2 always 0
+	if [ "$premote" == "primary" ]
+	then
+	    # primary  site-to-site
+	    cat > $cnfile <<EOF
+*mangle
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+#-A PREROUTING -s $myrmtts -d 10.8.0.0/24 -i eth0 -j MARK --set-xmark 0x4/0xffffffff
+COMMIT
+*nat
+:PREROUTING ACCEPT [0:0]
+:INPUT ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+:POSTROUTING ACCEPT [0:0]
+#-A PREROUTING -d $mylocalts -i eth0 -m mark --mark 0x8 -j NETMAP --to $myrmtts
+# Change eth0 to eth1 if 2 adatpers V
+#-A PREROUTING -d 10.8.0.0/24 -i eth0 -m mark --mark 0x4 -j NETMAP --to $myrmtts
+#-A POSTROUTING -s $myrmtts  -o eth0 -m mark --mark 0x8 -j NETMAP --to 10.8.0.0/24
+# Change eth0 to eth1 if 2 adatpers V
+#-A POSTROUTING -s $myrmtts  -o eth0 -m mark --mark 0x4 -j NETMAP --to $mylocalts
+COMMIT
+*filter
+#:INPUT DROP [0:0]
+#:FORWARD DROP [0:0]
+#:OUTPUT DROP [0:0]
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT [0:0]
+:OUTPUT ACCEPT [0:0]
+# These are only really needed if default policy for each table != ACCEPT
+-A INPUT -i eth0 -p esp -j ACCEPT
+-A INPUT -i eth0 -p ah -j ACCEPT
+-A INPUT -i eth0 -p udp -m udp --sport 500 --dport 500 -j ACCEPT
+-A INPUT -i eth0 -p udp -m udp --sport 4500 --dport 4500 -j ACCEPT
+-A FORWARD -o eth0 -m mark --mark 0x4 -j ACCEPT
+-A FORWARD -i eth0 -m mark --mark 0x8 -j ACCEPT
+-A OUTPUT -o eth0 -p esp -j ACCEPT
+-A OUTPUT -o eth0 -p ah -j ACCEPT
+-A OUTPUT -o eth0 -p udp -m udp --sport 500 --dport 500 -j ACCEPT
+-A OUTPUT -o eth0 -p udp -m udp --sport 4500 --dport 4500 -j ACCEPT
+COMMIT
+EOF
+	else
+	    # secondary site-to-site
+	    cat > $cnfile <<EOF
+*filter
+# INPUT items only needed if default policy for INPUT != ACCEPT
+-A INPUT -i eth0 -p esp -j ACCEPT
+-A INPUT -i eth0 -p ah -j ACCEPT
+-A INPUT -i eth0 -p udp -m udp --sport 500 --dport 500 -j ACCEPT
+-A INPUT -i eth0 -p udp -m udp --sport 4500 --dport 4500 -j ACCEPT
+# OUTPUT items only needed if default policy for OUTPUT != ACCEPT
+-A OUTPUT -o eth0 -p esp -j ACCEPT
+-A OUTPUT -o eth0 -p ah -j ACCEPT
+-A OUTPUT -o eth0 -p udp -m udp --sport 500 --dport 500 -j ACCEPT
+-A OUTPUT -o eth0 -p udp -m udp --sport 4500 --dport 4500 -j ACCEPT
+# FORWARD table entries needed
+#-A FORWARD -s $mylocalts -d $rmlocalts -i eth0 -m policy --dir in --pol ipsec --reqid 1 --proto esp -j ACCEPT
+#-A FORWARD -s $rmlocalts -d $mylocalts -o eth0 -m policy --dir out --pol ipsec --reqid 1 --proto esp -j ACCEPT
+COMMIT
+EOF
+	fi
+    fi
 }
 
 function makefwiptables() {
@@ -371,8 +488,8 @@ echo $"
 
    This script will build a $ttype VPN with this configuration:
 "
-[ $fsite == 0 ] && echo "   LocalNet1 <---> VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost) <---> LocalNet2"
-[ $fsite == 1 ] && echo "   VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost)"
+[ $fsite -eq 0 ] && echo "   LocalNet1 <---> VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost) <---> LocalNet2"
+[ $fsite -eq 1 ] && echo "   VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost)"
 echo $"   Where:
         LocalNet1         Local LAN IP Range for ${thishost}'s network
         VPN Server 1      Server at one end of the tunnel ($thishost)
@@ -383,46 +500,98 @@ echo $"   Where:
    Site-to-site VPN: Hosts on each LAN can access the remote LAN with appropriate routing settings
    Host-to-host VPN: VPN Servers can access each other but not hosts on the remote LAN
 
-   NOTE: LocalNet1 and LocalNet2 cannot be the same subnet (e.g., 192.168.1.0/24 on both networks)
+   NOTE: For site-to-site VPNs LocalNet1 and LocalNet2 cannot be the same subnet (e.g., 192.168.1.0/24 on both networks)
    If both networks are the same, one network must be completely IP-reassigned before configuring this VPN
    This script does NO IP range syntax checking. If it's wrong the VPN will fail or will not pass traffic
+
+   For host-to-host VPNs, the subnets on each end of the VPN can be the same. However, the two VPN servers
+   may not have the exact same IP address.
 
 ** IP ranges are entered as a.b.c.d/nn (e.g., 192.168.1.0/24)
    See CIDR: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 "
 while [ 0 ]
 do
-    mustanswer "IP range for the '$thishost' LAN" myrange ""
-    issubnet $myrange && break
-    echo "? '$myrange' is not a subnet in the form a.b.c.d/nn"
+    if [ $fsite -eq 0 ]
+    then
+	mustanswer "IP range for the '$thishost' LAN" myrange ""
+	issubnet $myrange && break
+	echo "? '$myrange' is not a subnet in the form a.b.c.d/nn"
+    else
+	mustanswer "LAN IP address for '$thishost'" mylanip ""
+	isipaddr $mylanip && break
+	echo "? '$mylanip' is not a valid IP Address"
+    fi
 done
 
 while [ 0 ]
 do
-    mustanswer "LAN IP address for '$thishost' in subnet $myrange" mylanip ""
-    isipaddr $mylanip && break
-    echo "? '$mylanip' is not a valid IP Address"
+    if [ $fsite -eq 0 ]
+    then
+	mustanswer "LAN IP address for '$thishost' in subnet $myrange" mylanip ""
+	isipaddr $mylanip && break
+	echo "? '$mylanip' is not a valid IP Address"
+    else
+	myrange=$mylanip
+	break
+    fi
 done
 
 [[ ! "$myrange" =~ "${mylanip%.*}" ]] && echo "% My LAN IP [$mylanip] is not in the IP range for '$thishost' [$myrange]; Continuing..."
 
 while [ 0 ]
 do
-    mustanswer "IP range for the '$rmhost' LAN" rmrange ""
-    issubnet $rmrange && break
-    echo "? '$rmrange' is not a subnet in the form a.b.c.d/nn"
+    if [ $fsite -eq 0 ]
+    then
+	mustanswer "IP range for the '$rmhost' LAN" rmrange ""
+	issubnet $rmrange && break
+	echo "? '$rmrange' is not a subnet in the form a.b.c.d/nn"
+    else
+	mustanswer "LAN IP address for '$rmhost'" rmlanip ""
+	isipaddr $rmlanip && rmrange=$rmlanip && break
+	echo "? '$rmlanip' is not a valid IP Address"
+    fi
 done
-
-[ "$myrange" == "$rmrange" ] && echo "% Tunnel endpoint LANs use the same subnet; VPN Routing may not work as desired"
 
 while [ 0 ]
 do
-    mustanswer "LAN IP address for '$rmhost' in subnet $rmrange" rmlanip ""
-    isipaddr $rmlanip && break
-    echo "? '$rmlanip' is not a valid IP Address"
+    if [ $fsite -eq 0 ]
+    then
+	mustanswer "LAN IP address for '$rmhost' in subnet $rmrange" rmlanip ""
+	isipaddr $rmlanip && break
+	echo "? '$rmlanip' is not a valid IP Address"
+    else
+	rmrange=$rmlanip
+	break
+    fi
 done
 
 [[ ! "$rmrange" =~ "${rmlanip%.*}" ]] && echo "% LAN IP [$rmlanip] is not in the IP range for '$rmhost' [$rmrange]; Continuing..."
+
+if [ "$myrange" == "$rmrange" ]
+then
+    if [ $fsite -eq 0 ]
+    then
+	errexit "? Site-to-site tunnel endpoint LANs cannot have identical subnets"
+    else
+	errexit "? Host-to-host tunnel endpoints cannot have identical LAN IP addresses"
+    fi
+fi
+
+net2=0
+# Same subnet site-to-site not working yet, so tied off
+#if [ "$myrange" == "$rmrange" -a $fsite -eq 0 ]
+#then
+#    echo "% Site-to-site tunnel endpoints are on the same subnet; Using net2net iptables routing"
+#    net2=1
+#    # These are only used in site-to-site same-subnet which is not yet working
+#    # Need some renaming!!!! And add 10.8.0.0/24
+#    # ?? add ability to change these?
+#    rmlocalts="10.0.0.0/24"
+#    rmrmtts="10.4.0.0/24"
+#    mylocalts="10.4.0.0/24"
+#    myrmtts="10.0.0.0/24"
+#fi
 
 dynurl="http://ipinfo.io.ip"
 myip=""
@@ -557,7 +726,7 @@ ikesfx="-Tunnel"
 thisike="${thishost}${ikesfx}"
 rmike="${rmhost}${ikesfx}"
 echo $"
-** Ready to create the tunnel '$tunnelname'
+** Ready to create the configuration for $ttype tunnel '$tunnelname'
 
       CA  Cert  $cacertfn
       VPN Cert  $myvpncertfn with id '$mytid'
@@ -607,9 +776,9 @@ pushd $tmpdir > /dev/null
 cnfile="Tunnel-${tunnelmyhost}.conf"
 ipfile="Tunnel-${tunnelmyhost}-VPNRouting.iptables"
 fwfile="Tunnel-${tunnelmyhost}-firewall.iptables"
-makeconnconf "./$cnfile" $thisike $myip $rmvpncertfn $rtid $myvpncertfn $mytid $rmrange $myrange
-makevpniptables "./$ipfile" "$myrange"
-makefwiptables "./$fwfile" "$rmlanip"
+makeconnconf "./$cnfile" $thisike $myip $rmvpncertfn $rtid $myvpncertfn $mytid $rmrange $myrange "remote"
+makevpniptables "./$ipfile" "$myrange" "remote"
+makefwiptables "./$fwfile" "$rmlanip" "remote"
 
 if [ $debug -eq 1 ]
 then
@@ -638,9 +807,9 @@ rm -f "Tunnel-${tunnelmyhost}-firewall.iptables"
 cnfile="Tunnel-${tunnelrmhost}.conf"
 ipfile="Tunnel-${tunnelrmhost}-VPNRouting.iptables"
 fwfile="Tunnel-${tunnelrmhost}-firewall.iptables"
-makeconnconf "./$cnfile" $rmike $rmip $myvpncertfn $mytid $rmvpncertfn $rtid $myrange $rmrange
-makevpniptables "./$ipfile" "$rmrange"
-makefwiptables "./$fwfile" "$mylanip"
+makeconnconf "./$cnfile" $rmike $rmip $myvpncertfn $mytid $rmvpncertfn $rtid $myrange $rmrange "primary"
+makevpniptables "./$ipfile" "$rmrange" "primary"
+makefwiptables "./$fwfile" "$mylanip" "primary"
 makeInstallScript $thishost $rmip $rmhost $cnfile $ipfile $fwfile $thisike
 zip -j /etc/swanctl/pistrong/server-assets/Tunnel-${tunnelmyhost}.zip *
 if [ $fpack -eq 1 ]
