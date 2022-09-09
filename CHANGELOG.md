@@ -1,5 +1,11 @@
 # Changelog
 
+## V3.14
+
+* Enable host-to-host VPNs where both the LANs have the same subnet, as long as the VPN hosts have different IP addresses
+* Correct uncaught error in socket.gethostbyname that only occurs under abnormal configuration
+* Prevent Client VPN installers from over-writing existing Cert and config files
+
 ## V3.13
 
 * macOS tested, verified, and documented!
