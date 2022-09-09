@@ -41,7 +41,7 @@ class pdat:
         self.dconfd = "conf.d"
         self.revokecrl = self.revoketmp = self.hostfqdn = self.shorthost = self.vpnip = self.lxscript = ""
 
-version = "V3.13"
+version = "V3.14"
 dbversion = "3"
 
 def qdelfile(qfn):
@@ -332,7 +332,10 @@ def gethostfqdn(pd, args):
     else:
         pd.hostfqdn = socket.getfqdn()
         pd.shorthost = pd.hostfqdn.split(".")[0]
-        pd.vpnip = socket.gethostbyname(pd.hostfqdn)
+        try:
+            pd.vpnip = socket.gethostbyname(pd.hostfqdn)
+        except:
+            pd.vpnip = "127.0.0.1"
         if pd.vpnip.split(".")[0] == "127":
             try:
                 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -615,6 +618,11 @@ def buildlinuxpack(pd, args, newkey, newremoteid):
         f.write("zfn=$(basename $zf)\n")
         f.write("swandir=${2:-/etc/swanctl}\n")
         f.write("cd $swandir\n")
+        f.write("[ -f $swandir/pistrong/VPNClients/{} ] && echo \"? Client VPN connection named '{}' already exists\" && exit 1\n".format(pd.hostfqdn, pd.hostfqdn))
+        f.write("for f in $swandir/x509ca/{} $swandir/x509/{} $swandir/private/{} $swandir/conf.d/{}-ClientConnection.conf\n".format(tmpswancertfn, pd.clientcertfn, pd.clientkeyfn, pd.hostfqdn))
+        f.write("do\n")
+        f.write("    [ -f $f ] && echo \"? File '$f' already exists; Aborting\" && exit 1\n")
+        f.write("done\n")
         f.write("unzip -d  $swandir/x509ca  $zf {}\n".format(tmpswancertfn))
         f.write("unzip -d  $swandir/x509    $zf {}\n".format(pd.clientcertfn))
         f.write("unzip -d  $swandir/private $zf {}\n".format(pd.clientkeyfn))
@@ -962,7 +970,6 @@ def cmd_createca(pd, args):
         if not os.path.isdir(cadir): os.mkdir(cadir, pd.cadirlist[cadir])
     if os.path.isfile(pd.swancert):
         perrorexit("? There is already a CA in this directory\n% Use 'pistrong deleteca' first")
-    sts = stopifrunning(pd)
     makevpnfns(pd, args)
     if args.novpncert or (pd.dx['vpnsankey'] != "ipsec.vpn.net"):
         makeca(pd, args)
@@ -970,6 +977,8 @@ def cmd_createca(pd, args):
             print("% CA created in {}".format(pd.swandir))
     else:
         perrorexit("? You must specify --vpnsankey with other than the default 'ipsec.vpn.net'")
+    sts = stopifrunning(pd)
+    startifwas(pd, sts)
     return
 
 def cmd_deleteca(pd, args):
