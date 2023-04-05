@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-version="V3.1"
+version="V3.2"
 #
 # Run this script via sudo After strongSwan is installed
 # If you intend to send mail to cert recipients, you'll need an email server and web server
@@ -327,7 +327,7 @@ then
    then
        echo $"
 % The host name of this system is '$thishost' which is different than the VPN DNS name '$checkhost'
-  The CA will be built with the information you provided, but you  should consider
+  The CA will be built with the information you provided, but you should consider
   setting your system and VPN host names to be the same to minimize confusion
   Continuing..."
    fi
@@ -710,7 +710,7 @@ connections {
         }
     }
     conn-ios : conn-defaults, remote-defaults {
-        proposals = aes256-sha256-modp2048, aes256-sha256-modp1024,aes256-sha1-modp1024
+        proposals = aes256-sha256-modp2048, aes256-sha256-modp1024,aes256-sha1-modp1024,aes256-sha256-prfsha256-modp2048
         local {
             certs = $ios-strongSwanVPNCert.pem
             id = $ioskey
