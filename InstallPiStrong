@@ -120,7 +120,7 @@ function do_cleanupaptinstall() {
 	echo "** Cannot do the web install until the apt install is removed"
 	exit
     fi
-    apt-get --yes remove strongswan strongswan-swanctl strongswan-pki charon-systemd libstrongswan libstrongswan-standard-plugins strongswan-libcharon libcharon-extra-plugins strongswan-charon strongswan-starter
+    apt-get --yes remove strongswan strongswan-swanctl strongswan-pki charon-systemd libstrongswan libstrongswan-extra-plugins libstrongswan-standard-plugins strongswan-libcharon libcharon-extra-plugins strongswan-charon strongswan-starter
 }
 
 function do_wrapup() {
@@ -184,12 +184,13 @@ function do_install_prereqs() {
 	    local pkgs=""
 	    [ "$(which curl)" == "" ] && pkgs="curl" 
 	    [ "$(which zip)" == "" ] && pkgs="$pkgs zip"
+	    [ "$(which unzip)" == "" ] && pkgs="$pkgs unzip"
 	    [ "$(which iptables)" == "" ] && pkgs="$pkgs iptables"
 	    [ "$(which dig)" == "" ] && pkgs="$pkgs bind9-dnsutils"
 	    if [ "$pkgs" != "" ]
 	    then
 		echo ""
-		#echo "% pistrong requires 'curl', 'zip', 'bind9-dnsutils', and 'iptables'"
+		#echo "% pistrong requires 'curl', 'unzip', 'zip', 'bind9-dnsutils', and 'iptables'"
 		echo "  Doing 'apt update' and 'apt install' of prerequisite package(s): $pkgs"
 		apt-get update && apt-get install --yes $pkgs --no-install-recommends
 	    fi
@@ -366,8 +367,8 @@ esac
 
 function do_apt_install() {
     echo "> Installing strongSwan from apt"
-    echo "* Installing packages 'strongswan-swanctl strongswan-pki charon-systemd libcharon-extauth-plugins libcharon-extra-plugins libstrongswan-standard-plugins python3-pexpect'"
-    apt-get --yes install strongswan-swanctl strongswan-pki charon-systemd libcharon-extauth-plugins libcharon-extra-plugins libstrongswan-standard-plugins python3-pexpect # iptables installed earlier
+    echo "* Installing packages 'strongswan-swanctl strongswan-pki charon-systemd libcharon-extauth-plugins libcharon-extra-plugins libstrongswan-extra-plugins libstrongswan-standard-plugins python3-pexpect'"
+    apt-get --yes install strongswan-swanctl strongswan-pki charon-systemd libcharon-extauth-plugins libcharon-extra-plugins libstrongswan-extra-plugins libstrongswan-standard-plugins python3-pexpect # iptables installed earlier
 }
 
 function do_post_config() {
