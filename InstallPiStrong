@@ -20,8 +20,18 @@
 #
 
 function get_wssver() {
-    vs1=$(curl -s -L https://www.strongswan.org/download.html | grep 'Current Release' | head -1)
-    s1=${vs1##<h4>Current Release*normal\">}
+    # Broke when strongswan website/download page updated. Sigh
+    #vs1=$(curl -s -L https://www.strongswan.org/download.html | grep 'Current Release' | head -1)
+    #s1=${vs1##<h4>Current Release*normal\">}
+    #wssver=${s1%%<*}
+    #echo $wssver
+    #return 1
+    #
+    # String returned now (5/2023) in vs1 starts with these 2 lines, grab 2nd line with version:
+    # <h4 class="has-text-primary">Current Release</h4>
+    # <p>Version: <strong class="has-text-primary">5.9.10</strong></p>
+    vs1=$(curl -s -L https://www.strongswan.org/download.html | sed -n '/Current Release/,/Version:/p' | head -2 | grep -v Current)
+    s1=${vs1##*primary\"\>}
     wssver=${s1%%<*}
     echo $wssver
     return 1
