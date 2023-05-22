@@ -710,7 +710,7 @@ connections {
         }
     }
     conn-ios : conn-defaults, remote-defaults {
-        proposals = aes256-sha256-modp2048, aes256-sha256-modp1024,aes256-sha1-modp1024,aes256-sha256-prfsha256-modp2048
+        proposals = aes256-sha256-modp2048,aes256-sha256-modp1024,aes256-sha1-modp1024,aes256-sha256-prfsha256-modp2048
         local {
             certs = $ios-strongSwanVPNCert.pem
             id = $ioskey
