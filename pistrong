@@ -1123,6 +1123,8 @@ def cmd_client_install(pd, args):
     pd.tmpdir = mkdtemp(prefix="pistrong")
     dosystem(pd, "unzip -d {} {} {}".format(pd.tmpdir, args.vpnorzip, pd.db['config']['lxscript']['value']))
     ufn = pd.fnpdir.format(pd.tmpdir,pd.db['config']['lxscript']['value'])
+    if not os.path.exists(ufn):
+        perrorexit("? File {} not found in Cert Pack {}\n  Was it created using --linux?".format(pd.db['config']['lxscript']['value'], args.vpnorzip))
     os.chmod(ufn, 0o755)
     askyn("\nPress Return when you are ready to review the Client VPN install script: ")
     dosystem(pd, "cat {}".format(ufn), doecho=False)
