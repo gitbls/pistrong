@@ -860,6 +860,8 @@ def cmd_add(pd, args):
     cmd = "openssl pkcs12 -export -inkey {}".format(pd.clientkey)
     cmd += " -in {} -name \"{}-{} VPN Certificate\"".format(pd.clientcert, newkey, pd.shorthost)
     cmd += " -certfile {} -caname \"{}\"  -out {}".format(pd.swancert, pd.rootca, pd.newp12)
+    # https://discussions.apple.com/thread/254518218. Set -legacy until iOS LibreSSL catches up
+    if args.ios: cmd += " -legacy"
     if ipwd != "":
         cmd += " -passout pass:{}".format(ipwd)
         dosystem(pd, cmd)
