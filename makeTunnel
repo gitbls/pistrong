@@ -33,6 +33,45 @@ function errexit() {
     exit 1
 }
 
+function readconfig() {
+    #
+    # Reads the config from the makeTunnel config file
+    #
+    # $1: Config file
+    #
+    local rpifun value cf="$1" snolq
+    if [ -f $cf ]
+    then
+        while IFS=":" read -r rpifun value
+        do
+            if [[ ! $rpifun =~ ^\ *# && -n $rpifun ]] # skip comment and malformed lines
+            then
+                # Cant' use stripquotes, it's in sdm-cparse, and can't source it w/o processing this first ($sdmdir)
+                #value="${value%%\#*}"    # Del EOL comments
+                value="${value%"${value##*[^[:blank:]]}"}"  # Del trailing spaces/tabs
+                snolq="${value#\"}"        # Get string without open quote
+                if [ "$snolq" != "$value" ] # if lq was there, then update string and also del close quote
+                then
+                    value=$snolq
+                    value="${value%\"}"
+                fi
+                snolq="${value#\'}"        # Get string without open quote
+                if [ "$snolq" != "$value" ] # Ditto double quote comment
+                then
+                    value=$snolq
+                    value="${value%\'}"
+                fi
+		# strip leading/trailing whitespace
+		value="${value#"${value%%[![:space:]]*}"}"
+		value="${value%"${value##*[![:space:]]}"}"
+                printf -v "$rpifun" "%s" "$value"     #eval "${rpifun}=\"$value\""
+
+            fi
+        done < $cf
+    fi
+    return
+}
+
 function askyn() {
     local ans
     echo -n "$1" '[y/N]? ' ; read $2 ans
@@ -439,6 +478,7 @@ EOF
 # Main
 #
 cmd=$0
+cf=$1
 [[ $EUID -ne 0 ]] && errexit "? Please rerun: 'sudo $cmd'"
 dbl=""
 debug=1
@@ -446,7 +486,11 @@ debug=1
 thishostx=$(hostname)
 thishostx=${thishostx%%.*} # Strip domain name(s)
 thishost="$thishostx"
-echo $"
+net2=0
+
+if [ "$cf" == "" ]
+then
+    echo $"
 Build a Site-to-Site tunnel configuration
 
 After the configuration information has been gathered, it will be displayed
@@ -460,37 +504,37 @@ Details required for each end of the Tunnel:
 
 The tunnel can be site-to-site (routing onto remote LAN) or host-to-host
 "
-echo -n "Tunnel type [S]ite or Host: " ; read tmp
-case "${tmp,,}" in
-    h|host) echo "Host-to-host tunnel selected"
-	    fsite=1
-	    ttype="Host-to-Host"
-	    ;;
-    s|site|*) echo "Site-to-site tunnel selected"
-	      ttype="Site-to-Site"
-	      fsite=0
-	      ;;
-esac
-echo $"
+    echo -n "Tunnel type [S]ite or Host: " ; read tmp
+    case "${tmp,,}" in
+	h|host) echo "Host-to-host tunnel selected"
+		fsite=1
+		ttype="Host-to-Host"
+		;;
+	s|site|*) echo "Site-to-site tunnel selected"
+		  ttype="Site-to-Site"
+		  fsite=0
+		  ;;
+    esac
+    echo $"
 ** The tunnel name is used for configuration naming
    Each tunnel must have a unique name
 "
-askdefault "Tunnel name" tunnelname "newtunnel"
-# Error if Tunnel config file exists
-fs=$(ls /etc/swanctl/conf.d/Tunnel-${tunnelname}*.conf  2> /dev/null)
-[ "$fs" != "" ] && errexit "? A tunnel named '$tunnelname' already exists"
-askdefault "Name for this end of the tunnel" thishost "$thishostx"
-[ "$thishost" != "$thishostx" ] && fpack=0 || fpack=1
-echo "** Use the host name (for example) for the remote end of the tunnel"
-askdefault "Remote VPN Server name" rmhost "remote"
-echo $"
+    askdefault "Tunnel name" tunnelname "newtunnel"
+    # Error if Tunnel config file exists
+    fs=$(ls /etc/swanctl/conf.d/Tunnel-${tunnelname}*.conf  2> /dev/null)
+    [ "$fs" != "" ] && errexit "? A tunnel named '$tunnelname' already exists"
+    askdefault "Name for this end of the tunnel" thishost "$thishostx"
+    [ "$thishost" != "$thishostx" ] && fpack=0 || fpack=1
+    echo "** Use the host name (for example) for the remote end of the tunnel"
+    askdefault "Remote VPN Server name" rmhost "remote"
+    echo $"
 ** The IP ranges for each end of the tunnel must be carefully and accurately specified
 
    This script will build a $ttype VPN with this configuration:
 "
-[ $fsite -eq 0 ] && echo "   LocalNet1 <---> VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost) <---> LocalNet2"
-[ $fsite -eq 1 ] && echo "   VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost)"
-echo $"   Where:
+    [ $fsite -eq 0 ] && echo "   LocalNet1 <---> VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost) <---> LocalNet2"
+    [ $fsite -eq 1 ] && echo "   VPN Server 1 ($thishost) <---> Tunnel <---> VPN Server 2 ($rmhost)"
+    echo $"   Where:
         LocalNet1         Local LAN IP Range for ${thishost}'s network
         VPN Server 1      Server at one end of the tunnel ($thishost)
         Tunnel            VPN tunnel transporting traffic between the two networks
@@ -510,98 +554,97 @@ echo $"   Where:
 ** IP ranges are entered as a.b.c.d/nn (e.g., 192.168.1.0/24)
    See CIDR: https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing
 "
-while [ 0 ]
-do
-    if [ $fsite -eq 0 ]
+    while [ 0 ]
+    do
+	if [ $fsite -eq 0 ]
+	then
+	    mustanswer "IP range for the '$thishost' LAN" myrange ""
+	    issubnet $myrange && break
+	    echo "? '$myrange' is not a subnet in the form a.b.c.d/nn"
+	else
+	    mustanswer "LAN IP address for '$thishost'" mylanip ""
+	    isipaddr $mylanip && break
+	    echo "? '$mylanip' is not a valid IP Address"
+	fi
+    done
+
+    while [ 0 ]
+    do
+	if [ $fsite -eq 0 ]
+	then
+	    mustanswer "LAN IP address for '$thishost' in subnet $myrange" mylanip ""
+	    isipaddr $mylanip && break
+	    echo "? '$mylanip' is not a valid IP Address"
+	else
+	    myrange=$mylanip
+	    break
+	fi
+    done
+
+    [[ ! "$myrange" =~ "${mylanip%.*}" ]] && echo "% My LAN IP [$mylanip] is not in the IP range for '$thishost' [$myrange]; Continuing..."
+
+    while [ 0 ]
+    do
+	if [ $fsite -eq 0 ]
+	then
+	    mustanswer "IP range for the '$rmhost' LAN" rmrange ""
+	    issubnet $rmrange && break
+	    echo "? '$rmrange' is not a subnet in the form a.b.c.d/nn"
+	else
+	    mustanswer "LAN IP address for '$rmhost'" rmlanip ""
+	    isipaddr $rmlanip && rmrange=$rmlanip && break
+	    echo "? '$rmlanip' is not a valid IP Address"
+	fi
+    done
+
+    while [ 0 ]
+    do
+	if [ $fsite -eq 0 ]
+	then
+	    mustanswer "LAN IP address for '$rmhost' in subnet $rmrange" rmlanip ""
+	    isipaddr $rmlanip && break
+	    echo "? '$rmlanip' is not a valid IP Address"
+	else
+	    rmrange=$rmlanip
+	    break
+	fi
+    done
+
+    [[ ! "$rmrange" =~ "${rmlanip%.*}" ]] && echo "% LAN IP [$rmlanip] is not in the IP range for '$rmhost' [$rmrange]; Continuing..."
+
+    if [ "$myrange" == "$rmrange" ]
     then
-	mustanswer "IP range for the '$thishost' LAN" myrange ""
-	issubnet $myrange && break
-	echo "? '$myrange' is not a subnet in the form a.b.c.d/nn"
-    else
-	mustanswer "LAN IP address for '$thishost'" mylanip ""
-	isipaddr $mylanip && break
-	echo "? '$mylanip' is not a valid IP Address"
+	if [ $fsite -eq 0 ]
+	then
+	    errexit "? Site-to-site tunnel endpoint LANs cannot have identical subnets"
+	else
+	    errexit "? Host-to-host tunnel endpoints cannot have identical LAN IP addresses"
+	fi
     fi
-done
 
-while [ 0 ]
-do
-    if [ $fsite -eq 0 ]
+    # Same subnet site-to-site not working yet, so tied off
+    #if [ "$myrange" == "$rmrange" -a $fsite -eq 0 ]
+    #then
+    #    echo "% Site-to-site tunnel endpoints are on the same subnet; Using net2net iptables routing"
+    #    net2=1
+    #    # These are only used in site-to-site same-subnet which is not yet working
+    #    # Need some renaming!!!! And add 10.8.0.0/24
+    #    # ?? add ability to change these?
+    #    rmlocalts="10.0.0.0/24"
+    #    rmrmtts="10.4.0.0/24"
+    #    mylocalts="10.4.0.0/24"
+    #    myrmtts="10.0.0.0/24"
+    #fi
+
+    dynurl="http://ipinfo.io.ip"
+    myip=""
+    if pingcheck $dynurl
     then
-	mustanswer "LAN IP address for '$thishost' in subnet $myrange" mylanip ""
-	isipaddr $mylanip && break
-	echo "? '$mylanip' is not a valid IP Address"
-    else
-	myrange=$mylanip
-	break
+	echo "Trying to obtain your external IP address..."
+	myip="$(curl -s $dynurl)"
     fi
-done
 
-[[ ! "$myrange" =~ "${mylanip%.*}" ]] && echo "% My LAN IP [$mylanip] is not in the IP range for '$thishost' [$myrange]; Continuing..."
-
-while [ 0 ]
-do
-    if [ $fsite -eq 0 ]
-    then
-	mustanswer "IP range for the '$rmhost' LAN" rmrange ""
-	issubnet $rmrange && break
-	echo "? '$rmrange' is not a subnet in the form a.b.c.d/nn"
-    else
-	mustanswer "LAN IP address for '$rmhost'" rmlanip ""
-	isipaddr $rmlanip && rmrange=$rmlanip && break
-	echo "? '$rmlanip' is not a valid IP Address"
-    fi
-done
-
-while [ 0 ]
-do
-    if [ $fsite -eq 0 ]
-    then
-	mustanswer "LAN IP address for '$rmhost' in subnet $rmrange" rmlanip ""
-	isipaddr $rmlanip && break
-	echo "? '$rmlanip' is not a valid IP Address"
-    else
-	rmrange=$rmlanip
-	break
-    fi
-done
-
-[[ ! "$rmrange" =~ "${rmlanip%.*}" ]] && echo "% LAN IP [$rmlanip] is not in the IP range for '$rmhost' [$rmrange]; Continuing..."
-
-if [ "$myrange" == "$rmrange" ]
-then
-    if [ $fsite -eq 0 ]
-    then
-	errexit "? Site-to-site tunnel endpoint LANs cannot have identical subnets"
-    else
-	errexit "? Host-to-host tunnel endpoints cannot have identical LAN IP addresses"
-    fi
-fi
-
-net2=0
-# Same subnet site-to-site not working yet, so tied off
-#if [ "$myrange" == "$rmrange" -a $fsite -eq 0 ]
-#then
-#    echo "% Site-to-site tunnel endpoints are on the same subnet; Using net2net iptables routing"
-#    net2=1
-#    # These are only used in site-to-site same-subnet which is not yet working
-#    # Need some renaming!!!! And add 10.8.0.0/24
-#    # ?? add ability to change these?
-#    rmlocalts="10.0.0.0/24"
-#    rmrmtts="10.4.0.0/24"
-#    mylocalts="10.4.0.0/24"
-#    myrmtts="10.0.0.0/24"
-#fi
-
-dynurl="http://ipinfo.io.ip"
-myip=""
-if pingcheck $dynurl
-then
-    echo "Trying to obtain your external IP address..."
-    myip="$(curl -s $dynurl)"
-fi
-
-echo $"
+    echo $"
 ** The VPN configuration requires one or both of the VPN Servers be the VPN Server
    A VPN Server has ports 500 and 4500 forwarded to it, if required,
    and its external IP address is accessible from the remote system
@@ -610,63 +653,63 @@ echo $"
 
    If a host does not have a DNS name or IP address assigned to it, it cannot
    be a VPN Server for this tunnel and is only capable of initiating the VPN (Client)"
-[ "$myip" == "" ] && dfl="Client Only" || dfl=$myip
-while [ 0 ]
-do
+    [ "$myip" == "" ] && dfl="Client Only" || dfl=$myip
     while [ 0 ]
     do
-	printf "\n** Enter the public DNS name/IP address for host '$thishost'\n"
-	askdefault "DNS name or IP address for host '$thishost'" myip "$dfl" "%any"
-	[ "$myip" == "%any" ] && break
-	isipaddr $myip && break
-	isdomain $myip && break
-	echo "? '$myip' is not a recognized IP Address or domain name"
-    done
+	while [ 0 ]
+	do
+	    printf "\n** Enter the public DNS name/IP address for host '$thishost'\n"
+	    askdefault "DNS name or IP address for host '$thishost'" myip "$dfl" "%any"
+	    [ "$myip" == "%any" ] && break
+	    isipaddr $myip && break
+	    isdomain $myip && break
+	    echo "? '$myip' is not a recognized IP Address or domain name"
+	done
 
-    while [ 0 ]
-    do
-	printf "\n** Enter the public DNS name/IP address for host '$rmhost'\n"
-	askdefault "DNS name or IP address for host '$rmhost'" rmip "Client Only" "%any"
-	[ "$rmip" == "%any" ] && break
-	isipaddr $rmip && break
-	isdomain $rmip && break
-	echo "? '$rmip' is not a recognized IP Address or domain name"
-    done
+	while [ 0 ]
+	do
+	    printf "\n** Enter the public DNS name/IP address for host '$rmhost'\n"
+	    askdefault "DNS name or IP address for host '$rmhost'" rmip "Client Only" "%any"
+	    [ "$rmip" == "%any" ] && break
+	    isipaddr $rmip && break
+	    isdomain $rmip && break
+	    echo "? '$rmip' is not a recognized IP Address or domain name"
+	done
 
-    if [ "$myip" == "%any" -a "$rmip" == "%any" ]
-    then
-	echo "% Neither host is configured to be a Server for this VPN"
-	echo ""
-	if  ! askyn "Do you want to redo VPN server public name/address configuration"
+	if [ "$myip" == "%any" -a "$rmip" == "%any" ]
 	then
-	    echo "% Rerun with 'sudo $cmd' when you're ready to proceed"
-	    exit
-	fi
-    else
-	break
-    fi    
-done
+	    echo "% Neither host is configured to be a Server for this VPN"
+	    echo ""
+	    if  ! askyn "Do you want to redo VPN server public name/address configuration"
+	    then
+		echo "% Rerun with 'sudo $cmd' when you're ready to proceed"
+		exit
+	    fi
+	else
+	    break
+	fi    
+    done
 
-echo $"
+    echo $"
 ** The VPN ID is used as part of the authentication process
    The defaults are fine, but change them as desired
 "
-askdefault "VPN ID for the '$thishost' VPN Server" mytid "$thishost.$tunnelname.com"
-askdefault "VPN ID for the '$rmhost' VPN Server" rtid "$rmhost.$tunnelname.com"
+    askdefault "VPN ID for the '$thishost' VPN Server" mytid "$thishost.$tunnelname.com"
+    askdefault "VPN ID for the '$rmhost' VPN Server" rtid "$rmhost.$tunnelname.com"
 
-echo $"
+    echo $"
 ** Rekeying the connection increases security
    Default rekey times in seconds set by this script:
      Connection rekey: 86400 (24*60*60=1 day)
      Child tunnel rekey: Connection rekey minus 3 minutes
    You can change the rekey time here or edit the connection config files later
 "
-askdefault "Connection rekey time" connrekeytime "86400"
-childrekeytime=$((connrekeytime-180))
-#
-# Dead peer delay configuration
+    askdefault "Connection rekey time" connrekeytime "86400"
+    childrekeytime=$((connrekeytime-180))
+    #
+    # Dead peer delay configuration
 
-echo $"
+    echo $"
 ** Dead peer detection enables the VPN to recognize that the tunnel is
    not responding. This is done by sending an 'ruthere' message every
    dpd-delay seconds. If you want to use dpd, a good delay is 10 seconds
@@ -678,16 +721,16 @@ echo $"
 ** dpd-delay specifies the delay in seconds between ruthere messages
    Press Return or enter 0 to disable dead peer detection
 "
-while [ 0 ]
-do
-    askdefault "Dead peer detection delay" dpddelay "10"
-    [ $dpddelay -eq 0 -o $dpddelay -gt 2 ] && break
-    echo "% Dead peer detection delay must be great than 2"
-done
-dpdaction="none"
-if [ $dpddelay -ne 0 ]
-then
-    echo $"
+    while [ 0 ]
+    do
+	askdefault "Dead peer detection delay" dpddelay "10"
+	[ $dpddelay -eq 0 -o $dpddelay -gt 2 ] && break
+	echo "% Dead peer detection delay must be great than 2"
+    done
+    dpdaction="none"
+    if [ $dpddelay -ne 0 ]
+    then
+	echo $"
 ** Dead peer detection can take one of these actions when a dead peer is detected:
    * clear:   Close the tunnel
    * restart: Restarts the tunnel
@@ -697,19 +740,38 @@ then
   You must specify one of clear, restart, trap, or none
   or press Enter to accept the default [clear]
 "
-    while [ 0 ]
-    do
-	askdefault "Dead peer detection action (clear, restart, trap)" dpdaction "clear"
-	dpdaction=${dpdaction,,}
-	case $dpdaction in
-	    clear|restart|trap|none)
-		break
-		;;
-	    *)
-		echo "? '$dpdaction' is an invalid action"
-		;;
-	esac
-    done
+	while [ 0 ]
+	do
+	    askdefault "Dead peer detection action (clear, restart, trap)" dpdaction "clear"
+	    dpdaction=${dpdaction,,}
+	    case $dpdaction in
+		clear|restart|trap|none)
+		    break
+		    ;;
+		*)
+		    echo "? '$dpdaction' is an invalid action"
+		    ;;
+	    esac
+	done
+    fi
+else
+    # Process config file
+    [ -f $cf ] || errexit "? makeTunnel Configuration file '$cf' not found"
+    echo "> Load Tunnel configuration from '$cf'"
+    readconfig $cf
+    #
+    # Fiddle a few things
+    #
+    [ "$thishost" != "$thishostx" ] && fpack=0 || fpack=1
+    [ "$tunneltype" == "Site-to-Site" ] && fsite=0 || fsite=1
+    [ "$myip" == "" ] && myip="%any"
+    [ "$rmip" == "" ] && rmip="%any"
+    mytid="$thishost.$tunnelname.com"
+    rtid="$rmhost.$tunnelname.com"
+    dpddelay=10
+    dpdaction=clear
+    connrekeytime=86400
+    childrekeytime=$((connrekeytime-180))
 fi
 #
 # All done asking questions!
@@ -755,11 +817,14 @@ fi
 printf "\n** Dead peer detection configuration\n"
 [ $dpddelay -ne 0 ] && printf "   Dead peer detection is enabled\n   Delay:  %s seconds\n   Action: %s\n" $dpddelay $dpdaction || \
 	printf "   Dead peer detection is disabled\n"
-printf "\n** Answer N and restart the script if you'd like to change anything\n"
 
-if ! askyn "Do you want to continue"
+if [ "$cf" == "" ]
 then
-    exit
+    printf "\n** Answer N and restart the script if you'd like to change anything\n"
+    if ! askyn "Do you want to continue"
+    then
+	exit
+    fi
 fi
 
 echo "Create certs..."
