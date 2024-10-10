@@ -994,11 +994,11 @@ def cmd_deleteca(pd, args):
         for cadir in pd.cadirlist:
             shutil.rmtree(cadir, ignore_errors=True)
             if not os.path.isdir(cadir): os.mkdir(cadir, pd.cadirlist[cadir])
-        qdelwild(pd.pswandir, "Tunnel.*\.iptables$")
-        qdelwild(pd.dconfd, "Tunnel.*\.conf$")
+        qdelwild(pd.pswandir, "Tunnel.*\\.iptables$")
+        qdelwild(pd.dconfd, "Tunnel.*\\.conf$")
         qdelwild(pd.dconfd, ".*ClientConnection.conf$")
-        qdelwild("{}/server-assets".format(pd.pswandir), ".*\.zip$")
-        qdelwild("{}/client-assets".format(pd.pswandir), ".*\.zip$")
+        qdelwild("{}/server-assets".format(pd.pswandir), ".*\\.zip$")
+        qdelwild("{}/client-assets".format(pd.pswandir), ".*\\.zip$")
         qdelwild("{}/VPNClients".format(pd.pswandir), ".*$")
         pd.db['users'] = {}    # Delete all the users and flush certdb
         pd.db['certs'] = {}
