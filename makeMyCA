@@ -595,6 +595,8 @@ else
     [ -f $cf ] || errexit "? makeMyCA Configuration file '$cf' not found"
     echo "> Load CA configuration from '$cf'"
     readconfig $cf
+    isipaddr "$vpnaddr" && dsan="$vpnaddr,$thisfqdn" ||	dsan="$vpnaddr"
+    [ "$san2" == "" ] && san2x="$dsan" || san2x="$dsan,$san2"
 fi
 
 echo $"
