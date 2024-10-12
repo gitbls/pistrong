@@ -597,6 +597,7 @@ else
     readconfig $cf
     isipaddr "$vpnaddr" && dsan="$vpnaddr,$thisfqdn" ||	dsan="$vpnaddr"
     [ "$san2" == "" ] && san2x="$dsan" || san2x="$dsan,$san2"
+    [ "$emyipaddr" == "" ] && emyipaddr=$myipaddr
 fi
 
 echo $"
