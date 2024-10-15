@@ -762,12 +762,17 @@ else
     #
     # Fiddle a few things
     #
-    [ "$thishost" != "$thishostx" ] && fpack=0 || fpack=1
+    thishostx=$thishost
+    fpack=1
+    [ "$tunneltype" == "" ] && tunneltype="Site-to-Site"
+    #[ "$thishost" != "$thishostx" ] && fpack=0 || fpack=1
     [ "$tunneltype" == "Site-to-Site" ] && fsite=0 || fsite=1
     [ "$myip" == "" ] && myip="%any"
     [ "$rmip" == "" ] && rmip="%any"
     mytid="$thishost.$tunnelname.com"
     rtid="$rmhost.$tunnelname.com"
+    myrange="${mylanip%.*}.0/24"
+    rmrange="${rmlanip%.*}.0/24"
     dpddelay=10
     dpdaction=clear
     connrekeytime=86400
