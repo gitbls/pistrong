@@ -572,12 +572,7 @@ within the VPN configuration and can only be changed by rebuilding the CA and al
     askdefault "VPN SAN key for Windows users" winkey "$winkey"
 
     echo ""
-    if isipaddr "$vpnaddr"
-    then
-	dsan="$vpnaddr,$thisfqdn"
-    else
-	dsan="$vpnaddr"
-    fi
+    isipaddr "$vpnaddr" && dsan="$vpnaddr,$thisfqdn" || dsan="$vpnaddr"
     echo $"** Default secondary VPN SAN Key(s): '$dsan'
    You can add additional SAN Keys if desired
    Precede the string with a '%' (e.g., %newkey.foo.com) to replace the entire string
@@ -595,9 +590,16 @@ else
     [ -f $cf ] || errexit "? makeMyCA Configuration file '$cf' not found"
     echo "> Load CA configuration from '$cf'"
     readconfig $cf
-    isipaddr "$vpnaddr" && dsan="$vpnaddr,$thisfqdn" ||	dsan="$vpnaddr"
+    thisfqdn="$thishost.$thisdomain"
+    isipaddr "$vpnaddr" && dsan="$vpnaddr,$thisfqdn" || dsan="$vpnaddr"
     [ "$san2" == "" ] && san2x="$dsan" || san2x="$dsan,$san2"
     [ "$emyipaddr" == "" ] && emyipaddr=$myipaddr
+    mysubnetx="${myipaddr%.*}"    # Strip 4th octed
+    myfullsubnet="${mysubnetx}.0/24"
+    androidkey="android.$cnsuffix"
+    ioskey="ios.$cnsuffix"
+    linuxkey="linux.$cnsuffix"
+    winkey="windows.$cnsuffix"
 fi
 
 echo $"
