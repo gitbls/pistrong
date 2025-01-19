@@ -133,7 +133,7 @@ Now define the VPN connection:
 
 You can now connect to the VPN from your macOS device.
 
-## Windows 10 Cert Installation
+## Windows 10/11 Cert Installation
 
 * Install the certificate
     * Make the .p12 file available to the user, via mail, file share, etc.
@@ -162,7 +162,7 @@ You can now connect to the VPN from your macOS device.
         * Ensure *Use machine certificates* is selected
       *  Click *OK* or *Done* all the way out, and you can then close the Adapter Connections window and the Settings app.
 
-You can now connect to the VPN from your Windows 10 device.
+You can now connect to the VPN from your Windows 10/11 device.
 
 If you want to route all of your internet traffic over the VPN, as opposed to only traffic destined for your VPN server network, you need to enable *Use default gateway on remote network*, or disable Split Tunneling. There are two ways to do this.
 
